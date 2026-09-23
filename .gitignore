@@ -1,0 +1,23 @@
+# Secrets — never commit (API keys live here)
+.env
+.env.*
+!.env.example
+
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Regenerable build/runtime artefacts
+# parquet/pickle caches, rebuilt automatically (17 MB)
+ml/cache/
+# ADK dev-UI session database
+agent/.adk/
+.streamlit/secrets.toml
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
