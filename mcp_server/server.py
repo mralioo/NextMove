@@ -1,13 +1,15 @@
 """FastMCP server exposing the Berlin U-Bahn dataset + TabPFN prediction
 tools to any MCP client (the ADK agent in `agent/`, or any other).
 
-Scope right now: **Category D — station profiling** (the blueprint's "fast
+Scope right now: **Category C** (disruption response, mcp_server/disruption_tools.py) and
+**Category D — station profiling** (the blueprint's "fast
 path", e.g. training question 4: "At what time does commute flow peak at
 Rudow station, does it exceed the network mean?"), plus two prediction tools
 (`predict_overcrowding_risk` classification, `predict_expected_flow`
 regression) that demonstrate the TabPFN integration the wider design calls
 for. Categories A/B/C/E/F/G/H from docs/agentic_system_design.md are not
 wired up yet — this is the first vertical slice, not the full blueprint.
+(Update: Category C — disruption response — is now wired up, see disruption_tools.py.)
 
 Run standalone (stdio transport, for the ADK agent to spawn):
     ./.venv/bin/python mcp_server/server.py
@@ -21,7 +23,6 @@ ml/train_overcrowding_classifier.py's docstring for where to put it).
 from __future__ import annotations
 
 import difflib
-import os
 import sys
 from pathlib import Path
 
@@ -32,14 +33,16 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "dashboard"))
 sys.path.insert(0, str(REPO_ROOT / "ml"))
+sys.path.insert(0, str(REPO_ROOT / "mcp_server"))
 
 from env_loader import load_all_dotenvs  # noqa: E402
 from features import (  # noqa: E402
-    CATEGORICAL_COLUMNS,
     FEATURE_COLUMNS,
     build_feature_table,
     encode_categoricals,
 )
+from disruption_tools import register as register_disruption_tools  # noqa: E402
+from inference_models import load_or_fit_point_models  # noqa: E402
 from utils.data_loader import (  # noqa: E402
     DEFAULT_DATA_DIR,
     discover_dataset_dirs,
@@ -195,62 +198,18 @@ def _get_network_mean_weekday_peak() -> float:
     return _network_mean_weekday_peak_cache
 
 
-def _get_train_pool_dates() -> tuple[set, object]:
-    """Chronological train-pool dates, matching ml/train_overcrowding_classifier.py's
-    80/20 split, so predict tools can flag whether a queried row was inside the
-    model's training window (potential memorization) or genuinely held out."""
-    table = _get_feature_table()
-    dates = sorted(table["timestamp"].dt.date.unique())
-    cutoff = dates[int(len(dates) * 0.8)]
-    return {d for d in dates if d < cutoff}, cutoff
-
-
 def _fit_models() -> dict:
-    """Fit (once) a TabPFNClassifier on `overcrowded` and a TabPFNRegressor on
-    `passengers`, both on the same chronological-train-pool stratified sample
-    used by ml/train_overcrowding_classifier.py, so a live prediction here is
-    directly comparable to that script's offline evaluation."""
+    """Restore (or, first time only, fit and checkpoint) the TabPFN classifier + regressor.
+
+    Checkpoints live in ml/checkpoints/ (see ml/checkpoints.py): a server restart reuses the
+    saved models instead of re-fitting, and `make checkpoints` pre-builds them. The training
+    sample is the same stratified chronological-train-pool sample that
+    ml/train_overcrowding_classifier.py evaluates, so a live prediction is directly comparable
+    to that script's offline evaluation."""
     if _model_cache:
         return _model_cache
-
-    token = os.environ.get("TABPFN_API_TOKEN")
-    if not token:
-        raise RuntimeError(
-            "TABPFN_API_TOKEN not set. Add it to a .env file above this repo "
-            "(see ml/train_overcrowding_classifier.py docstring)."
-        )
-    import tabpfn_client
-    from tabpfn_client import TabPFNClassifier, TabPFNRegressor
-
-    tabpfn_client.set_access_token(token)
-
-    table = _get_feature_table()
-    train_dates, cutoff = _get_train_pool_dates()
-    train_pool = table[table["timestamp"].dt.date.isin(train_dates)]
-
-    # Same stratified-sample size/strategy as the offline training script.
-    n = min(8000, len(train_pool))
-    frac_pos = train_pool["overcrowded"].mean()
-    n_pos = min(int(round(n * max(frac_pos, 0.15))), (train_pool["overcrowded"] == 1).sum())
-    n_neg = min(n - n_pos, (train_pool["overcrowded"] == 0).sum())
-    sample = pd.concat([
-        train_pool[train_pool["overcrowded"] == 1].sample(n_pos, random_state=0),
-        train_pool[train_pool["overcrowded"] == 0].sample(n_neg, random_state=0),
-    ]).sample(frac=1, random_state=0).reset_index(drop=True)
-
-    X = encode_categoricals(sample[FEATURE_COLUMNS])
-    cat_idx = [FEATURE_COLUMNS.index(c) for c in CATEGORICAL_COLUMNS]
-
-    clf = TabPFNClassifier(model_path="v3.5_default", categorical_features_indices=cat_idx)
-    clf.fit(X, sample["overcrowded"])
-
-    reg = TabPFNRegressor(model_path="v3.5_default", categorical_features_indices=cat_idx)
-    reg.fit(X, sample["passengers"])
-
-    _model_cache["classifier"] = clf
-    _model_cache["regressor"] = reg
-    _model_cache["train_sample"] = sample
-    _model_cache["cutoff_date"] = cutoff
+    models = load_or_fit_point_models(_get_feature_table(), dataset_folder=_FOLDER)
+    _model_cache.update(models)
     return _model_cache
 
 
@@ -357,6 +316,10 @@ def predict_expected_flow(station_name: str, timestamp: str) -> dict:
         ),
         "model": "TabPFNRegressor(v3.5_default)",
     }
+
+
+# Category C (disruption response) tools — see mcp_server/disruption_tools.py
+register_disruption_tools(mcp, _FOLDER, _get_feature_table)
 
 
 if __name__ == "__main__":

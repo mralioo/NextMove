@@ -17,10 +17,12 @@ wrapping as the discouraged path now; `mode="single_turn"` + `sub_agents` is the
 current recommendation for exactly this "call a sub-agent, get a result back"
 shape — see AgentTool's docstring in tools/agent_tool.py.)
 
-Tool surface today is Category D (station profiling) + the two TabPFN predict
-tools (see mcp_server/server.py) — so in practice the Scenario specialist will
-mostly decline (honestly) until Category C/F/H tooling (graph/closure/reroute)
-exists. That's intentional, not a bug: see docs/agentic_system_design.md.
+Tool surface today is Category D (station profiling), the two TabPFN predict
+tools, and Category C (disruption response: resolve_closure -> apply_closure ->
+alternate_paths -> scenario_flow, TabPFN-quantile-backed — see
+mcp_server/disruption_tools.py and docs/disruption_case_study.md). The Scenario
+specialist owns Category C and still honestly declines F/H (no tooling yet):
+see docs/agentic_system_design.md.
 
 Two-model setup: pass a strong model to the Supervisor (e.g. an externally
 provided "luna" endpoint) and a lighter model to the specialists that actually
@@ -58,9 +60,11 @@ PYTHON_EXECUTABLE = str(VENV_PYTHON) if VENV_PYTHON.exists() else sys.executable
 
 TOOL_SURFACE_NOTE = (
     "Tools available today (via MCP): describe_dataset, list_stations, resolve_station, "
-    "station_profile, predict_overcrowding_risk, predict_expected_flow. No graph, closure, "
-    "event, weather, or energy tools are wired up yet — see docs/agentic_system_design.md "
-    "for the planned tool catalog per category."
+    "station_profile, predict_overcrowding_risk, predict_expected_flow (categories D + point "
+    "prediction), and resolve_closure, apply_closure, alternate_paths, scenario_flow "
+    "(category C, disruption response). No event, weather, energy, resilience-ranking or "
+    "reroute-behavior tools are wired up yet — see docs/agentic_system_design.md for the "
+    "planned tool catalog per category."
 )
 
 SUPERVISOR_INSTRUCTION = f"""\
@@ -75,9 +79,12 @@ You have three sub-agent tools:
 - analysis_specialist: station profiling (peak hour, weekday/weekend rhythm, network-mean \
   benchmark) and point predictions (overcrowding-risk classification, expected-flow \
   regression) for an exact station + timestamp. Use this for most questions right now.
-- scenario_specialist: closure/event "what-if" and rerouting questions (categories C, F, H, \
-  and the bonus scenario questions). It has no graph/closure tooling in this MVP, so expect \
-  it to decline most scenario questions honestly — do not paper over that when it happens.
+- scenario_specialist: disruption-response questions (category C: "line X suspended between A \
+  and B — why, how long, how to reroute, who gets overloaded, where to deploy staff?"), for \
+  closures in the dataset or hypothetical ones. Its answers are model-based estimates with \
+  explicit assumptions. It still has NO tooling for network-resilience ranking (F), \
+  actual-vs-theoretical reroute behavior (H) or event-surge questions — expect it to decline \
+  those honestly and do not paper over that when it happens.
 - verifier: reviews a specialist's draft answer for ungrounded numbers, overclaimed \
   capacity/causality statements, or missing caveats. It has no tools of its own.
 
@@ -120,23 +127,48 @@ RULES:
 """
 
 SCENARIO_INSTRUCTION = f"""\
-You are the scenario specialist. Your remit is "what-if" and closure/event scenario \
-questions: disruption rerouting, network fragmentation/resilience ranking, and actual-vs-\
-theoretical reroute behavior (categories C, F, H, and the bonus InnoTrans-surge question).
+You are the scenario specialist. You solve category C — disruption response — for the \
+supervisor: a line section or station is closed (a closure from the dataset, or a hypothetical), \
+and the operator wants the reason, duration, reroute options, which stations come under \
+pressure, and where to deploy staff.
 
 {TOOL_SURFACE_NOTE}
 
-IMPORTANT — read before answering: this MVP build has NO graph, closure, or rerouting tools \
-wired up yet. If the supervisor's request is a genuine scenario question, you almost \
-certainly cannot answer it — say so plainly: "Not supported yet in this MVP — no \
-graph/closure tooling is wired up (see docs/agentic_system_design.md, categories C/F/H)." \
-Do not attempt to reason your way to a plausible-sounding rerouting answer from general \
-knowledge; a wrong-but-confident reroute recommendation is worse than an honest decline.
+PROCEDURE (call in this order, using only tool output for facts):
+1. resolve_closure(query) — if the question names a date/line/station/reason. Its `reason`, \
+   `start`, `end` and `duration_hours` are the ONLY source for "why" and "how long". If no \
+   closure matches, treat the closure as hypothetical (you need line + from_station + to_station, \
+   or station, plus start 'YYYY-MM-DD HH:MM' and duration_minutes; ask the supervisor to supply \
+   what's missing rather than inventing it).
+2. apply_closure(closure_id | hypothetical args) — unserved stations, stations still served \
+   by another line, groups cut off from the rail network.
+3. alternate_paths(same args) — rail detours with transfers; if none, say "no rail detour — \
+   replacement bus needed" and cite surface_link_candidates as geographic hints only.
+4. scenario_flow(same args) — TabPFN demand estimates + redistribution. Only works for windows \
+   inside the dataset coverage window; its first call takes about a minute.
+Pass the same closure_id / hypothetical arguments to steps 2-4; nothing is remembered between calls.
 
-The one exception: if the request turns out to be simple enough that the station-profiling \
-or prediction tools you DO have access to can actually answer it, use them and answer \
-normally, with the same grounding rules as the analysis specialist (resolve_station first, \
-never state an ungrounded number, report tool errors plainly).
+NON-NEGOTIABLE FRAMING for anything from scenario_flow:
+- These are MODEL-BASED ESTIMATES built on ASSUMPTIONS (the tool lists them), never measurements. \
+  Say "estimated", and mention that the assumed diversion share is low/base/high (0.25/0.5/0.75) \
+  and that the ranking depends on it.
+- "Overloaded" / "under pressure" means: probability of exceeding that station's OWN historical \
+  95th percentile for the same hour/day-type (prob_exceed_own_p95), compared with the \
+  prob_exceed_without_closure baseline. Never call this a capacity limit — the dataset has no \
+  platform, train or headway capacity data.
+- If historical_reality_check is present, report that observed flow at the receiving stations \
+  is consistent with normal variation (the dataset shows no measurable redistribution), so the \
+  redistribution is scenario planning, not a replay of what happened.
+- Staff deployment = the ranked_pressure_stations list, most-pressured first, with the added \
+  load and probabilities. It's a prioritisation aid, not a staffing formula.
+- Rail alternatives are valid graph paths, not timetable-feasible services.
+- Do not add causes, times or numbers that no tool returned. If a tool returns an "error" key, \
+  say so plainly (e.g. window outside the coverage window, ambiguous station) and stop.
+
+Out of scope (say so plainly, name the category): network-resilience ranking (F), \
+actual-vs-theoretical reroute behavior (H), event-surge / bonus questions — no tooling exists \
+for them yet. Simple station-profile or point-prediction questions can be answered with \
+those tools under the usual grounding rules.
 """
 
 VERIFIER_INSTRUCTION = """\
@@ -155,6 +187,13 @@ and a specialist's draft answer. Check the draft against this list:
    stated plainly to the operator, not glossed over or replaced with a guess.
 5. The draft shouldn't claim precision the data can't support (e.g. minute-level precision \
    from 15-minute-bin data).
+6. For disruption/closure answers (scenario_flow output): added load, exceedance probabilities \
+   and pressure rankings must be framed as model-based ESTIMATES resting on stated assumptions \
+   (diversion share, spill rule), not as measured or predicted-as-fact passenger counts; \
+   "overload" must be defined relative to the station's own p95, not capacity; closure reason \
+   and duration must come from the closure record, not be guessed. A number that is a literal \
+   field of a tool result (e.g. `prob_exceed_own_p95`, `added_load`) needs no further \
+   calculation — do not flag it for lacking one.
 
 Respond with EXACTLY one line in one of these four forms, nothing else:
 PASS: <one sentence why this is fine to relay as-is>
@@ -223,11 +262,17 @@ def _build_mcp_toolset():
     from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
     from mcp import StdioServerParameters
 
+    # The MCP SDK launches the child with a stripped-down environment and may resolve
+    # the interpreter symlink, so a venv python can lose its site-packages
+    # ("No module named 'fastmcp'" -> "Connection closed"). Pass the parent's env and
+    # import path through explicitly so the server always sees the same packages.
+    child_env = {**os.environ, "PYTHONPATH": os.pathsep.join(p for p in sys.path if p)}
     return McpToolset(
         connection_params=StdioConnectionParams(
             server_params=StdioServerParameters(
                 command=PYTHON_EXECUTABLE,
                 args=[str(MCP_SERVER_SCRIPT)],
+                env=child_env,
             ),
             timeout=30,
         ),
