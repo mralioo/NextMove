@@ -23,6 +23,7 @@ Registered onto the shared FastMCP server by mcp_server/server.py.
 from __future__ import annotations
 
 import sys
+import threading
 from pathlib import Path
 from typing import Callable
 
@@ -60,24 +61,34 @@ def _jsonable(x):
 
 def register(mcp, folder: str, get_feature_table: Callable[[], pd.DataFrame]) -> None:
     state: dict = {}
+    net_lock, base_lock = threading.RLock(), threading.RLock()   # separate: a slow model load must not block cheap tools
 
     def net() -> D.Network:
-        if "net" not in state:
-            state["net"] = D.Network.from_frames(
-                load_stations(folder), load_connections(folder), station_cols(load_flows(folder)))
-        return state["net"]
+        with net_lock:
+            if "net" not in state:
+                state["net"] = D.Network.from_frames(
+                    load_stations(folder), load_connections(folder), station_cols(load_flows(folder)))
+            return state["net"]
 
     def closures() -> pd.DataFrame:
         return load_closures(folder).reset_index(drop=True)
 
     def baseline() -> DemandBaseline:
         """Prepared once; restored from the checkpoint (or fitted once) on first scenario_flow call."""
-        if "baseline" not in state:
-            state["baseline"] = DemandBaseline.prepare(get_feature_table(), closures(), dataset_folder=folder)
-        b = state["baseline"]
-        if not b.is_fitted:
-            b.restore_or_fit()
-        return b
+        with base_lock:
+            if "baseline" not in state:
+                state["baseline"] = DemandBaseline.prepare(get_feature_table(), closures(), dataset_folder=folder)
+            b = state["baseline"]
+            if not b.is_fitted:
+                b.restore_or_fit()
+            return b
+
+    def warm() -> None:
+        """Pre-load everything scenario_flow needs (called from a background thread at server start)."""
+        net()
+        b = baseline()
+        if b._pred_cache is None:
+            b._load_pred_cache()
 
     def build_spec(closure_id, line, from_station, to_station, station, start, duration_minutes):
         n = net()
@@ -198,7 +209,8 @@ def register(mcp, folder: str, get_feature_table: Callable[[], pd.DataFrame]) ->
         Window must lie inside the dataset coverage window. Output is a model-based
         demand-pressure estimate, NOT a measured capacity claim: the dataset has no
         capacity data, and its historical closures show no measurable redistribution.
-        Same arguments as apply_closure. First call fits the TabPFN model (~1 min)."""
+        Same arguments as apply_closure. Uses the checkpointed TabPFN model; predictions are cached,
+        so closures already seen (all 26 in the dataset are pre-warmed) answer instantly."""
         spec = build_spec(closure_id, line, from_station, to_station, station, start, duration_minutes)
         if isinstance(spec, str):
             return {"error": spec}
@@ -215,3 +227,5 @@ def register(mcp, folder: str, get_feature_table: Callable[[], pd.DataFrame]) ->
                 "staff-deployment candidates. Ranking depends on the assumed diversion share — "
                 "cite the low/high columns.")
         return _jsonable(result)
+
+    return warm

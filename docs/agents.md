@@ -1,5 +1,9 @@
 # Talk To My Train — Agents Overview & Session Summary
 
+> **Update:** the default agent is now the fast **router → executor → writer** pipeline (~4 s per answer) — see
+> `docs/latency_optimization.md`. The Supervisor / specialists / Verifier described below are the original
+> LLM loop, still available with `AGENT_MODE=llm` (~37 s).
+
 This is the agent-focused companion to `docs/system_design.md` (which covers MCP schemas,
 the TabPFN engine, and data-layer internals in full technical depth). This document
 covers: what's been built so far, which question category is currently solved, how the

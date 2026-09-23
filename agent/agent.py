@@ -53,6 +53,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 from env_loader import load_all_dotenvs  # noqa: E402
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from llm_config import litellm_params  # noqa: E402
+
 load_all_dotenvs()
 MCP_SERVER_SCRIPT = REPO_ROOT / "mcp_server" / "server.py"
 VENV_PYTHON = REPO_ROOT / ".venv" / "bin" / "python"
@@ -222,37 +225,11 @@ def _build_model(role: str):
         extracted from the api_base's query string automatically if `{role}_API_VERSION`
         isn't set explicitly.
     """
-    model_name = (
-        os.environ.get(f"{role}_LITELLM_MODEL")
-        or os.environ.get("WORKER_LITELLM_MODEL")
-        or os.environ.get("ADK_LITELLM_MODEL")
-    )
-    if not model_name:
+    cfg = litellm_params(role)
+    if cfg is None:
         return os.environ.get("ADK_MODEL", "gemini-2.5-flash")
-
+    model_name, kwargs = cfg
     from google.adk.models.lite_llm import LiteLlm
-
-    kwargs = {}
-    api_base = os.environ.get(f"{role}_API_BASE")
-    api_key = os.environ.get(f"{role}_API_KEY")
-    api_version = os.environ.get(f"{role}_API_VERSION")
-
-    if api_base:
-        from urllib.parse import parse_qs, urlparse
-
-        parsed = urlparse(api_base)
-        if "azure.com" in parsed.netloc:
-            if not api_version:
-                qs_version = parse_qs(parsed.query).get("api-version")
-                api_version = qs_version[0] if qs_version else None
-            api_base = f"{parsed.scheme}://{parsed.netloc}"
-            if not model_name.startswith("azure/"):
-                model_name = "azure/" + model_name.split("/", 1)[-1]
-        kwargs["api_base"] = api_base
-    if api_key:
-        kwargs["api_key"] = api_key
-    if api_version:
-        kwargs["api_version"] = api_version
 
     return LiteLlm(model=model_name, **kwargs)
 
@@ -322,4 +299,14 @@ def build_agent() -> Agent:
     )
 
 
-root_agent = build_agent()
+def build_root_agent():
+    """AGENT_MODE=fast (default): router -> executor -> writer pipeline (seconds).
+    AGENT_MODE=llm: the original Supervisor + specialists + Verifier LLM loop (~1 min, open-ended)."""
+    if os.environ.get("AGENT_MODE", "fast").lower() == "llm":
+        return build_agent()
+    from fast_agent import build_fast_agent
+
+    return build_fast_agent()
+
+
+root_agent = build_root_agent()

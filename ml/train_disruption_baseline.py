@@ -45,6 +45,7 @@ from env_loader import load_all_dotenvs  # noqa: E402
 from demand_baseline import MEAN_COL, Q_COLS, DemandBaseline, q_col  # noqa: E402
 from disruption import Network, _closure_to_spec, apply_closure  # noqa: E402
 from features import build_feature_table  # noqa: E402
+from table_cache import cached_feature_table  # noqa: E402
 from utils.data_loader import (  # noqa: E402
     DEFAULT_DATA_DIR,
     discover_dataset_dirs,
@@ -63,7 +64,7 @@ def build_baseline(folder: str) -> tuple[DemandBaseline, Network, pd.DataFrame]:
     closures = load_closures(folder)
     net = Network.from_frames(load_stations(folder), load_connections(folder),
                               station_cols(load_flows(folder)))
-    return DemandBaseline.prepare(build_feature_table(folder), closures, dataset_folder=folder), net, closures
+    return DemandBaseline.prepare(cached_feature_table(folder), closures, dataset_folder=folder), net, closures
 
 
 def case_study(base: DemandBaseline, net: Network, closures: pd.DataFrame) -> pd.DataFrame:
@@ -92,7 +93,7 @@ def case_study(base: DemandBaseline, net: Network, closures: pd.DataFrame) -> pd
         rows = t[t["station_name"].isin(role) & (t["timestamp"] >= start) & (t["timestamp"] < end)]
         if rows.empty:
             continue
-        pred = base.predict_quantiles(rows)
+        pred = base.predict_quantiles(rows, exact_mean=True)
         bl = base.baseline_columns(rows)
         df = rows[["timestamp", "station_name", "passengers"]].join(pred).join(bl)
         df["closure_id"] = i

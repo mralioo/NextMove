@@ -26,37 +26,57 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-from agent import build_agent
 
 APP_NAME = "talk_to_my_train"
 USER_ID = "operator"
 
 
-async def run(question: str) -> None:
-    agent = build_agent()
+async def run(question: str, trace: bool = False) -> None:
+    import time
+
+    t0 = time.time()
+    agent = build_agent_for_cli()
     session_service = InMemorySessionService()
     session = await session_service.create_session(app_name=APP_NAME, user_id=USER_ID)
     runner = Runner(agent=agent, app_name=APP_NAME, session_service=session_service)
-
     message = types.Content(role="user", parts=[types.Part(text=question)])
+    final = ""
     async for event in runner.run_async(user_id=USER_ID, session_id=session.id, new_message=message):
-        if event.content and event.content.parts:
-            for part in event.content.parts:
-                if part.function_call:
-                    print(f"[tool call] {part.function_call.name}({dict(part.function_call.args or {})})")
-                if part.function_response:
-                    print(f"[tool result] {part.function_response.name} -> {part.function_response.response}")
-                if part.text:
-                    print(part.text, end="")
-    print()
+        for part in (event.content.parts if event.content and event.content.parts else []):
+            if part.function_call and trace:
+                print(f"[tool call] {part.function_call.name}({dict(part.function_call.args or {})})")
+            if part.function_response and trace:
+                print(f"[tool result] {part.function_response.name} -> {str(part.function_response.response)[:300]}")
+            if part.text:
+                if event.is_final_response():
+                    final = part.text
+                elif trace:
+                    print(f"[{event.author}] {part.text[:600]}")
+    print(final)
+    total = time.time() - t0
+    st = (await session_service.get_session(app_name=APP_NAME, user_id=USER_ID, session_id=session.id)).state
+    tm = st.get("timing")
+    if tm:   # fast pipeline: per-stage breakdown
+        calls = ", ".join(f"{c['tool']} {c['s']}s" for c in tm.get("calls", []))
+        print(f"\n⏱ total {total:.1f}s · route {tm.get('route_ms')} ms (tier {tm.get('tier')}) · tools {tm.get('tools_s')}s "
+              f"[{calls}] · write {tm.get('write_s')}s ({tm.get('tok_in')}→{tm.get('tok_out')} tok) · guard: {tm.get('guard')}")
+    else:
+        print(f"\n⏱ total {total:.1f}s")
+
+
+def build_agent_for_cli():
+    """Honour AGENT_MODE (fast pipeline by default; AGENT_MODE=llm = the original LLM supervisor loop)."""
+    from agent import build_root_agent
+
+    return build_root_agent()
 
 
 def main() -> None:
     if len(sys.argv) < 2:
         print(__doc__)
         raise SystemExit(1)
-    question = " ".join(sys.argv[1:])
-    asyncio.run(run(question))
+    args = [a for a in sys.argv[1:] if a != "--trace"]
+    asyncio.run(run(" ".join(args), trace="--trace" in sys.argv))
 
 
 if __name__ == "__main__":

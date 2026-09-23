@@ -24,6 +24,8 @@ from __future__ import annotations
 
 import difflib
 import sys
+import threading
+import time
 from pathlib import Path
 
 import pandas as pd
@@ -36,16 +38,14 @@ sys.path.insert(0, str(REPO_ROOT / "ml"))
 sys.path.insert(0, str(REPO_ROOT / "mcp_server"))
 
 from env_loader import load_all_dotenvs  # noqa: E402
-from features import (  # noqa: E402
-    FEATURE_COLUMNS,
-    build_feature_table,
-    encode_categoricals,
-)
+from features import FEATURE_COLUMNS, encode_categoricals  # noqa: E402
+from table_cache import cached_feature_table  # noqa: E402
 from disruption_tools import register as register_disruption_tools  # noqa: E402
 from inference_models import load_or_fit_point_models  # noqa: E402
 from utils.data_loader import (  # noqa: E402
     DEFAULT_DATA_DIR,
     discover_dataset_dirs,
+    flows_long,
     hourly_profile,
     load_stations,
     station_avg_flow,
@@ -75,11 +75,15 @@ _model_cache: dict[str, object] = {}
 _network_mean_weekday_peak_cache: float | None = None
 
 
+_table_lock, _models_lock = threading.Lock(), threading.Lock()   # tool calls run in a thread pool; the warm-up thread shares these caches
+
+
 def _get_feature_table() -> pd.DataFrame:
     global _feature_table_cache
-    if _feature_table_cache is None:
-        _feature_table_cache = build_feature_table(_FOLDER)
-    return _feature_table_cache
+    with _table_lock:
+        if _feature_table_cache is None:
+            _feature_table_cache = cached_feature_table(_FOLDER)   # parquet cache: ~1 s instead of ~12 s
+        return _feature_table_cache
 
 
 def _all_station_names() -> list[str]:
@@ -206,11 +210,12 @@ def _fit_models() -> dict:
     sample is the same stratified chronological-train-pool sample that
     ml/train_overcrowding_classifier.py evaluates, so a live prediction is directly comparable
     to that script's offline evaluation."""
-    if _model_cache:
+    with _models_lock:
+        if _model_cache:
+            return _model_cache
+        models = load_or_fit_point_models(_get_feature_table(), dataset_folder=_FOLDER)
+        _model_cache.update(models)
         return _model_cache
-    models = load_or_fit_point_models(_get_feature_table(), dataset_folder=_FOLDER)
-    _model_cache.update(models)
-    return _model_cache
 
 
 def _seen_in_training_sample(models: dict, station_name: str, timestamp: str) -> bool:
@@ -319,7 +324,36 @@ def predict_expected_flow(station_name: str, timestamp: str) -> dict:
 
 
 # Category C (disruption response) tools — see mcp_server/disruption_tools.py
-register_disruption_tools(mcp, _FOLDER, _get_feature_table)
+_warm_disruption = register_disruption_tools(mcp, _FOLDER, _get_feature_table)
+
+
+def _warm_up() -> None:
+    """Runs in background threads right after start-up so the first question doesn't pay for cold start.
+    Category C first (checkpointed model + prediction cache), station-profile aggregates in parallel,
+    then the two point-prediction models. Tool calls that arrive earlier simply wait on the same locks."""
+    t0 = time.time()
+
+    def guarded(fn, label):
+        try:
+            fn()
+            print(f"[warm-up] {label} ready after {time.time() - t0:.1f}s", file=sys.stderr, flush=True)
+        except Exception as e:  # warm-up is best effort; the tools re-raise real errors themselves
+            print(f"[warm-up {label} skipped: {e}]", file=sys.stderr)
+
+    def category_c():
+        _warm_disruption()                         # hot path first: baseline model + prediction cache
+        threading.Thread(target=guarded, args=(_fit_models, "point-models"), daemon=True).start()
+
+    def profiles():
+        _get_network_mean_weekday_peak()          # heavy groupby used by station_profile
+        flows_long(_FOLDER)                       # cached melt used by hourly_profile
+
+    _get_feature_table()
+    for fn, label in ((category_c, "C"), (profiles, "D")):
+        threading.Thread(target=guarded, args=(fn, label), name=f"warm-{label}", daemon=True).start()
+
+
+threading.Thread(target=_warm_up, name="warm-up", daemon=True).start()
 
 
 if __name__ == "__main__":

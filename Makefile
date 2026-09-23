@@ -18,7 +18,7 @@ FREE_PORT   = $(shell $(if $(wildcard $(PY)),$(PY),python3) -c "import socket,sy
 .PHONY: help venv install install-ml install-mcp install-agent install-all \
         run build docker-run docker-stop docker-logs \
         train-overcrowding train-disruption train-all checkpoints test \
-        mcp-server agent-query agent-web agent-cli clean clean-venv
+        mcp-server agent-query agent-web agent-cli bench eval-router clean clean-venv
 
 ##@ Help
 help:  ## Show this list
@@ -95,6 +95,12 @@ agent-query:  ## One-shot question through the agent, e.g. make agent-query Q="L
 
 agent-web:  ## Open the ADK dev UI (tool calls, traces) on port 8000
 	$(VENV)/bin/adk web --port $(ADK_PORT) agent/
+
+bench:  ## Latency benchmark of the fast pipeline (8 questions, warm server); add ARGS="--show" to print answers
+	$(PY) agent/bench.py --wait $(ARGS)
+
+eval-router:  ## Accuracy of the deterministic question router on docs/test_questions.md (no LLM, no network)
+	$(PY) agent/eval_router.py
 
 agent-cli:  ## Chat with the agent in the terminal
 	$(VENV)/bin/adk run agent/

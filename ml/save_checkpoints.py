@@ -9,7 +9,8 @@ Checkpoints (ml/checkpoints/<name>/, see ml/checkpoints.py for the format):
     overcrowding_classifier   TabPFNClassifier overcrowding risk         (predict_overcrowding_risk)
     expected_flow_regressor   TabPFNRegressor  expected flow              (predict_expected_flow)
 
-The MCP server restores these on start-up, so inference never pays for a fresh fit.
+The MCP server restores these on start-up, so inference never pays for a fresh fit. The demand-baseline
+prediction cache for all dataset closures is warmed too (ml/cache/pred_cache_*.parquet).
 Requires TABPFN_API_TOKEN (the same account must load the checkpoints later).
 """
 from __future__ import annotations
@@ -31,6 +32,8 @@ from checkpoints import CHECKPOINT_DIR, write_manifest  # noqa: E402
 from features import build_feature_table  # noqa: E402
 from inference_models import load_or_fit_point_models  # noqa: E402
 from train_disruption_baseline import build_baseline  # noqa: E402
+from disruption import _closure_to_spec, apply_closure  # noqa: E402
+from scenario import run_scenario  # noqa: E402
 from utils.data_loader import DEFAULT_DATA_DIR, discover_dataset_dirs  # noqa: E402
 
 
@@ -46,6 +49,18 @@ def main() -> None:
     # The point models reuse the same feature table the baseline was prepared from.
     point = load_or_fit_point_models(base.table, dataset_folder=folder, force=force)
     status.update(point["status"])
+
+    # Pre-compute the scenario predictions for every closure in the dataset, so questions about them
+    # (the common case) are answered without any TabPFN API call.
+    t1 = time.time()
+    n_pred = 0
+    for i in range(len(_closures)):
+        spec = _closure_to_spec(_net, i, _closures.iloc[i])
+        if spec.get("warnings"):
+            continue
+        run_scenario(_net, base, apply_closure(_net, spec))
+    n_pred = len(base._pred_cache or {})
+    print(f"Prediction cache warmed for {len(_closures)} closures: {n_pred} station-slot rows ({time.time() - t1:.0f}s)")
 
     write_manifest()
     print(f"\nCheckpoints in {CHECKPOINT_DIR} ({time.time() - t0:.0f}s):")

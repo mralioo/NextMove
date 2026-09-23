@@ -78,7 +78,7 @@ def save_checkpoint(name: str, estimator, train_sample: pd.DataFrame, meta: dict
 
 def restore_checkpoint(
     name: str, estimator_cls, fingerprint: str, encode: Callable[[pd.DataFrame], pd.DataFrame],
-    target_col: str,
+    target_col: str, probe: bool = True,
 ):
     """Returns (estimator, train_sample, meta, status) or None if there is no usable checkpoint.
     status is 'loaded' (server still had the fit) or 'refit-from-checkpoint'."""
@@ -94,6 +94,10 @@ def restore_checkpoint(
 
     authenticate()
     est = estimator_cls.load_model(d / "model.json")
+    if not probe:
+        # Latency-critical callers skip the verification round trip (~3 s); they must handle a
+        # forgotten fit themselves (see DemandBaseline._predict_grid -> refit_from_checkpoint).
+        return est, sample, meta, "loaded"
     try:
         est.predict(encode(sample.head(1)))          # probe: does the server still hold the fit?
         return est, sample, meta, "loaded"
@@ -105,6 +109,18 @@ def restore_checkpoint(
         (d / "meta.json").write_text(json.dumps(meta, indent=2, default=str) + "\n")
         write_manifest()
         return est, sample, meta, "refit-from-checkpoint"
+
+
+def refit_from_checkpoint(name: str, est, X: pd.DataFrame, y: pd.Series) -> None:
+    """Refit `est` on the checkpoint's saved rows and rewrite its model record."""
+    d = _dir(name)
+    est.fit(X, y)
+    est.save_model(d / "model.json")
+    meta = json.loads((d / "meta.json").read_text())
+    meta["refit_at"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    meta["model_id"] = est.model_id_
+    (d / "meta.json").write_text(json.dumps(meta, indent=2, default=str) + "\n")
+    write_manifest()
 
 
 def write_manifest() -> Path:
