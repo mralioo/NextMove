@@ -1,0 +1,108 @@
+{
+  "heldout_metrics": {
+    "n_train_sample": 10000,
+    "n_test_rows": 4000,
+    "train_days_before": "2026-09-02",
+    "tabpfn_median": {
+      "mae": 74.62
+    },
+    "tabpfn_mean": {
+      "rmse": 135.61,
+      "r2": 0.3538
+    },
+    "baseline_station_slot_mean": {
+      "mae": 77.87,
+      "rmse": 135.05,
+      "r2": 0.3592
+    },
+    "baseline_station_slot_median": {
+      "mae": 75.42
+    },
+    "baseline_global_mean": {
+      "mae": 110.31
+    },
+    "interval_coverage": {
+      "80% (q10-q90)": 0.786,
+      "90% (q05-q95)": 0.897,
+      "95% (q025-q975)": 0.948
+    },
+    "baseline_interval_coverage": {
+      "80% (q10-q90)": 0.817,
+      "90% (q05-q95)": 0.916,
+      "95% (q025-q975)": 0.954
+    },
+    "mean_interval_width_80": 237.28,
+    "baseline_mean_interval_width_80": 239.68,
+    "mean_pinball_loss": {
+      "tabpfn": 22.137,
+      "baseline_empirical_quantiles": 22.25,
+      "skill_vs_baseline": 0.0051
+    }
+  },
+  "case_study_summary": {
+    "line_section/closed_unserved": {
+      "rows": 412,
+      "observed_over_expected": 1.06,
+      "observed_over_slot_mean": 1.083,
+      "baseline_share_above_q90": 0.083,
+      "share_inside_80pct_interval": 0.813,
+      "share_above_q90": 0.087,
+      "share_below_q10": 0.1
+    },
+    "line_section/endpoint_or_interchange": {
+      "rows": 382,
+      "observed_over_expected": 1.005,
+      "observed_over_slot_mean": 1.01,
+      "baseline_share_above_q90": 0.084,
+      "share_inside_80pct_interval": 0.785,
+      "share_above_q90": 0.115,
+      "share_below_q10": 0.099
+    },
+    "line_section/hop1": {
+      "rows": 474,
+      "observed_over_expected": 0.949,
+      "observed_over_slot_mean": 0.96,
+      "baseline_share_above_q90": 0.093,
+      "share_inside_80pct_interval": 0.804,
+      "share_above_q90": 0.097,
+      "share_below_q10": 0.099
+    },
+    "line_section/hop2": {
+      "rows": 602,
+      "observed_over_expected": 1.041,
+      "observed_over_slot_mean": 1.057,
+      "baseline_share_above_q90": 0.086,
+      "share_inside_80pct_interval": 0.792,
+      "share_above_q90": 0.118,
+      "share_below_q10": 0.09
+    },
+    "station/closed_unserved": {
+      "rows": 120,
+      "observed_over_expected": 0.0,
+      "observed_over_slot_mean": 0.0,
+      "baseline_share_above_q90": 0.0,
+      "share_inside_80pct_interval": 0.05,
+      "share_above_q90": 0.0,
+      "share_below_q10": 0.95
+    },
+    "station/hop1": {
+      "rows": 242,
+      "observed_over_expected": 0.834,
+      "observed_over_slot_mean": 0.825,
+      "baseline_share_above_q90": 0.083,
+      "share_inside_80pct_interval": 0.773,
+      "share_above_q90": 0.107,
+      "share_below_q10": 0.12
+    },
+    "station/hop2": {
+      "rows": 258,
+      "observed_over_expected": 0.841,
+      "observed_over_slot_mean": 0.821,
+      "baseline_share_above_q90": 0.074,
+      "share_inside_80pct_interval": 0.748,
+      "share_above_q90": 0.101,
+      "share_below_q10": 0.151
+    }
+  },
+  "n_closures": 26
+}

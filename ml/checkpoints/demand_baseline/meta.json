@@ -1,0 +1,74 @@
+{
+  "task": "regression",
+  "target": "passengers (per station per 15 min)",
+  "description": "Counterfactual demand baseline (predictive distribution) for Category C",
+  "n_features": 17,
+  "features": [
+    "hour",
+    "slot",
+    "dow",
+    "is_weekend",
+    "month",
+    "station_avg_passengers",
+    "station_slot_mean",
+    "n_lines",
+    "is_interchange",
+    "primary_line",
+    "temp",
+    "prcp",
+    "wspd",
+    "cldc",
+    "coco",
+    "daily_event_count",
+    "daily_event_attendance"
+  ],
+  "tabpfn_model": "v3.5_default",
+  "fingerprint": "1a34b7202326e65c",
+  "dataset_folder": "data/training dataset",
+  "train_days_before": "2026-09-02",
+  "metrics": {
+    "n_train_sample": 10000,
+    "n_test_rows": 4000,
+    "train_days_before": "2026-09-02",
+    "tabpfn_median": {
+      "mae": 74.62
+    },
+    "tabpfn_mean": {
+      "rmse": 135.61,
+      "r2": 0.3538
+    },
+    "baseline_station_slot_mean": {
+      "mae": 77.87,
+      "rmse": 135.05,
+      "r2": 0.3592
+    },
+    "baseline_station_slot_median": {
+      "mae": 75.42
+    },
+    "baseline_global_mean": {
+      "mae": 110.31
+    },
+    "interval_coverage": {
+      "80% (q10-q90)": 0.786,
+      "90% (q05-q95)": 0.897,
+      "95% (q025-q975)": 0.948
+    },
+    "baseline_interval_coverage": {
+      "80% (q10-q90)": 0.817,
+      "90% (q05-q95)": 0.916,
+      "95% (q025-q975)": 0.954
+    },
+    "mean_interval_width_80": 237.28,
+    "baseline_mean_interval_width_80": 239.68,
+    "mean_pinball_loss": {
+      "tabpfn": 22.137,
+      "baseline_empirical_quantiles": 22.25,
+      "skill_vs_baseline": 0.0051
+    }
+  },
+  "name": "demand_baseline",
+  "saved_at": "2026-09-23T17:22:08+00:00",
+  "tabpfn_client_version": "0.6.0",
+  "model_id": "01a0cf49-602a-7ba3-88ea-c73ea5d6fa82",
+  "n_train_rows": 10000
+}

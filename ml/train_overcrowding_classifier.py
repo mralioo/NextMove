@@ -122,8 +122,19 @@ def main() -> None:
     print("Confusion matrix [rows=true, cols=pred] (normal, overcrowded):")
     print(confusion_matrix(y_test, y_pred))
 
+    # Naive baseline for the dashboard's comparison: historical overcrowding rate of the same
+    # station, day-type and hour, learned from the train pool only (no model, no weather).
+    rate = (train_pool.groupby(["station_name", "is_weekend", "hour"])["overcrowded"].mean()
+            .rename("baseline_probability").reset_index())
+    test_keys = test_df[["station_name", "is_weekend", "hour"]].merge(
+        rate, on=["station_name", "is_weekend", "hour"], how="left")
+    baseline_p = test_keys["baseline_probability"].fillna(float(train_pool["overcrowded"].mean())).to_numpy()
+    print(f"Baseline (station x day-type x hour rate): ROC-AUC {roc_auc_score(y_test, baseline_p):.3f}, "
+          f"PR-AUC {average_precision_score(y_test, baseline_p):.3f}")
+
     OUTPUT_DIR.mkdir(exist_ok=True)
     out = test_df[["timestamp", "station_name", "passengers", "overcrowded"]].reset_index(drop=True)
+    out["baseline_probability"] = baseline_p
     out["predicted_overcrowded"] = y_pred
     out["overcrowd_probability"] = y_proba
     out_path = OUTPUT_DIR / "overcrowding_predictions.csv"
