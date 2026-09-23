@@ -199,6 +199,20 @@ dropped.
 
 ---
 
+### 4.4 Category C — TabPFN demand baseline (`ml/demand_baseline.py`, `ml/scenario.py`)
+
+Regression counterpart to the overcrowding classifier: `TabPFNRegressor` with
+`output_type="quantiles"` + `"mean"` predicts each station's counterfactual demand
+distribution per 15-min slot, trained on a 10k-row sample of non-closure rows with leak-safe
+profile features. Held-out MAE 74.6 (vs 77.9 profile-mean baseline), 80/90/95 % interval coverage
+78.6/89.7/94.8 %. `scenario.run_scenario` layers explicit redistribution assumptions on top and
+returns per-station P(> own p95). Full method, numbers, and the 26-closure case study:
+`docs/disruption_case_study.md`. Train/evaluate: `make train-disruption`.
+
+MCP tools (`mcp_server/disruption_tools.py`, registered on the same server):
+`resolve_closure`, `apply_closure`, `alternate_paths`, `scenario_flow`. After the first
+`scenario_flow` call per process the TabPFN model is fitted once and cached.
+
 ## 5. MCP server (`mcp_server/server.py`)
 
 FastMCP server, stdio transport, one instance spawned per specialist agent. Six tools,
