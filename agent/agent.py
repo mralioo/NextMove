@@ -310,3 +310,11 @@ def build_root_agent():
 
 
 root_agent = build_root_agent()
+
+# `adk web` / `adk run` load `app` in preference to `root_agent`, so the observability plugin (traces + one
+# `runs` row per question in observability/agent_obs.db) is active there too. Runners we build ourselves
+# (run_query, bench, evaluation) pass `app=app` for the same effect.
+from google.adk.apps import App  # noqa: E402
+from observability import build_plugin  # noqa: E402
+
+app = App(name="agent", root_agent=root_agent, plugins=[build_plugin()])

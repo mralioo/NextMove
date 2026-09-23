@@ -3,7 +3,8 @@ FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     DATA_DIR=/app/data \
-    RESULTS_DIR=/app/ml_output
+    RESULTS_DIR=/app/ml_output \
+    OBS_DB=/app/observability/agent_obs.db
 
 WORKDIR /app
 

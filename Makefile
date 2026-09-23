@@ -18,7 +18,7 @@ FREE_PORT   = $(shell $(if $(wildcard $(PY)),$(PY),python3) -c "import socket,sy
 .PHONY: help venv install install-ml install-mcp install-agent install-all \
         run build docker-run docker-stop docker-logs \
         train-overcrowding train-disruption train-all checkpoints test \
-        mcp-server agent-query agent-web agent-cli bench eval-router clean clean-venv
+        mcp-server agent-query agent-web agent-cli bench eval-router eval experiments experiments-report jev-check clean-obs clean clean-venv
 
 ##@ Help
 help:  ## Show this list
@@ -62,6 +62,7 @@ docker-run: build  ## Run the dashboard in Docker (mounts data/ and ml/output/) 
 	 docker run --rm -d --name $(IMAGE_NAME) -p $$port:8501 \
 		-v "$(DATA_DIR):/app/data:ro" \
 		-v "$(CURDIR)/ml/output:/app/ml_output:ro" \
+		-v "$(CURDIR)/observability:/app/observability" \
 		$(IMAGE_NAME) && echo "Dashboard → http://localhost:$$port"
 
 docker-stop:  ## Stop and remove the dashboard container
@@ -98,6 +99,21 @@ agent-web:  ## Open the ADK dev UI (tool calls, traces) on port 8000
 
 bench:  ## Latency benchmark of the fast pipeline (8 questions, warm server); add ARGS="--show" to print answers
 	$(PY) agent/bench.py --wait $(ARGS)
+
+eval:  ## Stress-test the agent with ONE brutal multi-part question (1 call to the shared LLM); ARGS="--cheap" for the small model, "--suite training --allow-many" for the 11 workbook questions
+	$(PY) evaluation/run_eval.py $(ARGS)
+
+experiments:  ## Component-comparison study (2 questions x 12 arms: router / memory / MCP transport / ML engine / writer); ARGS="--list" shows the design, "--arms A00,M1,M2" a subset
+	$(PY) experiments/run_experiments.py $(ARGS)
+
+experiments-report:  ## Regenerate the results tables inside docs/experiments_plan.md from the latest experiment run (or EXP=exp-...)
+	$(PY) experiments/report.py $(EXP)
+
+jev-check:  ## Send ONE public question to the JEV API to verify JEV_API_KEY and the response format (sends data to a third party)
+	$(PY) agent/router_jev.py
+
+clean-obs:  ## Delete the observability database (runs, traces, eval results)
+	rm -f observability/agent_obs.db observability/agent_obs.db-wal observability/agent_obs.db-shm
 
 eval-router:  ## Accuracy of the deterministic question router on docs/test_questions.md (no LLM, no network)
 	$(PY) agent/eval_router.py

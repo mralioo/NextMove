@@ -16,11 +16,17 @@ Use:  data = await mcp.call("scenario_flow", closure_id=8)      (returns the too
 from __future__ import annotations
 
 import asyncio
+import atexit
 import os
+import socket
+import subprocess
 import sys
 import threading
 import time
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from config import CONFIG  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SERVER = REPO_ROOT / "mcp_server" / "server.py"
@@ -45,11 +51,36 @@ class McpRuntime:
     async def _start(self) -> None:
         try:
             from fastmcp import Client
-            from fastmcp.client.transports import PythonStdioTransport
 
-            env = {**os.environ, "PYTHONPATH": os.pathsep.join(p for p in sys.path if p)}
-            transport = PythonStdioTransport(SERVER, python_cmd=sys.executable, env=env, keep_alive=True)
-            self._client = Client(transport, timeout=120)
+            self.transport_kind = CONFIG.mcp
+            if CONFIG.mcp == "inmemory":
+                # server in THIS process: full MCP protocol semantics, but no subprocess and no pipes
+                sys.path.insert(0, str(SERVER.parent))
+                import importlib
+
+                self._client = Client(importlib.import_module("server").mcp, timeout=120)
+            elif CONFIG.mcp == "http":
+                # server as a separate process, reached over streamable HTTP on localhost
+                with socket.socket() as sk:
+                    sk.bind(("127.0.0.1", 0))
+                    port = sk.getsockname()[1]
+                env = {**os.environ, "MCP_TRANSPORT": "http", "MCP_PORT": str(port),
+                       "PYTHONPATH": os.pathsep.join(p for p in sys.path if p)}
+                self._proc = subprocess.Popen([sys.executable, str(SERVER)], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                atexit.register(self.shutdown)
+                for _ in range(240):                       # wait until the HTTP server accepts connections
+                    try:
+                        socket.create_connection(("127.0.0.1", port), timeout=0.25).close()
+                        break
+                    except OSError:
+                        await asyncio.sleep(0.25)
+                self._client = Client(f"http://127.0.0.1:{port}/mcp", timeout=120)
+            else:
+                from fastmcp.client.transports import PythonStdioTransport
+
+                env = {**os.environ, "PYTHONPATH": os.pathsep.join(p for p in sys.path if p)}
+                transport = PythonStdioTransport(SERVER, python_cmd=sys.executable, env=env, keep_alive=True)
+                self._client = Client(transport, timeout=120)
             await self._client.__aenter__()
             self.ready_after = time.time() - self.started_at
         except Exception as e:  # surfaced on the first call
@@ -57,14 +88,26 @@ class McpRuntime:
         finally:
             self._ready.set()
 
+    def shutdown(self) -> None:
+        """Stop a server process this runtime started (http mode); stdio children exit with their pipe."""
+        proc = getattr(self, "_proc", None)
+        if proc and proc.poll() is None:
+            proc.terminate()
+
     # -- public API ------------------------------------------------------------------------
     async def call(self, tool: str, **args):
         """Call an MCP tool; returns the decoded JSON result (dict/list)."""
-        await asyncio.get_running_loop().run_in_executor(None, self._ready.wait)
-        if self._error:
-            raise RuntimeError(f"MCP server failed to start: {self._error}")
-        fut = asyncio.run_coroutine_threadsafe(self._call(tool, args), self.loop)
-        return await asyncio.wrap_future(fut)
+        from observability import set_attr, span
+
+        with span(f"mcp.tool {tool}", **{"tmt.tool": tool, "tmt.args": {k: v for k, v in args.items() if v is not None}}) as sp:
+            await asyncio.get_running_loop().run_in_executor(None, self._ready.wait)
+            if self._error:
+                raise RuntimeError(f"MCP server failed to start: {self._error}")
+            fut = asyncio.run_coroutine_threadsafe(self._call(tool, args), self.loop)
+            result = await asyncio.wrap_future(fut)
+            if isinstance(result, dict) and "error" in result:
+                set_attr(sp, "tmt.tool_error", str(result["error"])[:300])
+            return result
 
     async def _call(self, tool: str, args: dict):
         args = {k: v for k, v in args.items() if v is not None}

@@ -239,7 +239,8 @@ def route(question: str, has_history: bool = False) -> dict:
     if scores[top] > 0:
         margin = scores[top] - scores[second]
         conf = min(1.0, scores[top] / 3.0) * (1.0 if margin >= 1.0 else 0.65)
-    if OOS.search(q) and not (top in ("C", "D") and scores[top] >= 3 and not re.search(r"capacity|safely hold", q, re.I)):
+    oos_hits = sorted({m.group(0).lower() for m in OOS.finditer(q)})
+    if oos_hits and not (top in ("C", "D") and scores[top] >= 3 and not re.search(r"capacity|safely hold", q, re.I)):
         cat, conf = "OOS", 0.9
     if follow:
         cat, conf = "FOLLOW", 0.9
@@ -247,23 +248,25 @@ def route(question: str, has_history: bool = False) -> dict:
         cat = "OOS"
     what_if = bool(re.search(r"\bwhat if\b|\bsuppose\b|\bimagine\b|\bwould be suspended\b", q, re.I))
     return {"cat": cat, "conf": round(conf, 2), "tier": 0, **CAT_DATA.get(cat, {}), "lines": list(dict.fromkeys(lines)),
-            "stations": stations, "raw": [], "dates": find_dates(q), "month": find_month(q), "time": find_time(q),
+            "stations": stations, "raw": [], "dates": find_dates(q), "month": find_month(q), "oos": oos_hits, "time": find_time(q),
             "dur_min": find_duration_min(q), "what_if": what_if, "follow": follow}
 
 
 ROUTER_SYSTEM = (
     "Route a Berlin U-Bahn operator question. Reply with ONE JSON object, no prose:\n"
-    '{"cat":"A|B|C|D|E|F|G|H|X|OOS","lines":["U6"],"places":["as written by user"],'
+    '{"cat":"A|B|C|D|E|F|G|H|X|OOS|FOLLOW","lines":["U6"],"places":["as written by user"],'
     '"dates":["YYYY-MM-DD"],"time":"HH:MM|null","dur_min":null,"what_if":false}\n'
     "A=event impact on stations, B=anomaly/root cause, C=line/station closure response (reroute, overload, staff), "
     "D=one station's flow profile/peak/prediction, E=energy per passenger, F=network fragmentation/critical stations, "
     "G=correlated stations, H=how passengers actually reroute, X=investment/InnoTrans/Messe, "
-    "OOS=needs data we lack (capacity, delays, costs, forecasts beyond 2026-09-22, off-topic). Year is 2026."
+    "OOS=needs data we lack (capacity, delays, costs, forecasts beyond 2026-09-22, off-topic). Year is 2026. "
+    "If HISTORY=yes and the message only refers back to the previous answer ('those stations', 'how sure'), use FOLLOW."
 )
 
 
-async def llm_route(question: str, base_plan: dict) -> dict:
-    """Tier 1: small JSON-only LLM call, used only when the deterministic router is unsure."""
+async def llm_route(question: str, base_plan: dict, has_history: bool = False) -> dict:
+    """Tier 1: small JSON-only LLM call, used when the deterministic router is unsure (or always, in the
+    `router=llm` experiment arm)."""
     import litellm
 
     from llm_config import litellm_params, sampling_params
@@ -273,19 +276,23 @@ async def llm_route(question: str, base_plan: dict) -> dict:
         return base_plan
     model, kw = cfg
     resp = await litellm.acompletion(
-        model=model, messages=[{"role": "system", "content": ROUTER_SYSTEM}, {"role": "user", "content": question}],
+        model=model, messages=[{"role": "system", "content": ROUTER_SYSTEM},
+                            {"role": "user", "content": f"HISTORY={'yes' if has_history else 'no'}\n{question}"}],
         max_tokens=160, **sampling_params(model, 0), response_format={"type": "json_object"}, timeout=12, **kw)
     try:
         j = json.loads(resp.choices[0].message.content)
     except (json.JSONDecodeError, TypeError):
         return base_plan
     plan = dict(base_plan)
-    plan.update(tier=1, cat=j.get("cat", plan["cat"]) if j.get("cat") in {*"ABCDEFGHX", "OOS"} else plan["cat"],
+    plan.update(tier=1, cat=j.get("cat", plan["cat"]) if j.get("cat") in {*"ABCDEFGHX", "OOS", "FOLLOW"} else plan["cat"],
                 conf=0.8, raw=[p for p in j.get("places", []) if isinstance(p, str)])
     plan["lines"] = plan["lines"] or [l for l in j.get("lines", []) if isinstance(l, str)]
-    plan["dates"] = plan["dates"] or [d for d in j.get("dates", []) if isinstance(d, str)]
-    plan["time"] = plan["time"] or j.get("time")
-    plan["dur_min"] = plan["dur_min"] or j.get("dur_min")
+    plan["dates"] = plan["dates"] or [d for d in j.get("dates", []) if isinstance(d, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", d)]
+    llm_time = j.get("time")
+    llm_time = llm_time if isinstance(llm_time, str) and re.fullmatch(r"\d{1,2}:\d{2}", llm_time.strip()) else None   # "null"/"None" -> None
+    plan["time"] = plan["time"] or llm_time
+    plan["dur_min"] = plan["dur_min"] or (j.get("dur_min") if isinstance(j.get("dur_min"), (int, float)) else None)
     plan["what_if"] = plan["what_if"] or bool(j.get("what_if"))
     plan.update(CAT_DATA.get(plan["cat"], {}))
+    plan["follow"] = plan["cat"] == "FOLLOW"
     return plan

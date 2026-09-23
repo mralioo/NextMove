@@ -94,6 +94,7 @@ class DemandBaseline:
     _pred_cache: dict | None = None             # (station, timestamp) -> [13 quantiles..., mean]
     _pred_cache_dirty: bool = False
     _verified: bool = True                      # False when restored without probing the server
+    engine: str = "tabpfn"                      # "empirical" = naive station x hour quantiles, no ML (experiment arm)
 
     # ------------------------------------------------------------------ prepare
     @classmethod
@@ -208,7 +209,15 @@ class DemandBaseline:
 
     @property
     def is_fitted(self) -> bool:
-        return self._model is not None
+        return self._model is not None or self.engine == "empirical"
+
+    def _empirical(self, rows: pd.DataFrame) -> pd.DataFrame:
+        """The non-ML engine: the empirical station x day-type x hour quantiles (and slot mean) as the 'prediction'."""
+        bl = self.baseline_columns(rows)
+        out = bl[[f"b_{c}" for c in Q_COLS]].copy()
+        out.columns = Q_COLS
+        out[MEAN_COL] = bl["baseline_mean"].to_numpy()
+        return out
 
     # ------------------------------------------------------------------ checkpoint
     CHECKPOINT_NAME = "demand_baseline"
@@ -301,6 +310,8 @@ class DemandBaseline:
         output (a second call, no cache) — used for evaluation so published metrics stay reproducible."""
         if not self.is_fitted:
             raise RuntimeError("call fit() first")
+        if self.engine == "empirical":
+            return self._empirical(rows)
         if exact_mean:
             X = self._encode(rows)
             parts, means = [], []

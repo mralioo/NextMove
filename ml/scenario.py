@@ -143,7 +143,8 @@ def run_scenario(net: Network, baseline: DemandBaseline, effect: ClosureEffect,
         "n_receiver_stations": len(receivers),
         "data_mode": "model-based estimate, NOT a measurement",
         "assumptions": ASSUMPTIONS,
-        "model": "TabPFNRegressor quantile baseline (see ml/demand_baseline.py)",
+        "model": ("empirical station x hour quantiles (no ML)" if baseline.engine == "empirical"
+                  else "TabPFNRegressor quantile baseline (see ml/demand_baseline.py)"),
     }
 
     # ---- reality check against the historical rows, when the closure is in the dataset ----

@@ -29,7 +29,8 @@ Format:
 Rules:
 - Every number must appear in FACTS. Never invent, add, subtract or recompute numbers.
 - status "need": ask for exactly the missing input, in one sentence (list options if given).
-- status "unsupported"/"oos": max 60 words, no Key facts. One sentence: it cannot be answered from this dataset/tool yet (say why in plain words). Add "finding" if present. One sentence offering what IS possible (see "have"). Never list things that are unavailable as bullets.
+- status "unsupported"/"oos": max 60 words, no Key facts. One sentence: it cannot be answered yet, giving the reason from facts.reason / facts.note in plain words (NEVER claim the dataset lacks data unless the note says so; for "unsupported" the data exists and the tool is not connected yet). Add "finding" if present. One sentence offering what IS possible (see "have"). Never list things that are unavailable as bullets.
+- status "error": one or two sentences: a data tool failed while answering, say what could not be done, and suggest retrying or rephrasing (e.g. a specific date/time inside 2026-06-10..2026-09-22). No numbers.
 - status "follow": answer the follow-up from facts.prev only. For "how confident / measured vs assumed" questions: measured = closure record, station graph, past flows; modelled = normal demand per station (TabPFN forecast); assumed = share of passengers who divert and where they go (codes A1-A5). Say which numbers are which and that pressure is a scenario, not a prediction of what will happen.
 - Write pressure as: "X% chance of exceeding its own busiest-5% level (Y% normally)". It is NOT a capacity limit. Never use the word "capacity" except to say none is known, and never claim measured overload.
 - alt.bus are only the closest station pairs across the cut: say "a replacement bus between A and B (about N km) would be needed". Never say a bus service exists.
@@ -62,7 +63,13 @@ def _allowed_numbers(facts: dict, question: str = "") -> set[float]:
     nums = {_val(m) for m in _NUM.findall(txt)}
     extra = set()
     for n in nums:
-        extra.update({round(n), round(n, 1), n * 60, n / 60, round(n * 100)})
+        extra.update({round(n), round(n, 1)})
+        if 0 < n <= 1:
+            extra.add(round(n * 100))                  # a fraction quoted as a percentage
+        if 0 < n <= 6 and (n * 10) % 5 == 0:
+            extra.add(n * 60)                          # a duration in hours quoted in minutes (1.5 h -> 90 min); NOT hours-of-day
+        if n >= 30 and n % 30 == 0:
+            extra.add(n / 60)                          # minutes quoted as hours (90 min -> 1.5 h)
     return nums | extra | set(map(float, STATIC_OK))
 
 
@@ -73,7 +80,7 @@ def find_ungrounded(answer: str, facts: dict, question: str = "") -> list[str]:
         v = _val(tok)
         if v <= 12 and float(v).is_integer():
             continue                                   # counts / hours-of-day
-        if any(abs(v - a) <= max(0.51, 0.01 * abs(a)) for a in allowed):
+        if any(abs(v - a) <= max(0.51, 0.002 * abs(a)) for a in allowed):     # rounding only, never a different number
             continue
         bad.append(tok)
     return bad
@@ -83,6 +90,10 @@ _BANNED = [
     (re.compile(r"(exceed\w*|above|over|beyond|reach\w*|surpass\w*)\s+(its |their |the |a )?(peak |platform |station |train |safe )?capacity|"
                 r"capacity\s+(is|was|will be|would be|has been)\s+(exceeded|reached|breached)", re.I), "capacity claim"),
     (re.compile(r"bus(es)? (service|line)s? (is|are) (available|running|operating)", re.I), "bus service claim"),
+    # found by the component experiments (arm A00, follow-up): the pressure ranking is a model-based scenario, never a measurement
+    (re.compile(r"(?<!not a )(?<!not )(?<!no )based on (the )?(measured|observed) (pressure|demand|overload)|"
+                r"(?<!not a )(?<!not )(?<!no )\bmeasured (pressure|overload|ranking)|"
+                r"(pressure|ranking)\s+(is|was)\s+(measured|observed)", re.I), "measured-pressure claim"),
 ]
 
 
@@ -98,9 +109,21 @@ def render_fallback(facts: dict) -> str:
         opts = facts.get("options")
         extra = f" Options: " + "; ".join(f"#{o['id']} {o['line'] or ''} {o['a']}→{o['b'] or ''} {o['from']}" for o in opts) if opts else ""
         return f"**Answer:** I need more detail: {', '.join(facts['missing'])}.{extra}"
+    if st == "follow":
+        prev = facts.get("prev", {})
+        rows = prev.get("press") or []
+        if rows:
+            order = "; ".join(f"{r['s']} ({r['p']}% chance vs {r['p0']}% normally)" for r in rows[:4])
+            return ("**Answer:** Staff first where the chance of an unusually busy period rises most: " + order + ". "
+                    "**Caveat:** this ranking is a model-based scenario built on assumed passenger diversion (25/50/75%), not a measurement; "
+                    "the 26 past closures show no measurable redistribution.")
+        return "**Answer:** I have no earlier analysis in this conversation to refer to; please restate the closure."
+    if st == "error":
+        return "**Answer:** A data tool failed while answering this, so I can't give a grounded answer. Please retry, or restate it with a specific date and time inside 2026-06-10 to 2026-09-22."
     if st in ("unsupported", "oos"):
-        return (f"**Answer:** This can't be answered from the current tools/dataset"
-                f"{' (' + facts['topic'] + ')' if facts.get('topic') else ''}. "
+        why = facts.get("reason") or facts.get("note") or "it is outside what the current tools cover"
+        return (f"**Answer:** This can't be answered yet"
+                f"{' (' + facts['topic'] + ')' if facts.get('topic') else ''}: {why}. "
                 + (facts.get("finding", "") + " " if facts.get("finding") else "")
                 + "**What I can do:** " + "; ".join(facts.get("have", [])))
     if cat == "C" and st == "ok":
@@ -148,24 +171,37 @@ def warm_connection() -> None:
 
 async def write(question: str, facts: dict) -> tuple[str, dict]:
     """Returns (answer, info). info: model, tokens, guard result."""
+    from config import CONFIG
     from llm_config import litellm_params, sampling_params
 
+    if CONFIG.writer == "template":                     # experiment arm: no LLM in the loop at all
+        return render_fallback(facts), {"model": "template", "guard": "template (config)", "tok_in": 0, "tok_out": 0}
     cfg = litellm_params("WRITER")
     if cfg is None:
         return render_fallback(facts), {"guard": "no-llm"}
     model, kw = cfg
     user = f"QUESTION: {question}\nFACTS: {json.dumps(facts, ensure_ascii=False, separators=(',', ':'))}"
+    from observability import set_attr, span
+
     budget = float(os.environ.get("WRITER_TIMEOUT_S", "10"))
-    try:
-        resp = await asyncio.wait_for(litellm.acompletion(
-            model=model, messages=[{"role": "system", "content": WRITER_SYSTEM}, {"role": "user", "content": user}],
-            max_tokens=1500, timeout=budget + 5, **sampling_params(model), **kw), timeout=budget)
-    except (asyncio.TimeoutError, Exception) as e:      # slow/failed LLM: ship the deterministic answer, never block
-        return render_fallback(facts), {"model": model, "guard": f"template ({type(e).__name__}: LLM over {budget:.0f}s budget or failed)"}
-    text = (resp.choices[0].message.content or "").strip()
-    u = getattr(resp, "usage", None)
-    info = {"model": model, "tok_in": getattr(u, "prompt_tokens", None), "tok_out": getattr(u, "completion_tokens", None)}
-    bad, banned = find_ungrounded(text, facts, question), find_banned(text)
+    with span("llm.write", **{"gen_ai.request.model": model, "tmt.budget_s": budget, "tmt.facts_status": facts.get("status")}) as sp:
+        try:
+            resp = await asyncio.wait_for(litellm.acompletion(
+                model=model, messages=[{"role": "system", "content": WRITER_SYSTEM}, {"role": "user", "content": user}],
+                max_tokens=1500, timeout=budget + 5, **sampling_params(model), **kw), timeout=budget)
+        except (asyncio.TimeoutError, Exception) as e:      # slow/failed LLM: ship the deterministic answer, never block
+            set_attr(sp, "tmt.error", f"{type(e).__name__}")
+            return render_fallback(facts), {"model": model, "guard": f"template ({type(e).__name__}: LLM over {budget:.0f}s budget or failed)"}
+        text = (resp.choices[0].message.content or "").strip()
+        u = getattr(resp, "usage", None)
+        info = {"model": model, "tok_in": getattr(u, "prompt_tokens", None), "tok_out": getattr(u, "completion_tokens", None)}
+        set_attr(sp, "gen_ai.usage.input_tokens", info["tok_in"])
+        set_attr(sp, "gen_ai.usage.output_tokens", info["tok_out"])
+    with span("guard.check") as gsp:
+        bad, banned = find_ungrounded(text, facts, question), find_banned(text)
+        set_attr(gsp, "tmt.ungrounded", bad)
+        set_attr(gsp, "tmt.banned", banned)
+        set_attr(gsp, "tmt.passed", not (bad or banned or not text))
     if bad or banned or not text:
         return render_fallback(facts), {**info, "guard": f"fallback (ungrounded: {bad[:4]}, banned: {banned})"}
     return text, {**info, "guard": "pass"}

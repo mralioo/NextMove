@@ -23,6 +23,7 @@ ml/train_overcrowding_classifier.py's docstring for where to put it).
 from __future__ import annotations
 
 import difflib
+import os
 import sys
 import threading
 import time
@@ -342,7 +343,8 @@ def _warm_up() -> None:
 
     def category_c():
         _warm_disruption()                         # hot path first: baseline model + prediction cache
-        threading.Thread(target=guarded, args=(_fit_models, "point-models"), daemon=True).start()
+        if os.environ.get("SCENARIO_ENGINE", "tabpfn") != "empirical":      # the empirical engine needs no TabPFN model
+            threading.Thread(target=guarded, args=(_fit_models, "point-models"), daemon=True).start()
 
     def profiles():
         _get_network_mean_weekday_peak()          # heavy groupby used by station_profile
@@ -357,4 +359,9 @@ threading.Thread(target=_warm_up, name="warm-up", daemon=True).start()
 
 
 if __name__ == "__main__":
-    mcp.run()
+    import os as _os
+
+    if _os.environ.get("MCP_TRANSPORT") == "http":     # used by the experiment suite's `mcp=http` arm
+        mcp.run(transport="http", host="127.0.0.1", port=int(_os.environ.get("MCP_PORT", "8765")), show_banner=False)
+    else:
+        mcp.run()

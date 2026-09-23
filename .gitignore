@@ -15,9 +15,15 @@ __pycache__/
 ml/cache/
 # ADK dev-UI session database
 agent/.adk/
+# observability database: every question asked, answers, traces, eval results
+observability/*.db*
+# evaluation reports and the filled-in copy of the answer workbook
+evaluation/output/
 .streamlit/secrets.toml
 
 # OS / editor
 .DS_Store
 .idea/
 .vscode/
+# experiment run outputs (regenerable from observability/agent_obs.db)
+experiments/output/

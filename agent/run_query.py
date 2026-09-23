@@ -17,6 +17,7 @@ subprocess by the ADK toolset — you don't need to start it separately.
 from __future__ import annotations
 
 import asyncio
+import os
 import sys
 from pathlib import Path
 
@@ -34,11 +35,12 @@ USER_ID = "operator"
 async def run(question: str, trace: bool = False) -> None:
     import time
 
+    os.environ.setdefault("OBS_SOURCE", "cli")
     t0 = time.time()
     agent = build_agent_for_cli()
     session_service = InMemorySessionService()
-    session = await session_service.create_session(app_name=APP_NAME, user_id=USER_ID)
-    runner = Runner(agent=agent, app_name=APP_NAME, session_service=session_service)
+    session = await session_service.create_session(app_name=agent.name, user_id=USER_ID)
+    runner = Runner(app=agent, session_service=session_service)
     message = types.Content(role="user", parts=[types.Part(text=question)])
     final = ""
     async for event in runner.run_async(user_id=USER_ID, session_id=session.id, new_message=message):
@@ -54,7 +56,7 @@ async def run(question: str, trace: bool = False) -> None:
                     print(f"[{event.author}] {part.text[:600]}")
     print(final)
     total = time.time() - t0
-    st = (await session_service.get_session(app_name=APP_NAME, user_id=USER_ID, session_id=session.id)).state
+    st = (await session_service.get_session(app_name=agent.name, user_id=USER_ID, session_id=session.id)).state
     tm = st.get("timing")
     if tm:   # fast pipeline: per-stage breakdown
         calls = ", ".join(f"{c['tool']} {c['s']}s" for c in tm.get("calls", []))
@@ -66,9 +68,9 @@ async def run(question: str, trace: bool = False) -> None:
 
 def build_agent_for_cli():
     """Honour AGENT_MODE (fast pipeline by default; AGENT_MODE=llm = the original LLM supervisor loop)."""
-    from agent import build_root_agent
+    from agent import app   # App(root_agent + observability plugin); honours AGENT_MODE
 
-    return build_root_agent()
+    return app
 
 
 def main() -> None:

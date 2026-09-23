@@ -69,3 +69,12 @@ def test_fallback_templates_are_grounded():
     text = writer.render_fallback(facts)
     assert writer.find_ungrounded(text, facts) == [] and writer.find_banned(text) == []
     assert "safety inspection" in text and "78%" in text
+
+
+def test_guard_rejects_calling_a_model_based_ranking_measured():
+    assert writer.find_banned("The ranking is based on measured pressure and observed demand.") == ["measured-pressure claim"]
+    assert writer.find_banned("The pressure ranking is measured at each station.") == ["measured-pressure claim"]
+    # legitimate wording must pass: negations, and real observations of a closed station
+    assert writer.find_banned("This is a model-based scenario, not a measured pressure.") == []
+    assert writer.find_banned("Observed demand at the closed station was zero.") == []
+    assert writer.find_banned("The 26 past closures show no measurable redistribution; this is an estimate.") == []

@@ -12,5 +12,8 @@ pages = [
     st.Page("views/5_Closures.py", title="Closures", icon="🚧", url_path="closures"),
     st.Page("views/6_Energy.py", title="Energy", icon="⚡", url_path="energy"),
     st.Page("views/7_ML_Engine.py", title="ML Engine (TabPFN)", icon="🤖", url_path="ml"),
+    st.Page("views/8_Observability.py", title="Observability", icon="🔭", url_path="observability"),
+    st.Page("views/9_Evaluation.py", title="Evaluation", icon="✅", url_path="evaluation"),
+    st.Page("views/10_Experiments.py", title="Experiments", icon="🧪", url_path="experiments"),
 ]
 st.navigation(pages).run()

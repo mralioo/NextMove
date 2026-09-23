@@ -22,6 +22,7 @@ Registered onto the shared FastMCP server by mcp_server/server.py.
 """
 from __future__ import annotations
 
+import os
 import sys
 import threading
 from pathlib import Path
@@ -79,6 +80,8 @@ def register(mcp, folder: str, get_feature_table: Callable[[], pd.DataFrame]) ->
             if "baseline" not in state:
                 state["baseline"] = DemandBaseline.prepare(get_feature_table(), closures(), dataset_folder=folder)
             b = state["baseline"]
+            if os.environ.get("SCENARIO_ENGINE", "tabpfn") == "empirical":
+                b.engine = "empirical"              # naive baseline instead of the TabPFN model (experiment arm)
             if not b.is_fitted:
                 b.restore_or_fit()
             return b

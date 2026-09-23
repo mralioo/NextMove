@@ -6,11 +6,12 @@ numbers, station names without the "U "/"(Berlin)" noise, assumptions as codes. 
 prose, not the raw 9k-token tool dumps — is what the writer sees, which is what makes the last LLM
 call short and fast.
 
-facts["status"]:  "ok" | "need" (missing input, ask the operator) | "unsupported" | "oos" | "follow"
+facts["status"]:  "ok" | "need" (missing input, ask the operator) | "unsupported" | "oos" | "follow" | "error" (a tool failed)
 """
 from __future__ import annotations
 
 import asyncio
+import difflib
 import re
 import time
 
@@ -26,6 +27,18 @@ NOT_YET = {
 H_FINDING = ("In the 26 recorded closures, neighbouring stations (1-2 hops), section endpoints and interchanges "
              "stayed at normal levels (about 10% of readings above their 90th-percentile bound, the noise rate); "
              "only closed stations dropped to 0. So no rerouting behaviour is measurable in this data.")
+
+
+_COVERAGE: dict = {}
+
+
+async def coverage(mcp) -> tuple[str, str]:
+    """(first, last) date the loaded dataset covers — read from the data, so it extends by itself when the
+    Sept 22-30 evaluation set is added."""
+    if not _COVERAGE:
+        d = await mcp.call("describe_dataset")
+        _COVERAGE.update(start=d["coverage_start"][:10], end=d["coverage_end"][:10])
+    return _COVERAGE["start"], _COVERAGE["end"]
 
 
 def short(name: str | None) -> str | None:
@@ -182,8 +195,11 @@ async def playbook_d(plan: dict, mcp, trace: list, question: str) -> dict:
     names = list(plan["stations"])[:2]
     for raw in plan["raw"][:2]:
         r = await mcp.call("resolve_station", query=raw, max_results=1)
-        if r and r[0].get("station_name"):
-            names.append(r[0]["station_name"])
+        cand = r[0].get("station_name") if r else None
+        # the tool's fuzzy cutoff is lenient (0.4): only accept a genuinely similar name, never a phantom match
+        if cand and (raw.lower() in cand.lower()
+                     or difflib.SequenceMatcher(None, raw.lower(), (short(cand) or "").lower()).ratio() >= 0.75):
+            names.append(cand)
     if not names:
         return {"status": "need", "cat": "D", "missing": ["station"]}
 
@@ -219,21 +235,48 @@ async def playbook_d(plan: dict, mcp, trace: list, question: str) -> dict:
 
 
 # ------------------------------------------------------------------------------------ dispatcher
-async def execute(plan: dict, question: str, last_facts: dict | None, mcp) -> tuple[dict, list]:
+async def execute(plan: dict, question: str, last_facts: dict | None, mcp, memory=None) -> tuple[dict, list]:
+    """Run the playbook. A tool/server failure never crashes the run: it becomes status "error" so the
+    writer can tell the operator plainly (and the trace records what failed). With an episodic `memory`, facts
+    for a situation analysed before are served from memory and the tools are skipped."""
     trace: list = []
+    try:
+        remember = memory is not None and plan.get("cat") in ("C", "D")
+        if remember:
+            _, cov_end = await coverage(mcp)
+            hit = memory.lookup(plan, cov_end)
+            if hit:
+                return hit, [{"tool": "memory (episodic hit)", "s": 0.0}]
+        facts, trace = await _execute(plan, question, last_facts, mcp, trace)
+        if remember:
+            memory.store(plan, cov_end, facts)
+        return facts, trace
+    except Exception as e:
+        return {"status": "error", "cat": plan.get("cat"), "note": f"{type(e).__name__}: {str(e)[:220]}"}, trace
+
+
+async def _execute(plan: dict, question: str, last_facts: dict | None, mcp, trace: list) -> tuple[dict, list]:
     cat = plan["cat"]
     if cat == "FOLLOW":
         if not last_facts:
             return {"status": "need", "cat": "FOLLOW", "missing": ["the earlier question this refers to"]}, trace
         return {"status": "follow", "prev": last_facts}, trace
+    if cat in ("C", "D") and plan.get("dates"):
+        first, last = await coverage(mcp)
+        if any(not first <= d <= last for d in plan["dates"]):
+            return {"status": "oos", "cat": cat, "have": HAVE,
+                    "note": f"the date is outside the data the system holds ({first} to {last}); no forecasting or invented figures"}, trace
     if cat == "C":
         return await playbook_c(plan, mcp, trace), trace
     if cat == "D":
         return await playbook_d(plan, mcp, trace, question), trace
     if cat == "H":
         return {"status": "unsupported", "cat": "H", "have": HAVE, "finding": H_FINDING,
-                "note": "no tool measures reroute behaviour; a finding from the closure case study applies"}, trace
+                "reason": "no tool measures reroute behaviour directly; a finding from the closure case study applies"}, trace
     if cat == "OOS":
+        hits = plan.get("oos") or []
+        asked = f"the question asks for {', '.join(repr(h) for h in hits)}, " if hits else ""
         return {"status": "oos", "cat": "OOS", "have": HAVE,
-                "note": "needs data the dataset lacks (capacity, delays, costs, U4, dates outside 2026-06-10..2026-09-22) or is off-topic"}, trace
-    return {"status": "unsupported", "cat": cat, "topic": NOT_YET.get(cat, "this topic"), "have": HAVE}, trace
+                "note": asked + "which the dataset and tools cannot provide (or it is off-topic). Mention ONLY what was asked."}, trace
+    return {"status": "unsupported", "cat": cat, "topic": NOT_YET.get(cat, "this topic"), "have": HAVE,
+            "reason": "the dataset has the data, but the analysis tool for this question type is not connected yet"}, trace
