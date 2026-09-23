@@ -1,81 +1,107 @@
+# Talk To My Train — InnoTrans 2026 hackathon
+# `make` or `make help` lists every command.
+
+# ---- configuration (override on the command line, e.g. `make run PORT=9000`) ----
+VENV       := .venv
+PY         := $(VENV)/bin/python
+DATA_DIR   := $(CURDIR)/data
 IMAGE_NAME := ubahn-flow-dashboard
-CONTAINER_NAME := ubahn-flow-dashboard
-PORT := 8501
-ADK_PORT := 8000
-DATA_DIR := $(CURDIR)/data
+# Preferred dashboard port; the next free one is used automatically if it is taken.
+PORT       ?= 8501
+# Port of the ADK dev UI (make agent-web).
+ADK_PORT   ?= 8000
 
-.PHONY: help venv install run build docker-run docker-stop docker-logs clean install-ml train-overcrowding install-mcp mcp-server install-agent agent-query agent-web agent-cli
+# First free TCP port >= PORT. Pure Python, so it works on Linux and macOS with no extra tools.
+FREE_PORT   = $(shell $(if $(wildcard $(PY)),$(PY),python3) -c "import socket,sys; p=int(sys.argv[1]); print(next(q for q in range(p, p+200) if socket.socket().connect_ex(('127.0.0.1', q))))" $(PORT))
 
-help:
-	@echo "Targets:"
-	@echo "  venv               Create local .venv"
-	@echo "  install            Install dashboard/requirements.txt into .venv"
-	@echo "  run                Run the Streamlit dashboard locally (no Docker)"
-	@echo "  build              Build the Docker image"
-	@echo "  docker-run         Run the dashboard in Docker (mounts ./data), open http://localhost:$(PORT)"
-	@echo "  docker-stop        Stop and remove the running container"
-	@echo "  docker-logs        Follow the container logs"
-	@echo "  install-ml         Install ml/requirements.txt into .venv (TabPFN client etc.)"
-	@echo "  train-overcrowding Train the TabPFN overcrowding-risk classifier (needs TABPFN_API_TOKEN in .env)"
-	@echo "  install-mcp        Install mcp_server/requirements.txt into .venv"
-	@echo "  mcp-server         Run the MCP dataset/TabPFN server standalone (stdio)"
-	@echo "  install-agent      Install agent/requirements.txt into .venv (Google ADK etc.)"
-	@echo "  agent-query Q=...  Run one question through the ADK agent, plain text output (needs an LLM key)"
-	@echo "  agent-web          Start the ADK dev UI to visualize the agent (tool calls, traces) at http://localhost:$(ADK_PORT)"
-	@echo "  agent-cli          Start an interactive ADK terminal chat with the agent"
-	@echo "  clean              Remove local .venv and __pycache__ files"
+.DEFAULT_GOAL := help
+.PHONY: help venv install install-ml install-mcp install-agent install-all \
+        run build docker-run docker-stop docker-logs \
+        train-overcrowding train-disruption train-all checkpoints test \
+        mcp-server agent-query agent-web agent-cli clean clean-venv
 
-venv:
-	python3 -m venv .venv
-	./.venv/bin/pip install --upgrade pip
+##@ Help
+help:  ## Show this list
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage: make \033[36m<command>\033[0m\n"} \
+		/^##@/ {printf "\n\033[1m%s\033[0m\n", substr($$0, 5)} \
+		/^[a-zA-Z0-9_-]+:.*##/ {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@printf "\nTypical first run:  make install-all  &&  make run\n\n"
 
-install: venv
-	./.venv/bin/pip install -r dashboard/requirements.txt
+##@ Setup (all installs go into ./.venv)
+venv:  ## Create the local .venv (Python 3) and upgrade pip
+	python3 -m venv $(VENV)
+	$(PY) -m pip install --upgrade pip
 
-run:
-	DATA_DIR="$(DATA_DIR)" ./.venv/bin/streamlit run dashboard/app.py
+install: venv  ## Install the dashboard dependencies (Streamlit, Plotly, ...)
+	$(PY) -m pip install -r dashboard/requirements.txt
 
-build:
+install-ml: venv  ## Install the ML dependencies (TabPFN client, scikit-learn, pytest)
+	$(PY) -m pip install -r ml/requirements.txt
+
+install-mcp: venv  ## Install the MCP server dependencies (FastMCP)
+	$(PY) -m pip install -r mcp_server/requirements.txt
+
+install-agent: venv  ## Install the agent dependencies (Google ADK, LiteLLM)
+	$(PY) -m pip install -r agent/requirements.txt
+
+install-all: install install-ml install-mcp install-agent  ## Install everything (dashboard + ML + MCP + agent)
+
+##@ Dashboard
+run:  ## Run the Streamlit dashboard locally (default port 8501, or the next free one)
+	@test -x $(PY) || { echo "No $(VENV) found — run 'make install' first."; exit 1; }
+	@port=$(FREE_PORT); \
+	 [ "$$port" = "$(PORT)" ] || echo "Port $(PORT) is in use — using $$port instead."; \
+	 echo "Dashboard → http://localhost:$$port"; \
+	 cd dashboard && DATA_DIR="$(DATA_DIR)" ../$(PY) -m streamlit run app.py --server.port $$port
+
+build:  ## Build the dashboard Docker image
 	docker build -t $(IMAGE_NAME) dashboard
 
-docker-run: build
-	docker run --rm -d \
-		--name $(CONTAINER_NAME) \
-		-p $(PORT):8501 \
+docker-run: build  ## Run the dashboard in Docker (mounts data/ and ml/output/) on a free port
+	@port=$(FREE_PORT); \
+	 docker run --rm -d --name $(IMAGE_NAME) -p $$port:8501 \
 		-v "$(DATA_DIR):/app/data:ro" \
-		$(IMAGE_NAME)
-	@echo "Dashboard running at http://localhost:$(PORT)"
+		-v "$(CURDIR)/ml/output:/app/ml_output:ro" \
+		$(IMAGE_NAME) && echo "Dashboard → http://localhost:$$port"
 
-docker-stop:
-	-docker stop $(CONTAINER_NAME)
+docker-stop:  ## Stop and remove the dashboard container
+	-docker stop $(IMAGE_NAME)
 
-docker-logs:
-	docker logs -f $(CONTAINER_NAME)
+docker-logs:  ## Follow the dashboard container logs
+	docker logs -f $(IMAGE_NAME)
 
-install-ml: venv
-	./.venv/bin/pip install -r ml/requirements.txt
+##@ ML engine (TabPFN — needs TABPFN_API_TOKEN in a .env file)
+train-overcrowding:  ## Train + evaluate the overcrowding classifier -> ml/output/overcrowding_predictions.csv
+	$(PY) ml/train_overcrowding_classifier.py
 
-train-overcrowding:
-	./.venv/bin/python ml/train_overcrowding_classifier.py
+train-disruption:  ## Train + evaluate the flow regressor (Category C) and run the 26-closure case study (~3 min)
+	$(PY) ml/train_disruption_baseline.py
 
-install-mcp: venv
-	./.venv/bin/pip install -r mcp_server/requirements.txt
+train-all: train-overcrowding train-disruption  ## Regenerate every result file the dashboard's ML Engine page reads
 
-mcp-server:
-	./.venv/bin/python mcp_server/server.py
+checkpoints:  ## Save/verify the TabPFN model checkpoints used for inference (ml/checkpoints/); FORCE=1 refits all
+	$(PY) ml/save_checkpoints.py $(if $(FORCE),--force)
 
-install-agent: venv
-	./.venv/bin/pip install -r agent/requirements.txt
+test:  ## Run the offline unit tests (graph/closure logic; no API calls)
+	$(PY) -m pytest -q tests
 
-agent-query:
-	./.venv/bin/python agent/run_query.py "$(Q)"
+##@ MCP server & agent
+mcp-server:  ## Run the MCP server standalone over stdio (dataset + TabPFN + Category C tools)
+	$(PY) mcp_server/server.py
 
-agent-web:
-	./.venv/bin/adk web --port $(ADK_PORT) agent/
+agent-query:  ## One-shot question through the agent, e.g. make agent-query Q="Line U9 suspended..."
+	@test -n "$(Q)" || { echo 'Usage: make agent-query Q="your question"'; exit 1; }
+	$(PY) agent/run_query.py "$(Q)"
 
-agent-cli:
-	./.venv/bin/adk run agent/
+agent-web:  ## Open the ADK dev UI (tool calls, traces) on port 8000
+	$(VENV)/bin/adk web --port $(ADK_PORT) agent/
 
-clean:
-	rm -rf .venv
-	find . -type d -name __pycache__ -exec rm -rf {} +
+agent-cli:  ## Chat with the agent in the terminal
+	$(VENV)/bin/adk run agent/
+
+##@ Housekeeping
+clean:  ## Delete all __pycache__ folders
+	find . -type d -name __pycache__ -not -path "./$(VENV)/*" -prune -exec rm -rf {} +
+
+clean-venv:  ## Delete the .venv (you will need 'make install-all' again)
+	rm -rf $(VENV)
