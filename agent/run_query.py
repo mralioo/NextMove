@@ -1,0 +1,63 @@
+"""CLI entry point: run one operator question through the ADK agent.
+
+Usage:
+    ./.venv/bin/python agent/run_query.py "When does station Rudow's commute peak happen?"
+
+Requires an LLM key for whichever backend agent.py is configured to use:
+  - Gemini (default): GOOGLE_API_KEY or GEMINI_API_KEY
+  - LiteLLM (if ADK_LITELLM_MODEL is set): whatever key that provider needs
+    (e.g. ANTHROPIC_API_KEY for "anthropic/claude-...")
+
+Put the key in the same .env this repo's other scripts read from (found by
+walking up from the working directory — see ml/train_overcrowding_classifier.py).
+
+The MCP server itself (mcp_server/server.py) is spawned automatically as a
+subprocess by the ADK toolset — you don't need to start it separately.
+"""
+from __future__ import annotations
+
+import asyncio
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google.genai import types
+
+from agent import build_agent
+
+APP_NAME = "talk_to_my_train"
+USER_ID = "operator"
+
+
+async def run(question: str) -> None:
+    agent = build_agent()
+    session_service = InMemorySessionService()
+    session = await session_service.create_session(app_name=APP_NAME, user_id=USER_ID)
+    runner = Runner(agent=agent, app_name=APP_NAME, session_service=session_service)
+
+    message = types.Content(role="user", parts=[types.Part(text=question)])
+    async for event in runner.run_async(user_id=USER_ID, session_id=session.id, new_message=message):
+        if event.content and event.content.parts:
+            for part in event.content.parts:
+                if part.function_call:
+                    print(f"[tool call] {part.function_call.name}({dict(part.function_call.args or {})})")
+                if part.function_response:
+                    print(f"[tool result] {part.function_response.name} -> {part.function_response.response}")
+                if part.text:
+                    print(part.text, end="")
+    print()
+
+
+def main() -> None:
+    if len(sys.argv) < 2:
+        print(__doc__)
+        raise SystemExit(1)
+    question = " ".join(sys.argv[1:])
+    asyncio.run(run(question))
+
+
+if __name__ == "__main__":
+    main()

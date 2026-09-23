@@ -1,0 +1,7 @@
+tabpfn-client
+python-dotenv
+scikit-learn
+pandas==2.2.3
+numpy==1.26.4
+networkx==3.4.2
+streamlit==1.39.0
