@@ -10,6 +10,7 @@ from utils.ui import page_header, sidebar_dataset_picker
 st.set_page_config(page_title="Events", page_icon="🎫", layout="wide")
 folder = sidebar_dataset_picker()
 page_header("Events in Berlin", "Concerts, matches, shows, and conferences — and how their days compare to network flow.")
+st.caption("Filter the 417 logged events, then check whether bigger/more event days line up with network-wide passenger spikes.")
 
 events = load_events(folder)
 flow_total = network_total_flow(folder)
@@ -61,11 +62,13 @@ st.divider()
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("Events by segment")
+    st.caption("What kind of events dominate the filtered set — Arts & Theatre, Music, etc.")
     fig = px.pie(filtered, names="segment", hole=0.45)
     fig.update_layout(height=380)
     st.plotly_chart(fig, use_container_width=True)
 with c2:
     st.subheader("Attendance distribution")
+    st.caption("Most events are small; a long tail of large ones (concerts, matches) drive the biggest flow impact.")
     fig = px.histogram(filtered, x="estimated_attendance", nbins=30,
                         labels={"estimated_attendance": "Estimated attendance"})
     fig.update_layout(height=380)

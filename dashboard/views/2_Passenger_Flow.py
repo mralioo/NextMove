@@ -15,6 +15,11 @@ from utils.ui import page_header, sidebar_dataset_picker
 st.set_page_config(page_title="Passenger Flow", page_icon="📈", layout="wide")
 folder = sidebar_dataset_picker()
 page_header("Passenger Flow Analysis", "Time series, daily/weekly rhythm, and station rankings.")
+st.caption(
+    "Three ways to look at the same 15-minute flow series: who's busiest overall, how one or "
+    "more stations behave over time/hour/weekday, and how any station's commute peak stacks "
+    "up against the network."
+)
 
 stations = load_stations(folder)
 flows = load_flows(folder)
@@ -22,6 +27,7 @@ avg_flow = station_avg_flow(folder)
 all_stations = sorted(station_cols(flows))
 
 st.subheader("Busiest & quietest stations")
+st.caption("Ranked by average daily passengers (sum of a station's 15-min counts per day, averaged across the whole dataset window).")
 c1, c2 = st.columns(2)
 top_n = st.slider("How many stations to rank", 5, 30, 15)
 ranked = avg_flow.sort_values("avg_daily_passengers", ascending=False)
@@ -43,6 +49,7 @@ with c2:
 st.divider()
 
 st.subheader("Station deep-dive")
+st.caption("Pick one or more stations to compare directly — same underlying data, three different views (raw trend, typical hour-of-day shape, and day×hour intensity).")
 default_sel = [ranked.iloc[0]["station_name"]]
 selected = st.multiselect("Select one or more stations", all_stations, default=default_sel)
 network_mean_peak = None
@@ -54,6 +61,7 @@ if selected:
     tab1, tab2, tab3 = st.tabs(["Time series", "Hourly profile (weekday vs weekend)", "Day × hour heatmap"])
 
     with tab1:
+        st.caption("Raw flow over time for the selected station(s) — resample to smooth out 15-min noise and spot trends or one-off spikes.")
         granularity = st.radio("Resample", ["15 min (raw)", "Hourly", "Daily"], horizontal=True, index=1, key="ts_gran")
         freq = {"15 min (raw)": None, "Hourly": "h", "Daily": "D"}[granularity]
         plot_df = sel_long.copy()
@@ -68,6 +76,7 @@ if selected:
         st.plotly_chart(fig, use_container_width=True)
 
     with tab2:
+        st.caption("Average passengers by hour-of-day, split weekday vs weekend — this is what \"commute peak\" means throughout this dashboard.")
         prof = hourly_profile(folder, tuple(sorted(selected)))
         prof["Day type"] = prof["is_weekend"].map({True: "Weekend", False: "Weekday"})
         fig = px.line(prof, x="hour", y="passengers", color="Day type", markers=True,
@@ -85,6 +94,7 @@ if selected:
         )
 
     with tab3:
+        st.caption("Same average-flow data as the hourly profile, but every day of the week shown separately — darker cells are busier hour/day combinations.")
         heat = dow_hour_heatmap(folder, tuple(sorted(selected)))
         fig = px.imshow(heat, aspect="auto", color_continuous_scale="YlOrRd",
                          labels=dict(x="Hour of day", y="", color="Avg passengers"))

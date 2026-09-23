@@ -2,7 +2,8 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    DATA_DIR=/app/data
+    DATA_DIR=/app/data \
+    RESULTS_DIR=/app/ml_output
 
 WORKDIR /app
 

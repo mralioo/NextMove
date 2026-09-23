@@ -7,6 +7,11 @@ from utils.ui import page_header, sidebar_dataset_picker
 st.set_page_config(page_title="Closures", page_icon="🚧", layout="wide")
 folder = sidebar_dataset_picker()
 page_header("Disruption & Closure Scenarios", "Simulated line suspensions and station closures.")
+st.caption(
+    "All 26 logged closures, parsed from free-text descriptions into structured fields "
+    "(type, affected line/station, reason, duration) — the same parsing the MCP agent's "
+    "planned disruption-response tooling would build on."
+)
 
 closures = load_closures(folder)
 
@@ -16,6 +21,7 @@ c2.metric("Line suspensions", int((closures["closure_type"] == "Line suspension"
 c3.metric("Station closures", int((closures["closure_type"] == "Station closure").sum()))
 
 st.subheader("Timeline")
+st.caption("Each bar is one closure's start-to-end window, colored by type — scan for clustering or overlapping disruptions.")
 gantt_df = closures.copy()
 gantt_df["label"] = gantt_df["affected_line"].fillna(gantt_df["affected_segment"])
 fig = px.timeline(gantt_df, x_start="when", x_end="end", y="label", color="closure_type",
@@ -28,6 +34,7 @@ st.divider()
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("Closures by affected line")
+    st.caption("Line-suspension closures only (station-only closures have no line to attribute).")
     by_line = closures.dropna(subset=["affected_line"])["affected_line"].value_counts().reset_index()
     by_line.columns = ["line", "count"]
     fig = px.bar(by_line.sort_values("count"), x="count", y="line", orientation="h",
@@ -36,11 +43,13 @@ with c1:
     st.plotly_chart(fig, use_container_width=True)
 with c2:
     st.subheader("Reason breakdown")
+    st.caption("Stated cause for each closure, parsed from its description text.")
     fig = px.pie(closures, names="reason", hole=0.45)
     fig.update_layout(height=350, showlegend=True)
     st.plotly_chart(fig, use_container_width=True)
 
 st.subheader("Duration distribution")
+st.caption("How long closures typically last, split by type — useful for setting expectations when a new closure is reported.")
 fig = px.histogram(closures, x="duration_hours", nbins=10, color="closure_type",
                     labels={"duration_hours": "Duration (hours)"})
 fig.update_layout(height=350)

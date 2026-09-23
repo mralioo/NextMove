@@ -21,6 +21,11 @@ page_header(
     "InnoTrans 2026 Hackathon — exploratory dashboard for the network, flow, event, "
     "weather, closure, and energy datasets that back the conversational agent.",
 )
+st.caption(
+    "Start here for the big picture, then use the pages on the left for depth: "
+    "**Network Explorer** (topology + fragmentation risk), **Passenger Flow** (per-station "
+    "rhythm), **Events**, **Weather**, **Closures**, **Energy**, and **ML Engine** (how well the TabPFN models predict vs the real flows)."
+)
 
 stations = load_stations(folder)
 flow_total = network_total_flow(folder)
@@ -48,6 +53,7 @@ left, right = st.columns([2, 1])
 
 with left:
     st.subheader("Network-wide passenger flow over time")
+    st.caption("Sum of all 167 stations' 15-min flow, resampled. Look for daily commute peaks and any unusual spikes across the whole dataset window.")
     granularity = st.radio("Resample", ["15 min (raw)", "Hourly", "Daily"], horizontal=True, index=2)
     freq = {"15 min (raw)": None, "Hourly": "h", "Daily": "D"}[granularity]
     plot_df = flow_total.copy()
@@ -60,6 +66,7 @@ with left:
 
 with right:
     st.subheader("Line coverage")
+    st.caption("How many stations each U-Bahn line serves — a quick sense of network size per line before drilling into any one of them.")
     line_counts = stations["u_bahn_lines"].str.split(",").explode().str.strip().value_counts().reset_index()
     line_counts.columns = ["line", "stations_served"]
     fig2 = px.bar(line_counts.sort_values("stations_served"), x="stations_served", y="line",
@@ -70,6 +77,7 @@ with right:
 st.divider()
 
 st.subheader("Data quality & context snapshot")
+st.caption("A one-glance check of what's in the weather, events, and closures datasets — useful before trusting any downstream correlation.")
 q1, q2, q3 = st.columns(3)
 with q1:
     st.markdown("**Weather**")

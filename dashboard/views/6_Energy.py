@@ -8,11 +8,13 @@ from utils.ui import page_header, sidebar_dataset_picker
 st.set_page_config(page_title="Energy", page_icon="⚡", layout="wide")
 folder = sidebar_dataset_picker()
 page_header("Energy Consumption & Efficiency", "Daily energy use per line, and energy-per-passenger efficiency.")
+st.caption("Simulated daily energy per line, plus the efficiency ranking that answers training question 5 (worst Wh/passenger line).")
 
 energy = load_energy(folder)
 line_cols = [c for c in energy.columns if c != "timestamp"]
 
 st.subheader("Daily energy consumption by line")
+st.caption("Raw daily MWh per line — a busier line isn't necessarily a less efficient one; that's what the ratio further down checks.")
 long_energy = energy.melt(id_vars="timestamp", value_vars=line_cols, var_name="line", value_name="MWh")
 fig = px.line(long_energy, x="timestamp", y="MWh", color="line",
               color_discrete_map=LINE_COLORS, labels={"timestamp": ""})
@@ -28,6 +30,7 @@ with c1:
     st.plotly_chart(fig, use_container_width=True)
 with c2:
     st.subheader("Average daily energy share by line")
+    st.caption("Which lines account for the biggest slice of total network energy, on an average day.")
     avg_share = energy[line_cols].mean().reset_index()
     avg_share.columns = ["line", "avg_MWh"]
     fig = px.pie(avg_share, names="line", values="avg_MWh", color="line", color_discrete_map=LINE_COLORS, hole=0.4)

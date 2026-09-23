@@ -13,6 +13,10 @@ from utils.ui import page_header, sidebar_dataset_picker
 st.set_page_config(page_title="Network Explorer", page_icon="🗺️", layout="wide")
 folder = sidebar_dataset_picker()
 page_header("Network Explorer", "Topology, line coverage, and station-fragmentation risk.")
+st.caption(
+    "Two views of the same 167-station graph: a map you can recolor by line/ridership/risk, "
+    "and a table ranking stations by how much closing them would hurt the network."
+)
 
 stations = load_stations(folder)
 connections = load_connections(folder)
@@ -28,6 +32,11 @@ stations = stations.merge(
 st.subheader("Station map")
 c1, c2 = st.columns([1, 3])
 with c1:
+    st.caption(
+        "**By line** — network layout. **By ridership** — bigger/darker dot = busier station. "
+        "**By fragmentation risk** — red dots are articulation points (removing them splits the network); "
+        "dot size tracks betweenness centrality (how many shortest paths pass through)."
+    )
     highlight_mode = st.radio(
         "Highlight",
         ["By line", "By ridership", "By fragmentation risk"],
@@ -98,9 +107,13 @@ st.plotly_chart(fig, use_container_width=True)
 st.divider()
 st.subheader("Fragmentation risk — which station closures hurt the network most?")
 st.caption(
-    "Articulation points are stations whose removal disconnects the network. "
-    "`fragmentation_score` = betweenness centrality × average daily ridership, "
-    "ranking stations by both structural importance and passenger impact."
+    "For every station, we simulate removing it from the graph (pure topology, no LLM). "
+    "**Articulation point** = removing it actually splits the network into disconnected pieces — "
+    "a true single point of failure. **Betweenness centrality** = the fraction of all shortest "
+    "paths in the network that pass through this station — high even for non-articulation "
+    "\"bridge\" stations. **Fragmentation score** = betweenness × average daily ridership, so a "
+    "structurally central but low-traffic station doesn't outrank a high-traffic one. Sorted "
+    "descending: the top rows are where a closure does the most combined structural + passenger damage."
 )
 
 top_n = st.slider("Top N stations", 5, 30, 10)

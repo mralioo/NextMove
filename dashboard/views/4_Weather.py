@@ -9,6 +9,7 @@ from utils.ui import page_header, sidebar_dataset_picker
 st.set_page_config(page_title="Weather", page_icon="🌦️", layout="wide")
 folder = sidebar_dataset_picker()
 page_header("Weather Impact", "Correlating temperature, precipitation, and conditions with ridership.")
+st.caption("Same question at two granularities: a 15-min correlation heatmap (noisy — time-of-day dominates), then daily aggregates that isolate the weather signal better.")
 
 weather = load_weather(folder)
 flow_total = network_total_flow(folder)
@@ -70,6 +71,7 @@ with c1:
     st.plotly_chart(fig, use_container_width=True)
 with c2:
     st.subheader("Temperature & precipitation over time")
+    st.caption("The raw weather series itself — useful for spotting the specific day behind any peak found elsewhere on this page.")
     fig = px.line(daily, x="timestamp", y="temp", labels={"timestamp": "", "temp": "Temp (°C)"})
     fig.add_bar(x=daily["timestamp"], y=daily["prcp"], name="Precipitation", yaxis="y2", opacity=0.4)
     fig.update_layout(
