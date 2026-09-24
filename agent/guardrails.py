@@ -13,6 +13,8 @@ Three layers, each returning `GuardrailResult`s that are stored with the run:
 """
 from __future__ import annotations
 
+import data_window
+
 import os
 import re
 from dataclasses import dataclass
@@ -46,7 +48,7 @@ BOUNCE_MESSAGE = ("I only answer questions about Berlin U-Bahn passenger flows a
                   "the busiest stations on a day, anomalies, energy per passenger, network resilience and correlations. "
                   "Your question is outside that, so I can't help with it here.")
 SAFE_FALLBACK = ("I can't give a verified answer to this one: the result did not pass the automatic checks against the data. "
-                 "Please rephrase it with a specific station, line, date and time inside 2026-06-10 to 2026-09-22, or ask about another topic I support.")
+                 "Please rephrase it with a specific station, line, date and time inside " + data_window.window() + ", or ask about another topic I support.")
 
 
 def check_input(question: str, route_plan: dict, has_history: bool = False) -> tuple[bool, list[GuardrailResult], str | None]:

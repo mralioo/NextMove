@@ -4,6 +4,7 @@
 | --- | --- | --- |
 | [`running_the_system.md`](running_the_system.md) | `make up` / `down` / `status`, what starts, ports, troubleshooting | current |
 | [`agent_architecture_v3.md`](agent_architecture_v3.md) | Supervisor / worker ⇄ evaluator / writer, unified schema, guardrails, knowledge graph (SQLite + Neo4j), Cognee | **current design** |
+| [`submission_run_report.md`](submission_run_report.md) | The organiser workbook (TRAINING, FINAL_TEST, TEAM_EVIDENCE) answered by the workflow: answers, tokens, times, configuration, run comparison | current |
 | [`workflow_v2_report.md`](workflow_v2_report.md) | Specialists for every category, knowledge base, Cognee, LangSmith-style evaluation, pressure-ranking validation | current results |
 | [`challenge_alignment_review.md`](challenge_alignment_review.md) | Critical review against the problem statement (before v2) | reference |
 | [`test_questions.md`](test_questions.md) | Question bank, grading checklist, **ADK eval set** with approximate answers | current |

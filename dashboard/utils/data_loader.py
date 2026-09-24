@@ -45,6 +45,12 @@ def discover_dataset_dirs(base_dir: str = DEFAULT_DATA_DIR) -> dict[str, Path]:
         folder = hit.parent
         label = str(folder.relative_to(base)) if folder != base else base.name
         candidates[label] = folder
+    if len(candidates) == 1:
+        # the test split (`data/testing dataset/*_rest.csv`) reuses the training network files: when data files live outside the one folder that holds the
+        # network files, the whole `data/` tree is the dataset (every matching file is merged, see _read_merged)
+        only = next(iter(candidates.values()))
+        if any(only not in f.parents for f in base.rglob("flows*.csv")):
+            return {base.name: base}
     return candidates or {base.name: base}
 
 
@@ -60,11 +66,39 @@ def _find_all(folder: Path, pattern: str) -> list[Path]:
     return sorted(folder.rglob(pattern))
 
 
-def _read_merged(folder: Path, pattern: str, **kw) -> pd.DataFrame:
+def _fix_mojibake(name: str) -> str:
+    """'U KurfÃ¼rstenstr.' (UTF-8 read as latin-1 by whoever exported the test split) -> 'U Kurfürstenstr.'"""
+    for enc in ("cp1252", "latin-1"):                          # ß = C3 9F: 'ÃŸ' only round-trips through cp1252
+        try:
+            return name.encode(enc).decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            continue
+    return name
+
+
+def _read_one(path: Path, names: list[str] | None, expect: str | None, **kw) -> pd.DataFrame:
+    df = pd.read_csv(path, encoding="utf-8-sig", **kw)
+    if expect and names and expect not in df.columns:      # a file without a header row (the events test split): use the training file's column names
+        df = pd.read_csv(path, encoding="utf-8-sig", header=None, names=names, **kw)
+        for c in df.select_dtypes("object").columns:      # this export is also mojibake in its text ('ALIZÃ‰' -> 'ALIZÉ')
+            df[c] = df[c].map(lambda v: _fix_mojibake(v) if isinstance(v, str) else v)
+    return df.rename(columns={c: _fix_mojibake(c) for c in df.columns if isinstance(c, str)})
+
+
+def _read_merged(folder: Path, pattern: str, expect: str | None = None, **kw) -> pd.DataFrame:
+    """Merge every file matching `pattern`. `expect` = a column name every file WITH a header has; a file without it is read headerless."""
     files = _find_all(folder, pattern)
     if not files:
         raise FileNotFoundError(f"no file matching {pattern} under {folder}")
-    return pd.concat([pd.read_csv(f, **kw) for f in files], ignore_index=True) if len(files) > 1 else pd.read_csv(files[0], **kw)
+    names = None
+    if expect:
+        for f in files:
+            cols = list(pd.read_csv(f, encoding="utf-8-sig", nrows=0).columns)
+            if expect in cols:
+                names = cols
+                break
+    frames = [_read_one(f, names, expect, **kw) for f in files]
+    return pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
 
 
 def _parse_mixed_datetime(series: pd.Series) -> pd.Series:
@@ -111,7 +145,7 @@ def load_weather(folder: str) -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def load_events(folder: str) -> pd.DataFrame:
-    df = _read_merged(Path(folder), "berlin_events*.csv").drop_duplicates(["event_name", "began_local"], keep="last")
+    df = _read_merged(Path(folder), "berlin_events*.csv", expect="event_name").drop_duplicates(["event_name", "began_local"], keep="last")
     df["began_local"] = pd.to_datetime(df["began_local"], utc=False, format="mixed")
     df["estimated_end_local"] = pd.to_datetime(
         df["estimated_end_local"], utc=False, format="mixed", errors="coerce"

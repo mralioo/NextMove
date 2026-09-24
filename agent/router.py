@@ -273,13 +273,35 @@ def find_top_n(text: str) -> int | None:
     return int(m.group(1)) if m.group(1).isdigit() else NUMWORDS[m.group(1)]
 
 
+def _mojibake(v: str) -> str:
+    for enc in ("cp1252", "latin-1"):
+        try:
+            return v.encode(enc).decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            continue
+    return v
+
+
 @lru_cache(maxsize=1)
 def _events_frame() -> pd.DataFrame:
     base = os.environ.get("DATA_DIR", "data")
     repo = Path(__file__).resolve().parent.parent
     hits = sorted(glob.glob(str(Path(base) / "**" / "berlin_events*.csv"), recursive=True)) or sorted(glob.glob(str(repo / "data" / "**" / "berlin_events*.csv"), recursive=True))
-    hits = [h for h in hits if "testing dataset" not in h and not h.endswith("_rest.csv")]      # the organisers' test split (headerless, evaluation period) is not part of the training data the agent knows
-    return pd.concat([pd.read_csv(h, usecols=["event_name", "venue_name", "began_local"]) for h in hits], ignore_index=True) if hits else pd.DataFrame(columns=["event_name", "venue_name", "began_local"])
+    header_names = None
+    for h in hits:                                                       # the events test split has no header row: the training file names its columns
+        cols = list(pd.read_csv(h, nrows=0, encoding="utf-8-sig").columns)
+        if "event_name" in cols:
+            header_names = cols
+            break
+    frames = []
+    for h in hits:
+        has_header = "event_name" in pd.read_csv(h, nrows=0, encoding="utf-8-sig").columns
+        df = pd.read_csv(h, encoding="utf-8-sig") if has_header else pd.read_csv(h, encoding="utf-8-sig", header=None, names=header_names)
+        if not has_header:
+            for c in ("event_name", "venue_name"):
+                df[c] = df[c].map(lambda v: _mojibake(v) if isinstance(v, str) else v)
+        frames.append(df[["event_name", "venue_name", "began_local"]])
+    return pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=["event_name", "venue_name", "began_local"])
 
 
 VENUE_ALIASES = {"mercedes-benz arena": "Uber Arena", "mercedes benz arena": "Uber Arena", "o2 arena": "Uber Arena", "mercedes-platz": "Uber Arena"}
@@ -348,8 +370,10 @@ def route(question: str, has_history: bool = False) -> dict:
         first_day = re.search(r"first day", q, re.I)
         dates = ["2026-09-22"] if first_day or cat == "P" else dates
         if dates:
-            assumed.append("InnoTrans 2026 is taken to start on 2026-09-22 (fair dates from the operator's context; the data has no InnoTrans event)")
+            assumed.append("InnoTrans 2026 is taken to start on 2026-09-22 (fair dates from the operator's context, cross-checked with the events file)")
     rel = REL_DAY.search(q)
+    if cat == "A" and find_event_name(q):
+        conf = max(conf, 0.7)                                       # an event of the data is named: the rules are sure (no need to ask the small LLM, which drifts to 'station profile')
     return {"cat": cat, "conf": round(conf, 2), "tier": 0, **CAT_DATA.get(cat, {}), "lines": list(dict.fromkeys(lines)),
             "stations": stations, "raw": [], "dates": dates, "month": find_month(q), "oos": oos_hits, "time": find_time(q), "times": times,
             "dur_min": find_duration_min(q), "horizon_min": find_horizon_min(q), "what_if": what_if, "follow": follow,
@@ -361,6 +385,9 @@ def route(question: str, has_history: bool = False) -> dict:
 # ---------------------------------------------------------------- multi-intent messages
 _SENT = re.compile(r"(?<=[?!.])\s+")
 _CLAUSE = re.compile(r",\s*(?:and\s+)?(?=(?:does|do|how|what|which|where|when|why|is|are|can|will|should)\b)|\band\s+(?=(?:what|how many|how much|which)\b)", re.I)
+
+
+_QWORD = re.compile(r"(does|do|how|what|which|where|when|why|is|are|can|will|should)\b", re.I)
 
 
 def _statement_merge(sents: list[str]) -> list[str]:
@@ -393,6 +420,13 @@ def split_parts(q: str, has_history: bool = False) -> list[dict]:
     texts: list[str] = []
     for sent in _statement_merge([x for x in _SENT.split(q.strip()) if len(x.split()) >= 3]):
         clauses = [c.strip(" ,;:") for c in _CLAUSE.split(sent) if c and len(c.split()) >= 4]
+        merged: list[str] = []
+        for c in clauses:                                   # 'On 2026-09-23, during InnoTrans, which 3 stations ...': a lead-in without a question word belongs to the question after it
+            if merged and not _QWORD.match(merged[-1]) and len(merged[-1].split()) <= 6:
+                merged[-1] = merged[-1] + ", " + c
+            else:
+                merged.append(c)
+        clauses = merged
         sub = [pp for pp in (_part_plan(c, has_history, 0.9) for c in clauses)] if len(clauses) > 1 else []
         cats = {pp["cat"] for pp in sub if pp} - {"FOLLOW"}
         texts.extend([pp["text"] for pp in sub if pp] if len(cats) > 1 else [sent])
@@ -419,7 +453,7 @@ ROUTER_SYSTEM = (
     "A=event impact on stations, B=anomaly/root cause, C=line/station closure response (reroute, overload, staff), "
     "D=one station's flow profile/peak/prediction, E=energy per passenger, F=network fragmentation/critical stations, "
     "G=correlated stations, H=how passengers actually reroute, P=which N stations get the highest load/pressure on a day (also weather/event scenarios), X=investment/InnoTrans route, "
-    "OOS=needs data we lack (capacity, delays, costs, forecasts beyond 2026-09-22, off-topic). Year is 2026. "
+    "OOS=needs data we lack (capacity, delays, costs, forecasts beyond the data window, off-topic). Year is 2026. "
     "If HISTORY=yes and the message only refers back to the previous answer ('those stations', 'how sure'), use FOLLOW."
 )
 

@@ -266,6 +266,10 @@ def record_run(ctx, live: dict, error: str | None, source: str | None) -> None:
     n_tool = len(timing.get("calls", []))
     tok_in = (timing.get("tok_in") or 0) + sum(e["tok_in"] or 0 for e in events)
     tok_out = (timing.get("tok_out") or 0) + sum(e["tok_out"] or 0 for e in events)
+    if timing.get("llm"):                                   # every LLM inference of the question (router, evaluator, writer) was logged: exact counts
+        n_llm = len(timing["llm"])
+        tok_in = sum(r.get("tok_in") or 0 for r in timing["llm"])
+        tok_out = sum(r.get("tok_out") or 0 for r in timing["llm"])
     total = time.time() - live["t0"]
     _write(
         "INSERT OR REPLACE INTO runs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",

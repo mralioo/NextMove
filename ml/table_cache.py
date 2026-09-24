@@ -20,10 +20,9 @@ CACHE_DIR = Path(os.environ.get("ML_CACHE_DIR", REPO_ROOT / "ml" / "cache"))
 
 def _fingerprint(folder: str) -> str:
     h = hashlib.sha1()
-    for p in sorted(Path(folder).glob("*")):
-        if p.is_file():
-            st = p.stat()
-            h.update(f"{p.name}:{st.st_size}:{int(st.st_mtime)}".encode())
+    for p in sorted(Path(folder).rglob("*.csv")):        # recursive: the test split lives in a sub-folder of data/
+        st = p.stat()
+        h.update(f"{p.relative_to(folder)}:{st.st_size}:{int(st.st_mtime)}".encode())
     for code in (REPO_ROOT / "ml" / "features.py", REPO_ROOT / "dashboard" / "utils" / "data_loader.py"):
         h.update(f"{code.name}:{int(code.stat().st_mtime)}".encode())
     return h.hexdigest()[:16]

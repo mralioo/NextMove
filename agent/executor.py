@@ -10,6 +10,8 @@ facts["status"]:  "ok" | "need" (missing input, ask the operator) | "unsupported
 """
 from __future__ import annotations
 
+import data_window
+
 import asyncio
 import difflib
 import re
@@ -157,12 +159,12 @@ async def playbook_c(plan: dict, mcp, trace: list) -> dict:
     import router as rt
 
     if plan.get("rel_day") and not plan["dates"]:
-        return {"status": "need", "cat": "C", "missing": [f"the date of '{plan['rel_day']}' (the data has no clock; give a date between 2026-06-10 and 2026-09-22)"]}
+        return {"status": "need", "cat": "C", "missing": [f"the date of '{plan['rel_day']}' (the data has no clock; give a date between {data_window.start()} and {data_window.end()})"]}
     closure, cands, near = await _find_closure(plan, mcp) if not plan["what_if"] else (None, [], [])
     assumed: dict = {}
     if closure is not None and plan.get("month") and not (closure.get("start") or "").startswith(plan["month"]):
         return {"status": "need", "cat": "C", "missing": [f"a date inside the data (no closure of these stations in {plan['month']}; "
-                                                          "data covers 2026-06-10 to 2026-09-22)"],
+                                                          f"data covers {data_window.window()})"],
                 "note": "the only recorded closure of this section is on " + (closure.get("start") or "")[:10]}
     src_note = None
     if closure is not None:

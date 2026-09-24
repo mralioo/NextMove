@@ -56,6 +56,7 @@ Before starting, it builds the **knowledge base** (`knowledge/knowledge.json`) a
 | Routing / scope decisions on a labelled set · router accuracy (no LLM) | `guardrail-suite` · `eval-router` |
 | ADK eval set (3 approximate-answer cases) | `adk-evalset` |
 | LangSmith: check key · create dataset · run + upload the experiment (`--all`, `--offline`) · offline scoring of stored runs | `ls-status` · `ls-dataset` · `ls-run` · `ls-eval` |
+| **Answer the organiser workbook** (TRAINING + FINAL_TEST + held-out stress run + TEAM_EVIDENCE) and store the run with its configuration: dashboard page *Submission runs* | `submission-run --label NAME [--cheap] [--env K=V] [--config JSON]` |
 | Component study and its report | `experiments [--list]` · `experiments-report` |
 | TabPFN: checkpoints · train · pressure-ranking skill | `checkpoints [--force]` · `train-disruption` · `train-overcrowding` · `validate-pressure` |
 | Trace database: back up before big runs · delete | `backup-obs` · `clean-obs` |

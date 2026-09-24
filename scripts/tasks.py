@@ -52,6 +52,7 @@ TASKS: dict[str, tuple[str, list[str], dict]] = {
     "guardrail-suite": ("Scope / guardrail / routing / follow-up decisions on a labelled set (no LLM)", [PY, "evaluation/guardrail_suite.py"], {}),
     "eval-router": ("Accuracy of the deterministic router on docs/test_questions.md (no LLM)", [PY, "agent/eval_router.py"], {}),
     "eval": ("Score the agent (LLM judge + gates): default ONE brutal question; --suite challenge|training, --ids CH1,CH3, --cheap, --allow-many", [PY, "evaluation/run_eval.py"], {"EVALUATOR_LITELLM_MODEL": SMALL}),
+    "submission-run": ("Answer the organiser workbook (TRAINING, FINAL_TEST, held-out stress run, TEAM_EVIDENCE) with the current configuration and store it for comparison: --label NAME [--cheap] [--env K=V] [--config JSON] [--stages ...] [--ids ...]", [PY, "evaluation/submission_run.py"], {}),
     "adk-evalset": ("Write the 3 approximate-answer cases into the ADK UI eval set eval_set_1", [PY, "evaluation/make_adk_evalset.py"], {}),
     "ls-eval": ("LangSmith-style evaluation of the latest stored runs, offline (--upload sends to LangSmith)", [PY, "evaluation/langsmith_eval.py"], {}),
     "ls-status": ("LangSmith: is LANGSMITH_API_KEY set and valid", [PY, "evaluation/langsmith_run.py", "status"], {}),

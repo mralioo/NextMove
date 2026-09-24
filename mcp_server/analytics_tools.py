@@ -81,9 +81,8 @@ def register(mcp, folder: str, get_feature_table: Callable[[], pd.DataFrame], ge
     def events() -> pd.DataFrame:
         with lock:
             if "events" not in S:
-                import glob
-                path = sorted(glob.glob(str(Path(folder) / "berlin_events*.csv")))[0]
-                e = pd.read_csv(path)
+                from utils.data_loader import _read_merged
+                e = _read_merged(Path(folder), "berlin_events*.csv", expect="event_name").drop_duplicates(["event_name", "began_local"], keep="last").reset_index(drop=True)
                 e["start"] = pd.to_datetime(e["began_local"].str[:19], errors="coerce")
                 e["end"] = pd.to_datetime(e["estimated_end_local"].fillna("").str[:19], errors="coerce")
                 e["end"] = e["end"].fillna(e["start"] + pd.Timedelta(hours=2))

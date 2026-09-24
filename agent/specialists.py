@@ -11,6 +11,8 @@ truth; partial = answers but with a stated proxy/limitation; planned = declines 
 """
 from __future__ import annotations
 
+import data_window
+
 import re
 import time
 from dataclasses import dataclass, field
@@ -111,7 +113,7 @@ async def pb_pressure(plan: dict, question: str, mcp, trace: list) -> dict:
 # ------------------------------------------------------------------------------------------- B  anomalies
 async def pb_anomalies(plan: dict, question: str, mcp, trace: list) -> dict:
     if not plan["dates"]:
-        return {"status": "need", "cat": "B", "missing": ["a date or date range (2026-06-10 to 2026-09-22)"]}
+        return {"status": "need", "cat": "B", "missing": [f"a date or date range ({data_window.window()})"]}
     ds = sorted(plan["dates"])
     cause = "weather" if re.search(r"weather|rain|storm|wind|heat|hot", question, re.I) else ""
     n = plan.get("n") or (1 if re.search(r"\ban example\b|\bone example\b", question, re.I) else 3)
