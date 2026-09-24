@@ -2,7 +2,7 @@
  "openapi": "3.1.0",
  "info": {
   "title": "NextMove operator API",
-  "description": "Feedback loop (score of a response, what the operator did) and operator knowledge base for the Talk To My Train UI.",
+  "description": "Feedback loop (score of a response, what the operator did) and operator knowledge base for the NextMove UI.",
   "version": "1.0"
  },
  "paths": {

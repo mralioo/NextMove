@@ -1,4 +1,4 @@
-"""ADK entry point for "Talk To My Train".
+"""ADK entry point for "NextMove".
 
 `adk web agent/`, `adk run agent/` and every runner we build ourselves (run_query, bench, evaluation, dashboard) load `app`:
 the supervisor -> worker <-> evaluator -> writer pipeline (fast_agent.py) with the observability plugin (traces, and one `runs` row per

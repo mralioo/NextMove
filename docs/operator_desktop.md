@@ -8,7 +8,7 @@
 ## 1. What it looks like
 
 ```
-┌─ Talk To My Train ── Passengers/15 min · Closures · Alerts · Weather ───────────────── clock 08:45 · 2026-09-27 ─┐
+┌─ NextMove ── Passengers/15 min · Closures · Alerts · Weather ───────────────── clock 08:45 · 2026-09-27 ─┐
 │ LINES         │                                             │ ALERTS (closure, unusual load, big event)           │
 │ U1 ▮▮▮ 2 614  │   city topology: 167 stations at their      │ CLOSURES NOW  [What should we do?] → asks Toby     │
 │ U2 ▮▮▮▮ 5 584 │   coordinates, edges in line colours,       │ EVENTS AROUND                                       │

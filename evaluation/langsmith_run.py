@@ -120,7 +120,7 @@ def cmd_dataset() -> None:
         existing = {e.metadata.get("id"): e for e in c.list_examples(dataset_id=d.id) if e.metadata}
         print(f"dataset '{DATASET}' exists with {len(existing)} examples")
     except Exception:
-        d = c.create_dataset(DATASET, description="NextMove / Talk To My Train: approximate-answer test set (3 core questions of the ADK eval set + 5 extended incl. a decline and a bounce). "
+        d = c.create_dataset(DATASET, description="NextMove: approximate-answer test set (3 core questions of the ADK eval set + 5 extended incl. a decline and a bounce). "
                                                   "Reference answers are approximate and come from the raw data / knowledge-base ground truth.")
         existing = {}
         print(f"created dataset '{DATASET}'")

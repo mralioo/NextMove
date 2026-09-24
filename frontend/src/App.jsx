@@ -40,7 +40,7 @@ export default function App() {
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 14.5C4 10.5 7.5 5 12 5C16.5 5 20 10.5 20 14.5C20 17 18 18 12 18C6 18 4 17 4 14.5Z" stroke="var(--teal)" strokeWidth="1.8" fill="rgba(0,229,212,0.12)" /><path d="M7 10C7.5 8 9.5 7 12 7C14.5 7 16.5 8 17 10" stroke="var(--teal)" strokeWidth="1.6" strokeLinecap="round" /><circle cx="8" cy="15" r="1.3" fill="var(--gold)" /><circle cx="16" cy="15" r="1.3" fill="var(--gold)" /><path d="M2 21H22" stroke="var(--teal)" strokeWidth="1.5" strokeLinecap="round" strokeOpacity="0.4" /></svg>
             </div>
             <div>
-              <div className="title">TALK TO MY TRAIN <span className="pill-badge teal">INNOTRANS 2026</span></div>
+              <div className="title">NEXTMOVE <span className="pill-badge teal">INNOTRANS 2026</span></div>
               <p>Dispatcher · Analyst · Inspector · Writer — an AI team for the control room</p>
             </div>
           </div>

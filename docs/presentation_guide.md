@@ -1,4 +1,4 @@
-# Talk To My Train — presentation guide and full project report
+# NextMove — presentation guide and full project report
 
 **For:** InnoTrans 2026, visitors of the fair (railway domain experts, mixed AI knowledge) · **Format:** 8–10 min talk + live demo + questions
 **One sentence:** *"Ask your control room's questions in plain words, get an answer you can act on in four seconds — with the evidence, the assumptions and the sources, and an honest "I can't know that" when the data doesn't support it."*
@@ -35,7 +35,7 @@ They know: lines, headways, closures, event traffic, control rooms, what a bad d
 
 > Rule: one idea per slide, ≤ 12 words of text, a picture or a number. The demo is the star.
 
-**Slide 1 — Title (10 s).** "Talk To My Train — an AI analyst for the control room." Team, InnoTrans 2026.
+**Slide 1 — Title (10 s).** "NextMove — an AI analyst for the control room." Team, InnoTrans 2026.
 
 **Slide 2 — The 3 a.m. question (40 s).** Picture: a control-room screen, a closure alert.
 *Say:* "U7 is suspended between Hermannplatz and Karl-Marx-Straße. Where do the passengers go? Which stations overflow? Where do I send staff? Today that is six screens and a phone call. We wanted: **ask, and get the answer in seconds.**"

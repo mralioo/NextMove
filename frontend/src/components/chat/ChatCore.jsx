@@ -66,7 +66,7 @@ export default function ChatCore({ variant = "page", onClose, onDock }) {
   return (
     <div className={"chat-core " + variant}>
       <header className="chat-head">
-        <div><b>Talk To My Train</b><small>your control-room assistant · advisory only, you decide</small></div>
+        <div><b>NextMove</b><small>your control-room assistant · advisory only, you decide</small></div>
         <div className="actions">
           <button className={"pill-tab" + (histOpen ? " active" : "")} onClick={() => setHistOpen(!histOpen)}><HistoryIcon size={13} /> History</button>
           <button className="pill-tab" onClick={newConversation}><Plus size={13} /> New</button>
@@ -80,7 +80,7 @@ export default function ChatCore({ variant = "page", onClose, onDock }) {
             {messages.length === 0 && (
               <div className="chat-welcome">
                 <div className="orb"><Sparkles size={26} /></div>
-                <h2>Talk To My Train</h2>
+                <h2>NextMove</h2>
                 <p>Ask in plain words. I answer with a short brief; say <i>why</i>, <i>evidence</i> or <i>which tools</i> for the full picture.</p>
                 <div className="grid">{suggestions.map((s, i) => (
                   <button key={i} onClick={() => submit(s.q)}><div><b>{s.label}</b><span>{short(s.q, 78)}</span></div><ChevronRight size={14} /></button>

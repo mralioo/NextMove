@@ -1,4 +1,4 @@
-# Talk To My Train
+# NextMove
 
 **An AI team for the control room** — InnoTrans 2026 hackathon, Berlin U-Bahn. An operator asks in plain words ("Line U7 is suspended between Hermannplatz and Karl-Marx-Straße tonight — how do we reroute, who gets overloaded, where should staff go?"); a small team of agents pulls the numbers through MCP tools, **recomputes the key figures before anything is shown**, and answers with a one-screen brief. The operator rates the answer and reports what they actually did; that becomes a precedent for the next similar situation. *Advisory only — the operator decides.*
 

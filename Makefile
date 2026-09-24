@@ -1,4 +1,4 @@
-# Talk To My Train — InnoTrans 2026 hackathon.  Four commands; `make` alone shows them.
+# NextMove — InnoTrans 2026 hackathon.  Four commands; `make` alone shows them.
 #
 #   make install   set up .venv and install every dependency (dashboard, ML, MCP, agent, evaluation)
 #   make up        run everything: prepares the knowledge base + graph, then starts the dashboard, the ADK chat/eval UI,
@@ -22,7 +22,7 @@ ADK_PORT ?= 8000
 .PHONY: help install up down check ui ui-build docs
 
 help:
-	@printf '\n\033[1mTalk To My Train\033[0m\n\n'
+	@printf '\n\033[1mNextMove\033[0m\n\n'
 	@printf '  \033[36mmake install\033[0m   Set up .venv and install every dependency\n'
 	@printf '  \033[36mmake up\033[0m        Run everything: operator UI + API, dashboard, ADK chat/eval UI, MCP servers, Neo4j (prepares the data, knowledge base, graph and UI first)\n'
 	@printf '  \033[36mmake down\033[0m      Stop everything that `make up` started\n'

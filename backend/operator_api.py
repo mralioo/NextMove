@@ -31,7 +31,7 @@ Followed = Literal["as_recommended", "modified", "different", "none"]
 Outcome = Literal["worked", "partly", "did_not_work", "unknown"]
 
 app = FastAPI(title="NextMove operator API", version="1.0",
-              description="Feedback loop (score of a response, what the operator did) and operator knowledge base for the Talk To My Train UI.")
+              description="Feedback loop (score of a response, what the operator did) and operator knowledge base for the NextMove UI.")
 app.add_middleware(CORSMiddleware, allow_origins=[o for o in os.environ.get("OPERATOR_API_CORS", "*").split(",") if o], allow_methods=["*"], allow_headers=["*"])
 
 
