@@ -190,9 +190,16 @@ class WorkerTask(_M):
 
 
 class ToolCall(_M):
+    """One MCP call the worker made: what was asked, what came back (preview) and how long it took."""
     tool: str
     server: str = "ubahn-flow-data"
     seconds: float = 0.0
+    args: dict[str, Any] = {}
+    result_preview: str = ""
+    result_bytes: int = 0
+    ok: bool = True
+    wait_ready_ms: int = 0
+    error: str | None = None
 
 
 class WorkerResult(_M):

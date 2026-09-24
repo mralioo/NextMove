@@ -22,6 +22,7 @@ import time
 
 import router
 from guardrails import LIMITS
+from observability import payload, set_attr, span
 from schemas import Adjustments, CheckResult, EvaluatorVerdict, KGCase, SupervisorPlan, WorkerResult, WorkerTask
 
 MODE = os.environ.get("EVALUATOR_MODE", "auto")
@@ -157,16 +158,42 @@ async def _llm(question: str, plan: SupervisorPlan, result: WorkerResult, checks
     user = json.dumps({"QUESTION": question, "OBJECTIVE": plan.objective.model_dump(), "RESULT": {"status": result.status, "facts": result.facts, "confidence": result.confidence,
                                                                                                   "confidence_reasons": result.confidence_reasons, "assumptions": result.assumptions},
                        "CHECKS": [c.model_dump() for c in checks], "KNOWLEDGE": know, "SIMILAR_CASES": [c.model_dump(exclude={"problem_id"}) for c in cases]}, ensure_ascii=False, default=str)[:9000]
-    try:
-        resp = await litellm.acompletion(model=model, messages=[{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}], max_tokens=1200, timeout=30,
-                                         response_format={"type": "json_object"}, **sampling_params(model, 0), **kw)
-        text = resp.choices[0].message.content or ""
-        return json.loads(text[text.index("{"): text.rindex("}") + 1]), model
-    except Exception as e:                                                    # an unreachable evaluator must not block the answer: deterministic verdict
-        return None, f"{type(e).__name__}"
+    with span("evaluator.llm", **{"gen_ai.request.model": model, "tmt.prompt_chars": len(user), "tmt.prompt": payload(user, 5000)}) as sp:
+        try:
+            resp = await litellm.acompletion(model=model, messages=[{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}], max_tokens=1200, timeout=30,
+                                             response_format={"type": "json_object"}, **sampling_params(model, 0), **kw)
+            text = resp.choices[0].message.content or ""
+            u = getattr(resp, "usage", None)
+            set_attr(sp, "gen_ai.usage.input_tokens", getattr(u, "prompt_tokens", None))
+            set_attr(sp, "gen_ai.usage.output_tokens", getattr(u, "completion_tokens", None))
+            set_attr(sp, "tmt.response", payload(text, 3000))
+            return json.loads(text[text.index("{"): text.rindex("}") + 1]), model
+        except Exception as e:                                                # an unreachable evaluator must not block the answer: deterministic verdict
+            set_attr(sp, "tmt.error", f"{type(e).__name__}")
+            return None, f"{type(e).__name__}"
 
 
 async def evaluate(question: str, plan: SupervisorPlan, task: WorkerTask, result: WorkerResult, kb=None, graph=None, allow_llm: bool = True) -> EvaluatorVerdict:
+    """The verdict, recorded as an `evaluator.check` span: objective, checks, evidence used, verdict, model, issues and adjustments."""
+    with span("evaluator.check", **{"tmt.iteration": task.iteration, "tmt.objective": plan.objective.statement, "tmt.success_criteria": plan.objective.success_criteria,
+                                     "tmt.worker_confidence": result.confidence, "tmt.worker_status": result.status}) as sp:
+        v = await _evaluate(question, plan, task, result, kb, graph, allow_llm)
+        set_attr(sp, "tmt.verdict", v.verdict)
+        set_attr(sp, "tmt.objective_met", v.objective_met)
+        set_attr(sp, "tmt.score", v.score)
+        set_attr(sp, "tmt.model", v.model)
+        set_attr(sp, "tmt.llm_used", not v.model.startswith("deterministic"))
+        set_attr(sp, "tmt.checks", [{"id": c.id, "ok": c.ok, "detail": c.detail[:120]} for c in v.checks])
+        set_attr(sp, "tmt.issues", v.issues)
+        set_attr(sp, "tmt.adjustments", v.adjustments.model_dump(exclude_none=True) if v.adjustments else None)
+        set_attr(sp, "tmt.ground_truth_ids", v.ground_truth_ids)
+        set_attr(sp, "tmt.boundary_ids", v.boundary_ids)
+        set_attr(sp, "tmt.similar_cases", [{"problem": c.problem[:80], "similarity": c.similarity, "actions": c.actions[:2]} for c in v.similar_cases])
+        set_attr(sp, "tmt.rationale", v.rationale)
+        return v
+
+
+async def _evaluate(question: str, plan: SupervisorPlan, task: WorkerTask, result: WorkerResult, kb=None, graph=None, allow_llm: bool = True) -> EvaluatorVerdict:
     t0 = time.time()
     checks, gt, bnd = deterministic(question, task, result, plan, kb)
     cases: list[KGCase] = []

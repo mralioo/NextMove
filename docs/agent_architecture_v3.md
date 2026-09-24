@@ -161,6 +161,20 @@ Environment: `EVALUATOR_MODE=auto|always|off`, `EVALUATOR_LITELLM_MODEL`, `LOOP_
 New: `agent/schemas.py`, `guardrails.py`, `supervisor.py`, `worker.py`, `evaluator.py`, `loop.py`, `kgraph.py`, `kgraph_build.py` · `evaluation/guardrail_suite.py`, `conversation_demo.py` · `docs/schemas/*.json`, `docs/agent_architecture_v3.md` · `knowledge/kg_export.cypher` · `tests/test_agent_schema_v3.py`.
 Changed: `agent/fast_agent.py` (supervisor / worker / writer ADK agents on the new schemas), `writer.py` (verdict-first format, references, argument, need-template), `router.py` (WHY_FOLLOW, German cues, delay/real-time out of scope), `executor.py` / `specialists.py` (`engine` passthrough), `knowledge.py` (turn store with verdict, `find_answered`, `last_turn`, `get_turn`), `llm_config.py` (`EVALUATOR` role), `mcp_server/analytics_tools.py` + `disruption_tools.py` (`engine` argument), `mcp_server/knowledge_server.py` (`kg_*` tools), `dashboard/views/11_Agent_Workflow.py`, `evaluation/{metrics,run_eval,dataset}.py`, `Makefile`.
 
+## 9a. Traces: every step, route, payload, time, MCP call
+
+Each question produces one OpenTelemetry trace (ADK UI → Traces tab, or dashboard → Observability → "Steps & payloads"). Span → what it carries:
+
+| Span | Attributes (`tmt.*`) |
+|---|---|
+| `supervisor.plan`, `route.rules`, `guardrails.input`, `history.lookup`, `llm.route` | category, decision, confidence, entities, route (specialist/tools/ML engine), guardrail results, history hit |
+| `worker.loop` → `worker_evaluator.round` → `worker.execute` | iteration, overrides, tools planned, ML engine, number of MCP calls, confidence, status |
+| `mcp.tool <tool>` (+ FastMCP client/server `tools/call` spans below it) | server, transport, **args**, **result** (truncated), result_bytes, seconds, wait_ready_ms (server warm-up), tool_error |
+| `evaluator.check`, `evaluator.llm` | verdict, score, issues, checks, adjustments, model, prompt size, tokens |
+| `llm.write`, `guard.check`, `writer.references`, `kb.sanity`, `kg.record_case` | prompt, response, model, tokens, number guard result, sources line, sanity checks, graph actions |
+
+Payloads are compact JSON, cut at 3–6 k characters (`observability.payload`). The same data is stored per run: `runs.timing_json["calls"]` (per MCP call, with round, args, result preview) and `["handover"]` (plan → rounds → result → verdict → writer). In the ADK Events tab each MCP call is a function_call (args) / function_response (seconds, bytes, preview) pair, followed by the evaluator verdict per round.
+
 ## 10. Cleanup (2026-09-24)
 
 Removed: **the legacy multi-LLM supervisor / specialist / verifier mode** (`AGENT_MODE=llm`, ~320 lines of `agent/agent.py`, now a 28-line entry point; `--mode` in `run_eval.py`, `--llm` in `bench.py`), **the JEV router** (`agent/router_jev.py`, the `jev` config choice, experiment arm R3, its test, `make jev-check`) and small dead code (`H_FINDING`, `FACTOR_LEVELS`, unused imports and variables). Kept because still used: `router_tfidf.py` and `memory.py` (experiment arms R2 / M2), `eval_router.py`. A copy of the old `agent.py` and Makefile was kept outside the repo; both are also in git history except the uncommitted edits.

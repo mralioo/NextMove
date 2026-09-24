@@ -315,20 +315,23 @@ async def write(question: str, facts: dict, wi=None) -> tuple[str, dict]:
         extra = (f"\nCONFIDENCE: {wi.result.confidence}\nISSUES: {wi.verdict.issues[:3]}\nWANTS_ARGUMENT: {str(wi.wants_argument).lower()}\n"
                  f"OBJECTIVE: {wi.objective.statement}")
     user = f"QUESTION: {question}{extra}\nFACTS: {json.dumps(facts, ensure_ascii=False, separators=(',', ':'))}"
-    from observability import set_attr, span
+    from observability import payload, set_attr, span
 
     budget = float(os.environ.get("WRITER_TIMEOUT_S", "10"))
-    with span("llm.write", **{"gen_ai.request.model": model, "tmt.budget_s": budget, "tmt.facts_status": facts.get("status")}) as sp:
+    with span("llm.write", **{"gen_ai.request.model": model, "tmt.budget_s": budget, "tmt.facts_status": facts.get("status"), "tmt.system_chars": len(WRITER_SYSTEM),
+                              "tmt.prompt": payload(user, 5000), "tmt.wants_argument": bool(wi.wants_argument) if wi is not None else None}) as sp:
         try:
             resp = await asyncio.wait_for(litellm.acompletion(
                 model=model, messages=[{"role": "system", "content": WRITER_SYSTEM}, {"role": "user", "content": user}],
                 max_tokens=1500, timeout=budget + 5, **sampling_params(model), **kw), timeout=budget)
         except (asyncio.TimeoutError, Exception) as e:      # slow/failed LLM: ship the deterministic answer, never block
             set_attr(sp, "tmt.error", f"{type(e).__name__}")
+            set_attr(sp, "tmt.fallback", "template (LLM slow or failed)")
             return render_fallback(facts), {"model": model, "guard": f"template ({type(e).__name__}: LLM over {budget:.0f}s budget or failed)"}
         text = (resp.choices[0].message.content or "").strip()
         u = getattr(resp, "usage", None)
-        info = {"model": model, "tok_in": getattr(u, "prompt_tokens", None), "tok_out": getattr(u, "completion_tokens", None)}
+        info = {"model": model, "tok_in": getattr(u, "prompt_tokens", None), "tok_out": getattr(u, "completion_tokens", None), "prompt": payload(user, 5000)}
+        set_attr(sp, "tmt.response", payload(text, 4000))
         set_attr(sp, "gen_ai.usage.input_tokens", info["tok_in"])
         set_attr(sp, "gen_ai.usage.output_tokens", info["tok_out"])
     with span("guard.check") as gsp:

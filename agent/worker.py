@@ -67,10 +67,23 @@ def score_confidence(cat: str, facts: dict, task: WorkerTask, truth_ok: bool | N
 
 async def run_worker(task: WorkerTask, last_facts: dict | None, mcp, kb=None) -> WorkerResult:
     """Execute one task. Never raises: a failure becomes status 'error' (the evaluator / failsafe deal with it)."""
+    from observability import CALL_LOG, payload, set_attr, span
+
     t0 = time.time()
     plan = task.to_legacy_plan()
     plan["engine"] = task.route.ml_engine if task.route.ml_engine == "empirical" else None       # tabpfn is the server default
-    facts, trace = await executor.execute(plan, task.question, last_facts, mcp)
+    calls: list = []
+    token = CALL_LOG.set(calls)                                    # every MCP call in this task (also the parallel ones) is logged with args and result preview
+    try:
+        with span("worker.execute", **{"tmt.iteration": task.iteration, "tmt.category": task.category, "tmt.specialist": task.route.specialist, "tmt.mcp_servers": task.route.mcp_servers,
+                                        "tmt.tools_planned": task.route.tools, "tmt.datasets": task.route.datasets, "tmt.ml_engine": task.route.ml_engine, "tmt.overrides": task.overrides,
+                                        "tmt.task": payload(task.model_dump(exclude={"parts"}, mode="json"), 4000)}) as sp:
+            facts, trace = await executor.execute(plan, task.question, last_facts, mcp)
+            set_attr(sp, "tmt.facts_status", facts.get("status"))
+            set_attr(sp, "tmt.facts", payload(facts, 4000))
+            set_attr(sp, "tmt.n_mcp_calls", len(calls))
+    finally:
+        CALL_LOG.reset(token)
     truth_ok = None
     if kb is not None and facts.get("status") == "ok":
         try:
@@ -84,7 +97,16 @@ async def run_worker(task: WorkerTask, last_facts: dict | None, mcp, kb=None) ->
     status = facts.get("status") if facts.get("status") in ("ok", "need", "unsupported", "oos", "follow", "multi", "error") else "error"
     return WorkerResult(task_id=task.task_id, iteration=task.iteration, status=status, facts=facts, confidence=conf, confidence_reasons=why, assumptions=[str(x) for x in assumptions],
                         datasets_used=task.route.datasets, ml_engine_used=task.route.ml_engine if task.route.ml_engine != "none" else "none",
-                        tools_called=[ToolCall(tool=str(c.get("tool")), seconds=float(c.get("s", 0.0))) for c in trace], seconds=round(time.time() - t0, 2))
+                        tools_called=_tool_calls(calls, trace, t0), seconds=round(time.time() - t0, 2))
+
+
+def _tool_calls(calls: list, trace: list, t0: float) -> list[ToolCall]:
+    """MCP call records (with arguments and result previews) when the runtime logged them, else the executor's plain (tool, seconds) trace."""
+    if calls:
+        return [ToolCall(tool=c["tool"], server=c.get("server", "ubahn-flow-data"), seconds=float(c.get("seconds", 0.0)), args=c.get("args", {}), result_preview=c.get("result_preview", ""),
+                         result_bytes=int(c.get("result_bytes", 0)), ok=bool(c.get("ok", True)), wait_ready_ms=int(c.get("wait_ready_ms", 0)), error=c.get("error"))
+                for c in sorted(calls, key=lambda c: c.get("start", 0))]
+    return [ToolCall(tool=str(c.get("tool")), seconds=float(c.get("s", 0.0))) for c in trace]
 
 
 def task_from_plan(plan, iteration: int = 1, overrides: dict | None = None) -> WorkerTask:

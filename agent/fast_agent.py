@@ -32,7 +32,7 @@ import router  # noqa: E402
 import writer  # noqa: E402
 from config import CONFIG  # noqa: E402
 from mcp_runtime import get_runtime  # noqa: E402
-from observability import init_tracing, set_attr, span  # noqa: E402
+from observability import init_tracing, payload, set_attr, span  # noqa: E402
 import specialists  # noqa: E402
 import supervisor  # noqa: E402
 from guardrails import BOUNCE_MESSAGE, SAFE_FALLBACK, check_output  # noqa: E402
@@ -94,12 +94,20 @@ class SupervisorAgent(BaseAgent):
             set_attr(sp, "tmt.confidence", plan.confidence)
             set_attr(sp, "tmt.decision", plan.decision)
             set_attr(sp, "tmt.guardrails_failed", [g.check for g in plan.guardrails if not g.passed])
+            set_attr(sp, "tmt.question", q)
+            set_attr(sp, "tmt.objective", plan.objective.model_dump())
+            set_attr(sp, "tmt.route", plan.route.model_dump())
+            set_attr(sp, "tmt.entities", plan.entities.model_dump(exclude_none=True, exclude_defaults=True))
+            set_attr(sp, "tmt.follow_up", plan.follow_up.model_dump() if plan.follow_up else None)
+            set_attr(sp, "tmt.history", plan.history.model_dump(exclude={"answer"}) if plan.history else None)
+            set_attr(sp, "tmt.plan", payload(plan.model_dump(mode="json", exclude={"parts"}), 6000))
         legacy = plan.to_legacy()
         legacy.update(plan_id=plan.plan_id, decision=plan.decision, objective=plan.objective.model_dump(), route=plan.route.model_dump(),
                       guardrails=[g.model_dump() for g in plan.guardrails], history=plan.history.model_dump() if plan.history else None,
                       follow_up=plan.follow_up.model_dump() if plan.follow_up else None, llm_router_error=plan.llm_router_error)
         timing = {"route_ms": round((time.time() - t0) * 1000), "tier": plan.tier, "cfg": asdict(CONFIG), "decision": plan.decision,
-                  "guardrails": [g.model_dump() for g in plan.guardrails if not g.passed or g.action != "allow"]}
+                  "guardrails": [g.model_dump() for g in plan.guardrails if not g.passed or g.action != "allow"],
+                  "handover": {"plan": {**plan.model_dump(mode="json", exclude={"parts", "guardrails"}), "guardrail_results": [g.model_dump() for g in plan.guardrails]}}}
         sp_dump = plan.model_dump(mode="json")
         st["plan"], st["sp"], st["timing"] = legacy, sp_dump, timing
         yield _text_event(self.name, f"[plan] {plan.decision} · {plan.category} · {plan.route.specialist} · objective: {plan.objective.statement}",
@@ -141,13 +149,40 @@ class WorkerAgent(BaseAgent):
                 extra = [K.by_id[i] for i in plan.kb_boundaries if i in K.by_id][:2]
                 extra += [e for e in K.search(plan.question, cats=[plan.category], kinds=["insight"], k=1) if e["id"] not in {x["id"] for x in extra}]
                 facts["kb"] = [{"id": e["id"], "t": e["text"][:230]} for e in extra][:3]
-        calls = [{"tool": c.tool, "s": c.seconds} for c in out.result.tools_called]
+        calls = [{"tool": c.tool, "s": c.seconds, "round": r, "server": c.server, "args": c.args, "result_preview": c.result_preview, "bytes": c.result_bytes, "ok": c.ok,
+                  "wait_ready_ms": c.wait_ready_ms, "error": c.error} for r, c in out.calls] or [{"tool": c.tool, "s": c.seconds} for c in out.result.tools_called]
         timing.update(tools_s=round(time.time() - t0, 2), calls=calls, loop=out.iterations, confidence=out.result.confidence, verdict=out.verdict.verdict,
                       evaluator_llm_calls=sum(1 for i in out.iterations if not str(i.get("model", "")).startswith("deterministic")),
                       guardrails=timing.get("guardrails", []) + [g.model_dump() for g in out.guardrails])
+        timing["handover"] = {**timing.get("handover", {}),
+                              "rounds": [{"round": i["i"], "overrides": i.get("overrides"), "tools": i.get("tools"), "confidence": i.get("confidence"), "status": i.get("status"), "engine": i.get("engine"),
+                                          "worker_s": i.get("worker_s"), "verdict": i.get("verdict"), "score": i.get("score"), "issues": i.get("issues"), "adjustments": i.get("adjustments"),
+                                          "evaluator_model": i.get("model"), "evaluator_s": i.get("evaluator_s")} for i in out.iterations],
+                              "result": {**out.result.model_dump(exclude={"facts", "tools_called"}, mode="json")},
+                              "verdict": out.verdict.model_dump(mode="json", exclude={"checks", "similar_cases"}), "checks": [c.model_dump() for c in out.verdict.checks],
+                              "similar_cases": [c.model_dump() for c in out.verdict.similar_cases]}
         st["facts"], st["timing"] = facts, timing
         name = specialists.SPECIALISTS[plan.category].name if plan.category in specialists.SPECIALISTS else plan.category.lower()
-        yield Event(author=f"worker:{name}", content=types.Content(role="model", parts=[types.Part(
+        author = f"worker:{name}"
+        # ---- the steps, as ADK events (visible in the ADK UI chat and trace): every MCP call as a function_call / function_response pair with its arguments,
+        #      result preview and time, then the evaluator's verdict for that round. Custom agents make these calls themselves, so we report them here.
+        by_round: dict[int, list] = {}
+        for r, c in out.calls:
+            by_round.setdefault(r, []).append(c)
+        for it in out.iterations:
+            for n, c in enumerate(by_round.get(it["i"], [])):
+                cid = f"mcp-{it['i']}-{n}"
+                yield Event(author=author, content=types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(id=cid, name=c.tool, args=c.args or {}))]),
+                            custom_metadata={"round": it["i"], "server": c.server, "kind": "mcp_call"})
+                yield Event(author=author, content=types.Content(role="user", parts=[types.Part(function_response=types.FunctionResponse(
+                    id=cid, name=c.tool, response={"ok": c.ok, "seconds": c.seconds, "server": c.server, "wait_ready_ms": c.wait_ready_ms, "result_bytes": c.result_bytes,
+                                                   "result_preview": c.result_preview, **({"error": c.error} if c.error else {})}))]),
+                            custom_metadata={"round": it["i"], "server": c.server, "kind": "mcp_result", "seconds": c.seconds})
+            yield Event(author="evaluator", content=types.Content(role="model", parts=[types.Part(text=(
+                f"[evaluator round {it['i']}] {it['verdict']} · score {it['score']} · confidence {it['confidence']} · model {it['model']} · {it['evaluator_s']} s"
+                + (f" · issues: {'; '.join(it['issues'])}" if it.get("issues") else "") + (f" · adjustments: {it['adjustments']}" if it.get("adjustments") else "")))]),
+                custom_metadata={"round": it["i"], "kind": "evaluator"})
+        yield Event(author=author, content=types.Content(role="model", parts=[types.Part(
             text=f"[facts] confidence {out.result.confidence} · verdict {out.verdict.verdict} · {json.dumps(facts, ensure_ascii=False, separators=(',', ':'))[:1800]}")]),
             actions=EventActions(state_delta={"facts": facts, "timing": timing, "result": out.result.model_dump(exclude={"facts"}, mode="json"), "verdict": out.verdict.model_dump(mode="json")}))
 
@@ -189,13 +224,21 @@ class WriterAgent(BaseAgent):
                 wi = WriterInput(question=q, objective=plan.objective, verdict=ver, result=res, wants_argument=writer.wants_argument(q))
                 answer, info = await writer.write(q, facts, wi)
                 if facts.get("status") in ("ok", "multi"):
-                    refs = writer.build_references(plan.route, res, ver)
-                    answer += SOURCES + writer.sources_line(refs, res.confidence, ver.verdict)[len("**Sources:**"):]
+                    with span("writer.references") as rsp:
+                        refs = writer.build_references(plan.route, res, ver)
+                        line = writer.sources_line(refs, res.confidence, ver.verdict)
+                        set_attr(rsp, "tmt.references", [{"kind": r.kind, "id": r.id} for r in refs])
+                        set_attr(rsp, "tmt.sources_line", line)
+                    answer += SOURCES + line[len("**Sources:**"):]
                 source = "decline" if facts.get("status") in ("oos", "unsupported", "need") else ("follow_up" if facts.get("status") == "follow" else "worker")
         body = _strip_sources(answer)
         outg = check_output(body, facts, q) if source in ("worker", "follow_up", "decline") else []
         timing = {**timing, "write_s": round(time.time() - t0, 2), **info,
                   "guardrails": timing.get("guardrails", []) + [g.model_dump() for g in outg if not g.passed]}
+        timing["handover"] = {**timing.get("handover", {}), "writer": {"source": source, "objective": plan.objective.statement, "wants_argument": writer.wants_argument(q), "model": info.get("model"),
+                                                                   "guard": info.get("guard"), "answer_words": len(body.split()), "references": [r.model_dump() for r in refs],
+                                                                   "prompt": info.get("prompt"), "output_guardrails": [g.model_dump() for g in outg]}}
+        timing.pop("prompt", None)
         keep = (facts if facts.get("status") == "ok" else st.get("last_facts")) if CONFIG.memory != "none" else None   # follow-ups refer to the last real answer
         delta = {"timing": timing, "last_facts": keep}
         if source == "history" and st.get("last_plan"):
@@ -217,6 +260,8 @@ def _sanity_and_remember(K, ctx, question: str, answer: str, facts: dict, legacy
         except Exception as e:                                       # a checker bug must never break an answer
             res = {"ok": None, "score": None, "checks": [], "error": f"{type(e).__name__}: {str(e)[:100]}"}
         set_attr(sp, "tmt.sanity_ok", res.get("ok"))
+        set_attr(sp, "tmt.sanity_checks", [{"id": c["id"], "ok": c["ok"], "detail": c["detail"][:110]} for c in res.get("checks", [])])
+        set_attr(sp, "tmt.evidence", res.get("evidence"))
         set_attr(sp, "tmt.sanity_fails", [c["id"] for c in res.get("checks", []) if not c["ok"]])
     accepted = bool(facts.get("status") in ("ok", "multi") and (verdict or {}).get("verdict") == "accept" and res.get("ok") is not False and source == "worker")
     conf = (result or {}).get("confidence")
@@ -230,7 +275,8 @@ def _sanity_and_remember(K, ctx, question: str, answer: str, facts: dict, legacy
         try:
             from kgraph import actions_from_facts, kg
             acts, opts = actions_from_facts(facts) if facts.get("status") == "ok" else ([], [])
-            kg().record_case(GraphCase(question=question, category=plan.category, entities=plan.entities, answer=answer, confidence=conf, verdict="accept", actions=acts, options=opts))
+            with span("kg.record_case", **{"tmt.category": plan.category, "tmt.actions": acts, "tmt.options": opts, "tmt.neo4j_mirror": kg().neo4j_configured()}):
+                kg().record_case(GraphCase(question=question, category=plan.category, entities=plan.entities, answer=answer, confidence=conf, verdict="accept", actions=acts, options=opts))
         except Exception:
             pass
     from knowledge import cognee

@@ -16,6 +16,7 @@ Use:  data = await mcp.call("scenario_flow", closure_id=8)      (returns the too
 from __future__ import annotations
 
 import asyncio
+import json
 import atexit
 import os
 import socket
@@ -96,17 +97,41 @@ class McpRuntime:
 
     # -- public API ------------------------------------------------------------------------
     async def call(self, tool: str, **args):
-        """Call an MCP tool; returns the decoded JSON result (dict/list)."""
-        from observability import set_attr, span
+        """Call an MCP tool; returns the decoded JSON result (dict/list). Every call is a span (`mcp.tool <tool>`) carrying the server, the arguments, a preview of the
+        result, its size and how long it waited for the server to be ready; the same record is appended to observability.CALL_LOG when the caller set one."""
+        from observability import CALL_LOG, payload, set_attr, span
 
-        with span(f"mcp.tool {tool}", **{"tmt.tool": tool, "tmt.args": {k: v for k, v in args.items() if v is not None}}) as sp:
+        clean = {k: v for k, v in args.items() if v is not None}
+        with span(f"mcp.tool {tool}", **{"tmt.tool": tool, "tmt.server": "ubahn-flow-data", "tmt.transport": getattr(self, "transport_kind", CONFIG.mcp), "tmt.args": clean}) as sp:
+            t0 = time.time()
             await asyncio.get_running_loop().run_in_executor(None, self._ready.wait)
-            if self._error:
-                raise RuntimeError(f"MCP server failed to start: {self._error}")
-            fut = asyncio.run_coroutine_threadsafe(self._call(tool, args), self.loop)
-            result = await asyncio.wrap_future(fut)
+            wait_ms = round((time.time() - t0) * 1000)
+            rec = {"tool": tool, "server": "ubahn-flow-data", "args": clean, "wait_ready_ms": wait_ms, "ok": True, "start": t0}
+            try:
+                if self._error:
+                    raise RuntimeError(f"MCP server failed to start: {self._error}")
+                fut = asyncio.run_coroutine_threadsafe(self._call(tool, args), self.loop)
+                result = await asyncio.wrap_future(fut)
+            except Exception as e:
+                rec.update(ok=False, error=f"{type(e).__name__}: {str(e)[:200]}", seconds=round(time.time() - t0, 3))
+                set_attr(sp, "tmt.error", rec["error"])
+                log = CALL_LOG.get()
+                if log is not None:
+                    log.append(rec)
+                raise
+            rec["seconds"] = round(time.time() - t0, 3)
+            rec["result_preview"] = payload(result, 1500)
+            rec["result_bytes"] = len(json.dumps(result, default=str)) if result is not None else 0
+            set_attr(sp, "tmt.wait_ready_ms", wait_ms)
+            set_attr(sp, "tmt.seconds", rec["seconds"])
+            set_attr(sp, "tmt.result", payload(result, 3000))
+            set_attr(sp, "tmt.result_bytes", rec["result_bytes"])
             if isinstance(result, dict) and "error" in result:
+                rec["ok"] = False
                 set_attr(sp, "tmt.tool_error", str(result["error"])[:300])
+            log = CALL_LOG.get()
+            if log is not None:
+                log.append(rec)
             return result
 
     async def _call(self, tool: str, args: dict):

@@ -21,6 +21,7 @@ import router
 import specialists
 from config import CONFIG
 from guardrails import BOUNCE_MESSAGE, LIMITS, check_input, check_route
+from observability import payload, set_attr, span
 from schemas import (Entities, FollowUp, GuardrailResult, HistoryHit, Objective, PartPlan, Route, SupervisorPlan)
 
 ROUTER_CONF_MIN = float(os.environ.get("ROUTER_CONF_MIN", "0.55"))
@@ -118,10 +119,17 @@ async def supervise(question: str, *, last: dict | None, last_facts: dict | None
     if last and last_facts:
         r0 = router.route(q, has_history=False)
         standalone = r0["conf"] >= ROUTER_CONF_MIN and r0["cat"] not in ("OOS", "FOLLOW") and not router.WHY_FOLLOW.search(q)
-    legacy = router.route(q, has_history=has_history and not standalone)
+    with span("route.rules", **{"tmt.has_history": has_history, "tmt.standalone": standalone}) as rsp:
+        legacy = router.route(q, has_history=has_history and not standalone)
+        set_attr(rsp, "tmt.category", legacy["cat"])
+        set_attr(rsp, "tmt.confidence", legacy["conf"])
+        set_attr(rsp, "tmt.entities", {k: legacy.get(k) for k in ("lines", "stations", "dates", "times", "dur_min", "horizon_min", "venue", "event", "n", "rain", "rel_day", "oos") if legacy.get(k) not in (None, [], "", False)})
     tier = 0
     # ---- 2 · input guardrails FIRST: an unrelated question is bounced before any LLM call (the router fallback would cost a call and ~1.5 s)
-    in_scope, guards, message = check_input(q, legacy, has_history)
+    with span("guardrails.input") as gsp:
+        in_scope, guards, message = check_input(q, legacy, has_history)
+        set_attr(gsp, "tmt.in_scope", in_scope)
+        set_attr(gsp, "tmt.results", [{"check": g.check, "passed": g.passed, "action": g.action, "detail": g.detail} for g in guards])
     if not in_scope:
         return SupervisorPlan(question=q, decision="bounce", in_scope=False, category="BOUNCE", confidence=1.0, tier=tier, objective=BOUNCE, route=build_route("BOUNCE"),
                               guardrails=guards, message=message or BOUNCE_MESSAGE)
@@ -129,7 +137,9 @@ async def supervise(question: str, *, last: dict | None, last_facts: dict | None
     router_error = None
     if llm_fallback and (CONFIG.router == "llm" or (legacy["conf"] < ROUTER_CONF_MIN and legacy["cat"] not in ("OOS", "FOLLOW") and CONFIG.router == "rules")):
         try:
-            legacy = await router.llm_route(q, legacy, has_history)
+            with span("llm.route", **{"tmt.reason": "router=llm" if CONFIG.router == "llm" else "low confidence", "tmt.det_category": legacy["cat"]}) as lsp:
+                legacy = await router.llm_route(q, legacy, has_history)
+                set_attr(lsp, "tmt.category", legacy["cat"])
             tier = 1
         except Exception as e:                                         # network / LLM trouble: keep the deterministic plan
             router_error = str(e)[:80]
@@ -165,9 +175,12 @@ async def supervise(question: str, *, last: dict | None, last_facts: dict | None
     # ---- 4 · history: an accepted answer already exists
     hit = None
     if kb is not None and HISTORY_ON() and follow is None and cat not in ("OOS", "FOLLOW"):
-        h = kb.find_answered(q, key, data_end)
-        if h:
-            hit = HistoryHit(**h)
+        with span("history.lookup", **{"tmt.plan_key": key, "tmt.data_end": data_end}) as hsp:
+            h = kb.find_answered(q, key, data_end)
+            set_attr(hsp, "tmt.hit", bool(h))
+            if h:
+                hit = HistoryHit(**h)
+                set_attr(hsp, "tmt.hit_detail", {"kind": hit.kind, "similarity": hit.similarity, "age_s": hit.age_s, "turn_id": hit.turn_id})
 
     sp = specialists.SPECIALISTS.get(cat)
     guards.append(check_route(cat, sp.status if sp else None))

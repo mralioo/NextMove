@@ -149,11 +149,25 @@ def span(name: str, **attrs):
         yield sp
 
 
+def payload(obj, limit: int = 6000) -> str:
+    """Compact JSON of a hand-over payload for a span attribute, cut at `limit` characters (the size is kept: `… [+N chars]`)."""
+    text = obj if isinstance(obj, str) else json.dumps(obj, ensure_ascii=False, default=str, separators=(",", ":"))
+    return text if len(text) <= limit else text[:limit] + f"… [+{len(text) - limit} chars]"
+
+
+import contextvars
+
+CALL_LOG: contextvars.ContextVar = contextvars.ContextVar("tmt_call_log", default=None)
+"""When set to a list, every MCP call made in this context (and in tasks created from it) appends one record: tool, server, args, result preview, timings."""
+
+
 def set_attr(sp, key: str, value) -> None:
     if sp is None or value is None:
         return
     if not isinstance(value, (str, bool, int, float)):
-        value = json.dumps(value, ensure_ascii=False, default=str)[:2000]
+        value = payload(value, 6000)
+    elif isinstance(value, str) and len(value) > 8000:
+        value = payload(value, 8000)
     try:
         sp.set_attribute(key, value)
     except Exception:

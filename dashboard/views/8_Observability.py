@@ -174,15 +174,21 @@ else:
     def kind(n: str) -> str:
         if n.startswith("invoke_agent") or n == "invocation":
             return "ADK agent"
-        if n.startswith("llm."):
-            return "LLM call"
+        if n.startswith(("supervisor", "route.", "guardrails.", "history.", "llm.route")):
+            return "supervisor"
+        if n.startswith("worker"):
+            return "worker"
+        if n.startswith("evaluator"):
+            return "evaluator"
         if n.startswith("mcp.tool"):
-            return "MCP tool"
-        if n.startswith("guard"):
-            return "guard"
-        if n.startswith("route") or n.startswith("executor"):
-            return "pipeline step"
-        return "MCP protocol / other"
+            return "MCP call"
+        if n.startswith(("llm.", "gen_ai")):
+            return "LLM call"
+        if n.startswith(("guard", "writer.", "kb.", "kg.")):
+            return "writer / checks / memory"
+        if n.startswith("executor"):
+            return "worker"
+        return "MCP protocol"
 
     spans = spans.assign(kind=spans["name"].map(kind))
     t0 = pd.Timestamp("2000-01-01")
@@ -190,8 +196,8 @@ else:
     spans["end"] = spans["start"] + pd.to_timedelta(spans["duration_ms"].clip(lower=1), unit="ms")
     spans["label"] = spans["name"] + "  (" + spans["duration_ms"].round(0).astype(int).astype(str) + " ms)"
     fig = px.timeline(spans, x_start="start", x_end="end", y="label", color="kind",
-                      color_discrete_map={"ADK agent": REF, "LLM call": BASE, "MCP tool": PRED, "guard": GOOD, "pipeline step": ACTUAL,
-                                          "MCP protocol / other": "#d1d5db"})
+                      color_discrete_map={"ADK agent": REF, "supervisor": ACTUAL, "worker": "#0ea5e9", "evaluator": GOOD, "MCP call": PRED, "LLM call": BASE,
+                                          "writer / checks / memory": "#f59e0b", "MCP protocol": "#d1d5db"})
     fig.update_yaxes(autorange="reversed", title="")
     fig.update_xaxes(tickformat="%S.%L s", title="Time since the question arrived")
     fig.update_layout(height=max(360, 26 * len(spans) + 90), legend=dict(orientation="h", y=-0.15))
@@ -199,8 +205,8 @@ else:
     llm = spans[spans["name"].str.startswith("llm.")]
     inner = spans[~spans["name"].str.startswith(("invoke_agent", "invocation", "MCP send", "tools/call"))]   # skip wrapper spans
     explain(
-        "The waterfall of this single question: the ADK agent stages (router → executor → writer), the tool calls the executor made "
-        "(and the MCP protocol messages underneath), the LLM call and the guard check. Rows are nested top-to-bottom in call order.",
+        "The waterfall of this single question, every step: supervisor (rules, guardrails, history), the worker ⇄ evaluator rounds, each MCP call (and the MCP protocol "
+        "messages underneath), the evaluator's checks and LLM, the writer's LLM call, the guard, sources, sanity check and knowledge-graph write. Rows are nested top-to-bottom in call order.",
         "Read the bars left to right as time. Bars that start together ran in parallel (the executor calls several tools at once). "
         "The long bar is where this answer spent its time.",
         ("info", "Slowest step: **" + inner.loc[inner["duration_ms"].idxmax(), "name"] + f"** ({inner['duration_ms'].max():.0f} ms)."
@@ -211,12 +217,98 @@ else:
         tbl["attributes"] = spans["attrs"].apply(lambda a: {k: v for k, v in a.items() if k.startswith(("tmt.", "gen_ai.request", "gen_ai.usage", "gen_ai.tool", "gen_ai.agent.name"))})
         st.dataframe(tbl.round(1), use_container_width=True, hide_index=True)
 
-t1, t2, t3 = st.tabs(["Plan (router output)", "Facts (executor output)", "Event timeline"])
-with t1:
+timing = json.loads(run["timing_json"]) if run.get("timing_json") else {}
+hand = timing.get("handover", {})
+t_steps, t_mcp, t_hand, t_plan, t_facts, t_ev = st.tabs(["Steps & payloads", "MCP calls", "Hand-overs (route → result → verdict → writer)", "Plan", "Facts", "ADK events"])
+with t_steps:
+    if spans.empty:
+        st.info("No spans stored for this run.")
+    else:
+        explain("Every step in call order with its timing and the payload it carried: what the supervisor decided and routed, what each MCP call was asked and answered, what the evaluator checked and concluded, "
+                "and the prompt / response of each LLM call.", "Pick a step to see all its attributes. `tmt.args` / `tmt.result` are the request and (truncated) response of an MCP call; `tmt.prompt` / `tmt.response` those of an LLM call.")
+        core = spans[~spans["name"].str.startswith(("MCP send", "tools/call", "invocation"))].sort_values("start_ms")
+
+        def summary(r) -> str:
+            a = r["attrs"]
+            n = r["name"]
+            if n.startswith("mcp.tool"):
+                return f"{a.get('tmt.server', '')} · args {a.get('tmt.args', '')[:70]} · {a.get('tmt.result_bytes', '?')} B" + (f" · waited {a['tmt.wait_ready_ms']} ms for the server" if a.get("tmt.wait_ready_ms", 0) > 200 else "")
+            if n == "supervisor.plan":
+                return f"{a.get('tmt.decision')} · {a.get('tmt.category')} · route {a.get('tmt.route', '')[:110]}"
+            if n == "guardrails.input":
+                return "in scope" if a.get("tmt.in_scope") else "BOUNCED"
+            if n == "route.rules":
+                return f"{a.get('tmt.category')} conf {a.get('tmt.confidence')} · {a.get('tmt.entities', '')[:90]}"
+            if n == "history.lookup":
+                return "hit " + a.get("tmt.hit_detail", "") if a.get("tmt.hit") else "miss"
+            if n.startswith("worker.execute"):
+                return f"round {a.get('tmt.iteration')} · {a.get('tmt.specialist')} · planned {a.get('tmt.tools_planned', '')[:80]} · engine {a.get('tmt.ml_engine')} · {a.get('tmt.n_mcp_calls')} MCP calls"
+            if n.startswith("evaluator.check"):
+                return f"{a.get('tmt.verdict')} · score {a.get('tmt.score')} · {a.get('tmt.model')} · issues {a.get('tmt.issues', '[]')[:80]}"
+            if n.startswith("evaluator.llm"):
+                return f"{a.get('gen_ai.request.model')} · prompt {a.get('tmt.prompt_chars')} chars · {a.get('gen_ai.usage.input_tokens')}→{a.get('gen_ai.usage.output_tokens')} tok"
+            if n == "llm.write":
+                return f"{a.get('gen_ai.request.model')} · {a.get('gen_ai.usage.input_tokens')}→{a.get('gen_ai.usage.output_tokens')} tok" + (f" · {a['tmt.fallback']}" if a.get("tmt.fallback") else "")
+            if n == "guard.check":
+                return "passed" if a.get("tmt.passed") else f"FAILED ungrounded {a.get('tmt.ungrounded')} banned {a.get('tmt.banned')}"
+            if n == "writer.references":
+                return a.get("tmt.sources_line", "")[:110]
+            if n == "kb.sanity":
+                return f"ok={a.get('tmt.sanity_ok')} fails {a.get('tmt.sanity_fails')}"
+            if n == "kg.record_case":
+                return f"actions {a.get('tmt.actions', '')[:80]} · Neo4j mirror {a.get('tmt.neo4j_mirror')}"
+            return ""
+        step_tbl = pd.DataFrame({"start (ms)": core["start_ms"].round(0), "duration (ms)": core["duration_ms"].round(0), "kind": core["kind"], "step": core["name"], "what happened": core.apply(summary, axis=1)})
+        st.dataframe(step_tbl, use_container_width=True, hide_index=True, column_config={"what happened": st.column_config.TextColumn(width="large")})
+        pick_step = st.selectbox("Inspect a step", [f"{int(r.start_ms):>6} ms · {r.name}" for r in core.itertuples()])
+        srow = core.iloc[[f"{int(r.start_ms):>6} ms · {r.name}" for r in core.itertuples()].index(pick_step)]
+        st.json({k: (json.loads(v) if isinstance(v, str) and v[:1] in "[{" and not v.endswith("chars]") else v) for k, v in srow["attrs"].items() if k.startswith(("tmt.", "gen_ai.request", "gen_ai.usage"))}, expanded=True)
+with t_mcp:
+    calls = timing.get("calls") or []
+    if calls and "args" in calls[0]:
+        explain("Every MCP call of this question — server, tool, arguments, a preview of the answer, its size and duration (which includes waiting for the server the first time).", "Calls in the same round run in parallel. A long `waited` means the MCP server was still warming up (the first question after a start).")
+        st.dataframe(pd.DataFrame([{"round": c.get("round"), "server": c.get("server"), "tool": c["tool"], "seconds": c["s"], "waited for server (ms)": c.get("wait_ready_ms"), "bytes": c.get("bytes"),
+                                    "ok": c.get("ok"), "arguments": json.dumps(c.get("args"), ensure_ascii=False)[:160], "result preview": (c.get("result_preview") or "")[:220]} for c in calls]), use_container_width=True, hide_index=True)
+        pick_call = st.selectbox("Full arguments and result preview of", [f"round {c.get('round')} · {c['tool']} · {c['s']} s" for c in calls])
+        cc = calls[[f"round {c.get('round')} · {c['tool']} · {c['s']} s" for c in calls].index(pick_call)]
+        st.markdown("**Arguments**")
+        st.json(cc.get("args") or {})
+        st.markdown("**Result (preview, first 1 500 characters)**")
+        st.code(cc.get("result_preview") or "", language="json")
+    elif calls:
+        st.dataframe(pd.DataFrame(calls), use_container_width=True, hide_index=True)
+        st.caption("This run was recorded before per-call payloads were captured; only tool and seconds exist.")
+    else:
+        st.info("No MCP calls in this run (a bounce, a history answer, a follow-up explanation or a decline).")
+with t_hand:
+    if not hand:
+        st.info("No hand-over payloads stored for this run (recorded before this feature).")
+    else:
+        explain("The typed messages that moved between the stages of this one question, in order: the supervisor's plan and route → each worker ⇄ evaluator round (what was tried, confidence, verdict, adjustments) → the "
+                "writer's input, prompt and sources.", "This is the route the question took. Schemas: docs/agent_architecture_v3.md, docs/schemas/.")
+        st.markdown(f"**1 · Supervisor → worker**  ({timing.get('route_ms')} ms, decision `{timing.get('decision')}`)")
+        st.json(hand.get("plan", {}), expanded=False)
+        for rd in hand.get("rounds", []):
+            st.markdown(f"**2.{rd['round']} · Worker round {rd['round']} → evaluator**  (worker {rd.get('worker_s')} s, evaluator {rd.get('evaluator_s')} s · model `{rd.get('evaluator_model')}`)")
+            st.json(rd, expanded=False)
+        if hand.get("result"):
+            st.markdown("**3 · Final worker result (confidence and why)**")
+            st.json(hand["result"], expanded=False)
+            st.markdown("**4 · Evaluator verdict**")
+            st.json({**hand.get("verdict", {}), "checks": hand.get("checks"), "similar_cases": hand.get("similar_cases")}, expanded=False)
+        if hand.get("writer"):
+            st.markdown(f"**5 · Writer**  ({timing.get('write_s')} s, source `{hand['writer'].get('source')}`, model `{hand['writer'].get('model')}`, guard: {hand['writer'].get('guard')})")
+            w = dict(hand["writer"])
+            prompt = w.pop("prompt", None)
+            st.json(w, expanded=False)
+            if prompt:
+                st.markdown("Prompt sent to the writer LLM (question + facts, truncated):")
+                st.code(prompt, language="text")
+with t_plan:
     st.json(json.loads(run["plan_json"]) if run["plan_json"] else {})
-with t2:
+with t_facts:
     st.json(json.loads(run["facts_json"]) if run["facts_json"] else {})
-with t3:
+with t_ev:
     ev = pd.DataFrame(json.loads(run["events_json"]) if run["events_json"] else [])
     st.dataframe(ev, use_container_width=True, hide_index=True)
 

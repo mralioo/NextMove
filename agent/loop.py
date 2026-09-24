@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 import evaluator as ev
 import worker as wk
 from guardrails import LIMITS
+from observability import payload, set_attr, span
 from schemas import EvaluatorVerdict, GuardrailResult, SupervisorPlan, WorkerResult
 
 
@@ -24,6 +25,7 @@ class LoopOutcome:
     verdict: EvaluatorVerdict
     iterations: list[dict] = field(default_factory=list)
     guardrails: list[GuardrailResult] = field(default_factory=list)
+    calls: list = field(default_factory=list)          # (round, ToolCall) for every MCP call of every round, with arguments and result previews
 
 
 async def worker_evaluator_loop(plan: SupervisorPlan, last_facts: dict | None, mcp, kb=None, graph=None, allow_llm: bool = True) -> LoopOutcome:
@@ -32,14 +34,20 @@ async def worker_evaluator_loop(plan: SupervisorPlan, last_facts: dict | None, m
     its: list[dict] = []
     guards: list[GuardrailResult] = []
     result = verdict = None
+    all_calls: list = []
     for i in range(1, LIMITS.max_iterations + 1):
         task = wk.task_from_plan(plan, i, overrides)
-        try:
-            result = await wk.run_worker(task, last_facts, mcp, kb)
-        except Exception as e:                                                # schema / programming error: fail closed, never guess
-            guards.append(GuardrailResult(stage="worker", check="worker_ran", passed=False, action="fallback", detail=f"{type(e).__name__}: {str(e)[:120]}"))
-            raise
-        verdict = await ev.evaluate(plan.question, plan, task, result, kb, graph, allow_llm)
+        with span("worker_evaluator.round", **{"tmt.round": i, "tmt.of": LIMITS.max_iterations, "tmt.overrides": overrides}) as rsp:
+            try:
+                result = await wk.run_worker(task, last_facts, mcp, kb)
+            except Exception as e:                                            # schema / programming error: fail closed, never guess
+                guards.append(GuardrailResult(stage="worker", check="worker_ran", passed=False, action="fallback", detail=f"{type(e).__name__}: {str(e)[:120]}"))
+                raise
+            verdict = await ev.evaluate(plan.question, plan, task, result, kb, graph, allow_llm)
+            set_attr(rsp, "tmt.result", payload({"status": result.status, "confidence": result.confidence, "reasons": result.confidence_reasons, "assumptions": result.assumptions,
+                                                  "tools": [{"tool": c.tool, "s": c.seconds, "ok": c.ok} for c in result.tools_called]}, 3000))
+            set_attr(rsp, "tmt.verdict", verdict.verdict)
+        all_calls += [(i, c) for c in result.tools_called]
         its.append({"i": i, "worker_s": result.seconds, "confidence": result.confidence, "status": result.status, "tools": [c.tool for c in result.tools_called],
                     "engine": result.ml_engine_used, "verdict": verdict.verdict, "score": verdict.score, "issues": verdict.issues[:4], "model": verdict.model,
                     "evaluator_s": verdict.seconds, "adjustments": verdict.adjustments.model_dump(exclude_none=True) if verdict.adjustments else None, "overrides": dict(overrides)})
@@ -54,4 +62,4 @@ async def worker_evaluator_loop(plan: SupervisorPlan, last_facts: dict | None, m
         overrides = {**overrides, **(verdict.adjustments.model_dump(exclude_none=True) if verdict.adjustments else {})}     # closed list, validated
     if result.confidence < LIMITS.min_confidence and result.status == "ok":
         guards.append(GuardrailResult(stage="failsafe", check="confidence_floor", passed=False, action="escalate", detail=f"confidence {result.confidence} < {LIMITS.min_confidence}: flagged low-confidence"))
-    return LoopOutcome(result=result, verdict=verdict, iterations=its, guardrails=guards)
+    return LoopOutcome(result=result, verdict=verdict, iterations=its, guardrails=guards, calls=all_calls)
