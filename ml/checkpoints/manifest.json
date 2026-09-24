@@ -6,15 +6,15 @@
     "target": "passengers (per station per 15 min)",
     "n_features": 17,
     "n_train_rows": 10000,
-    "model_id": "01a0d32c-acad-74e1-9262-c4cb9c0057de",
-    "saved_at": "2026-09-24T11:28:37+00:00",
+    "model_id": "01a0d449-8335-7600-9f18-b4dd52cff63b",
+    "saved_at": "2026-09-24T16:39:44+00:00",
     "refit_at": null,
     "tabpfn_model": "v3.5_default",
     "tabpfn_client_version": "0.6.0",
-    "fingerprint": "017b67a41480d036",
+    "fingerprint": "5042630285347bb5",
     "metrics": null,
-    "dataset_folder": "/home/alioo/Desktop/hackathon/innotrans/NextMove/data/training dataset",
-    "train_days_before": "2026-09-02"
+    "dataset_folder": "/home/alioo/Desktop/hackathon/innotrans/NextMove/data",
+    "train_days_before": "2026-09-09"
   },
   {
     "name": "expected_flow_regressor",
@@ -23,15 +23,15 @@
     "target": "passengers (per station per 15 min)",
     "n_features": 17,
     "n_train_rows": 8000,
-    "model_id": "01a0d32c-bf95-7411-9b83-5486d57efcbd",
-    "saved_at": "2026-09-24T11:28:42+00:00",
+    "model_id": "01a0d449-9a26-75b3-9668-d648d0d7270e",
+    "saved_at": "2026-09-24T16:39:50+00:00",
     "refit_at": null,
     "tabpfn_model": "v3.5_default",
     "tabpfn_client_version": "0.6.0",
-    "fingerprint": "b3b5d3d996eaa5ea",
+    "fingerprint": "0acba7e14446d2df",
     "metrics": null,
-    "dataset_folder": "/home/alioo/Desktop/hackathon/innotrans/NextMove/data/training dataset",
-    "train_days_before": "2026-09-02"
+    "dataset_folder": "/home/alioo/Desktop/hackathon/innotrans/NextMove/data",
+    "train_days_before": "2026-09-09"
   },
   {
     "name": "overcrowding_classifier",
@@ -40,14 +40,14 @@
     "target": "overcrowded (flow >= station's own p90)",
     "n_features": 17,
     "n_train_rows": 8000,
-    "model_id": "01a0d32c-b83f-7920-9f49-427c56d99eb1",
-    "saved_at": "2026-09-24T11:28:42+00:00",
+    "model_id": "01a0d449-91d2-7582-8eb7-701441e6bb93",
+    "saved_at": "2026-09-24T16:39:50+00:00",
     "refit_at": null,
     "tabpfn_model": "v3.5_default",
     "tabpfn_client_version": "0.6.0",
-    "fingerprint": "b3b5d3d996eaa5ea",
+    "fingerprint": "0acba7e14446d2df",
     "metrics": null,
-    "dataset_folder": "/home/alioo/Desktop/hackathon/innotrans/NextMove/data/training dataset",
-    "train_days_before": "2026-09-02"
+    "dataset_folder": "/home/alioo/Desktop/hackathon/innotrans/NextMove/data",
+    "train_days_before": "2026-09-09"
   }
 ]

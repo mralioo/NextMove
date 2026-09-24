@@ -23,13 +23,13 @@
     "daily_event_attendance"
   ],
   "tabpfn_model": "v3.5_default",
-  "fingerprint": "017b67a41480d036",
-  "dataset_folder": "/home/alioo/Desktop/hackathon/innotrans/NextMove/data/training dataset",
-  "train_days_before": "2026-09-02",
+  "fingerprint": "5042630285347bb5",
+  "dataset_folder": "/home/alioo/Desktop/hackathon/innotrans/NextMove/data",
+  "train_days_before": "2026-09-09",
   "metrics": null,
   "name": "demand_baseline",
-  "saved_at": "2026-09-24T11:28:37+00:00",
+  "saved_at": "2026-09-24T16:39:44+00:00",
   "tabpfn_client_version": "0.6.0",
-  "model_id": "01a0d32c-acad-74e1-9262-c4cb9c0057de",
+  "model_id": "01a0d449-8335-7600-9f18-b4dd52cff63b",
   "n_train_rows": 10000
 }
