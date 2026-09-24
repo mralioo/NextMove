@@ -106,13 +106,18 @@ def prepare() -> None:
         print("· seeding the knowledge graph without the LLM step (./.venv/bin/python scripts/tasks.py kg-seed --no-llm) ...")
         subprocess.run([PY, "agent/kgraph_build.py", "--no-llm"], cwd=REPO, env=env, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     fe = REPO / "frontend"
-    if not (fe / "dist" / "index.html").exists() and (fe / "package.json").exists():
+    if (fe / "package.json").exists():
         import shutil
-        if shutil.which("npm"):
-            print("· building the operator desktop (React) once: frontend/ npm install + build ...")
-            subprocess.run("npm install --no-audit --no-fund && npm run build", cwd=fe, shell=True, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        else:
-            print("! npm not found: the operator desktop (frontend/) is not built; the API and the Streamlit dashboard still work.")
+        dist = fe / "dist" / "index.html"
+        srcs = [p for d in ("src", "index.html", "package.json", "vite.config.js") for p in ((fe / d).rglob("*") if (fe / d).is_dir() else [fe / d]) if p.is_file()]
+        stale = not dist.exists() or any(p.stat().st_mtime > dist.stat().st_mtime for p in srcs)   # rebuild when the UI sources changed
+        if stale and shutil.which("npm"):
+            print("· building the operator UI (React, frontend/): npm install + build ...")
+            r = subprocess.run("npm install --no-audit --no-fund && npm run build", cwd=fe, shell=True, check=False, capture_output=True, text=True)
+            if r.returncode:
+                print("! the UI build failed (last lines below); run `make ui-build` to see it. The API and the Streamlit dashboard still work.\n" + "\n".join((r.stdout + r.stderr).splitlines()[-8:]))
+        elif stale:
+            print("! npm not found: the operator UI (frontend/) is not built; the API and the Streamlit dashboard still work.")
     if not (REPO / ".env").exists():
         print("! no .env found: the agent needs TABPFN_API_TOKEN and LLM keys (see README); the dashboard and MCP servers still start.")
 

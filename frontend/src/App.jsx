@@ -1,87 +1,67 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { api } from "./api.js";
-import MapView from "./components/MapView.jsx";
-import TimeBar, { slotMs } from "./components/TimeBar.jsx";
-import { LinePanel, RightPanel, closureQuestion } from "./components/Panels.jsx";
-import Avatar, { loadPos } from "./components/Avatar.jsx";
-import ChatPanel from "./components/ChatPanel.jsx";
+import React, { useEffect, useState } from "react";
+import { MessageSquare, MapPin, BarChart2, AlertTriangle, Zap, Wifi, LayoutDashboard } from "lucide-react";
+import Desk from "./pages/Desk";
+import Network from "./pages/Network";
+import Analytics from "./pages/Analytics";
+import Chat from "./pages/Chat";
+import Disruptions from "./pages/Disruptions";
+import Energy from "./pages/Energy";
+import ChatOverlay from "./components/ChatOverlay";
+import { ChatProvider } from "./state/ChatContext";
+import { api } from "./api/client";
 
-const OPERATOR = "operator-1";
+const TABS = [
+  { id: "desk", label: "Operator Desk", icon: LayoutDashboard },
+  { id: "chat", label: "Chat Copilot", icon: MessageSquare },
+  { id: "network", label: "Network & Heatmap", icon: MapPin },
+  { id: "analytics", label: "Flow Analytics", icon: BarChart2 },
+  { id: "disruptions", label: "Cascade Simulator", icon: AlertTriangle },
+  { id: "energy", label: "Energy Efficiency", icon: Zap },
+];
 
 export default function App() {
-  const [topo, setTopo] = useState(null);
-  const [timeline, setTimeline] = useState(null);
-  const [at, setAt] = useState(null);
-  const [snap, setSnap] = useState(null);
-  const [series, setSeries] = useState(null);
-  const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(1);
-  const [lineFilter, setLineFilter] = useState(null);
-  const [selected, setSelected] = useState(null);
-  const [error, setError] = useState("");
-  // assistant
-  const [open, setOpen] = useState(false);
-  const [messages, setMessages] = useState([]);
-  const [sessionId, setSessionId] = useState(null);
-  const [thread, setThread] = useState({ title: "", linkTurn: null });
-  const [thinking, setThinking] = useState(false);
-  const [prefill, setPrefill] = useState(null);
-  const [pending, setPending] = useState(0);
-  const [pos, setPosState] = useState(loadPos);
-  const setPos = (p) => { setPosState(p); try { localStorage.setItem("toby.pos", JSON.stringify(p)); } catch { /* private mode */ } };
-
-  useEffect(() => { Promise.all([api.topology(), api.timeline()]).then(([t, tl]) => { setTopo(t); setTimeline(tl); setAt(tl.default_at.slice(0, 19)); }).catch((e) => setError(e.message)); }, []);
+  const [tab, setTab] = useState(() => localStorage.getItem("ttmt.tab") || "desk");
+  const [status, setStatus] = useState(null);
+  const [snap, setSnap] = useState(null);          // the desk's replay snapshot: the assistant suggests the closure that is active there
+  useEffect(() => { try { localStorage.setItem("ttmt.tab", tab); } catch { /* private mode */ } }, [tab]);
   useEffect(() => {
-    if (!at) return;
-    const h = setTimeout(() => api.snapshot(at).then(setSnap).catch((e) => setError(e.message)), 120);
-    return () => clearTimeout(h);
-  }, [at]);
-  const day = at?.slice(0, 10);
-  useEffect(() => { if (day) api.series(day).then(setSeries).catch(() => setSeries(null)); }, [day]);
-  const refreshPending = useCallback(() => api.pending(OPERATOR).then((p) => setPending(p.length)).catch(() => {}), []);
-  useEffect(() => { refreshPending(); }, [refreshPending]);
-
-  const ask = (q) => { setPrefill(q); setOpen(true); };
-  const suggestions = useMemo(() => {
-    const s = [];
-    for (const c of snap?.closures || []) s.push({ label: `Closure now: ${c.line || "station"} — what should we do?`, q: closureQuestion(c) });
-    s.push({ label: "U7 closure on 25 Sept: where to deploy staff?", q: "Line U7 is suspended between Hermannplatz and Karl-Marx-Strasse on 2026-09-25 from 20:45 for 2 hours. What is the reason, how should passengers be rerouted, which stations would become overloaded, and where should additional staff be deployed?" });
-    s.push({ label: "InnoTrans day: 3 highest-load stations", q: "On 2026-09-23, during InnoTrans, which 3 stations are most likely to see the highest load, and what should the control room do about it?" });
-    s.push({ label: "Rudow: when is the commute peak?", q: "At what time does the commute flow peak at Rudow station usually take place? Does it exceed the mean commute peak value across all stations?" });
-    s.push({ label: "Anomalies on 19 July", q: "Identify three passenger-flow anomalies that cannot be explained by station closures on July 19th. Determine the most likely root causes using all of the available data." });
-    return s.slice(0, 5);
-  }, [snap]);
-
-  if (error && !topo) return <div className="boot err">Cannot reach the operator API: {error}<br />Start it with <code>make up</code> (http://127.0.0.1:8770).</div>;
-  if (!topo || !timeline || !at) return <div className="boot">Loading the network…</div>;
-
-  const clock = new Date(slotMs(at));
-  const net = snap?.network;
-  const w = snap?.weather;
+    const load = () => api.status().then(setStatus).catch(() => setStatus({ status: "down" }));
+    load();
+    const t = setInterval(load, 30000);
+    return () => clearInterval(t);
+  }, []);
+  const up = status?.status === "ok";
   return (
-    <div className="desk">
-      <header className="top">
-        <div className="brand"><b>Talk To My Train</b><span>Operator desktop · replay of recorded data</span></div>
-        <div className="kpi"><small>Passengers / 15 min</small><b>{net ? net.total.toLocaleString() : "—"}</b><em className={net?.ratio > 1.3 ? "warn" : ""}>{net?.ratio ? `${net.ratio}× typical` : ""}</em></div>
-        <div className="kpi"><small>Closures</small><b className={snap?.closures?.length ? "crit" : ""}>{snap?.closures?.length ?? "—"}</b></div>
-        <div className="kpi"><small>Alerts</small><b>{snap?.alerts?.length ?? "—"}</b></div>
-        <div className="kpi"><small>Weather</small><b>{w ? `${Math.round(w.temp)}°C` : "—"}</b><em>{w ? (w.prcp > 0 ? `rain ${w.prcp} mm` : "dry") : ""}</em></div>
-        <div className="clock"><b>{clock.toISOString().slice(11, 16)}</b><small>{clock.toISOString().slice(0, 10)} · {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][clock.getUTCDay()]}</small></div>
-      </header>
-      <main className="grid">
-        <div className="left"><LinePanel snap={snap} lineFilter={lineFilter} setLineFilter={setLineFilter} /></div>
-        <div className="center">
-          <MapView topo={topo} snap={snap} lineFilter={lineFilter} selected={selected} onSelect={setSelected} />
-          <TimeBar timeline={timeline} at={at} setAt={setAt} playing={playing} setPlaying={setPlaying} speed={speed} setSpeed={setSpeed} series={series} />
-        </div>
-        <div className="right"><RightPanel snap={snap} topo={topo} selected={selected} onSelect={setSelected} onAsk={ask} /></div>
-      </main>
-      <Avatar open={open} onToggle={() => setOpen((o) => !o)} badge={pending} thinking={thinking} hint={pending ? `${pending} to close` : "Ask me"} pos={pos} setPos={setPos} />
-      {open && (
-        <ChatPanel operator={OPERATOR} sessionId={sessionId} setSessionId={setSessionId} messages={messages} setMessages={setMessages} prefill={prefill} clearPrefill={() => setPrefill(null)}
-                   onMinimize={() => setOpen(false)} onDockPick={(c) => { setPos({ corner: c }); setOpen(false); }}
-                   thinking={thinking} setThinking={setThinking} onAnswered={() => refreshPending()} suggestions={suggestions} thread={thread} setThread={setThread} />
-      )}
-    </div>
+    <ChatProvider snap={snap}>
+      <div className="app-shell">
+        <header className="app-top">
+          <div className="brand">
+            <div className="logo">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 14.5C4 10.5 7.5 5 12 5C16.5 5 20 10.5 20 14.5C20 17 18 18 12 18C6 18 4 17 4 14.5Z" stroke="var(--teal)" strokeWidth="1.8" fill="rgba(0,229,212,0.12)" /><path d="M7 10C7.5 8 9.5 7 12 7C14.5 7 16.5 8 17 10" stroke="var(--teal)" strokeWidth="1.6" strokeLinecap="round" /><circle cx="8" cy="15" r="1.3" fill="var(--gold)" /><circle cx="16" cy="15" r="1.3" fill="var(--gold)" /><path d="M2 21H22" stroke="var(--teal)" strokeWidth="1.5" strokeLinecap="round" strokeOpacity="0.4" /></svg>
+            </div>
+            <div>
+              <div className="title">TALK TO MY TRAIN <span className="pill-badge teal">INNOTRANS 2026</span></div>
+              <p>Dispatcher · Analyst · Inspector · Writer — an AI team for the control room</p>
+            </div>
+          </div>
+          <div className="tabs">
+            {TABS.map((t) => { const I = t.icon; return <button key={t.id} onClick={() => setTab(t.id)} className={`pill-tab ${tab === t.id ? "active" : ""}`}><I size={14} />{t.label}</button>; })}
+          </div>
+          <div className="right">
+            <div className={`pill-badge ${up ? "active" : "idle"}`}><span className="pulse" />{up ? "API UP" : "API DOWN"}</div>
+            <div className="model" title={status?.models ? Object.entries(status.models).map(([k, v]) => `${k}: ${v}`).join("\n") : ""}><Wifi size={13} color={status?.agent_up ? "var(--teal)" : "var(--danger)"} /><span>{status?.models?.writer || "agent"}</span></div>
+          </div>
+        </header>
+        <main className="app-main">
+          <div className={"page" + (tab === "desk" ? " on" : "")}><Desk snap={snap} setSnap={setSnap} /></div>
+          <div className={"page" + (tab === "chat" ? " on" : "")}><Chat /></div>
+          <div className={"page pad" + (tab === "network" ? " on" : "")}>{tab === "network" && <Network />}</div>
+          <div className={"page pad" + (tab === "analytics" ? " on" : "")}>{tab === "analytics" && <Analytics />}</div>
+          <div className={"page pad" + (tab === "disruptions" ? " on" : "")}>{tab === "disruptions" && <Disruptions />}</div>
+          <div className={"page pad" + (tab === "energy" ? " on" : "")}>{tab === "energy" && <Energy />}</div>
+        </main>
+        {tab !== "chat" && <ChatOverlay />}
+      </div>
+    </ChatProvider>
   );
 }

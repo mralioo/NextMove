@@ -58,7 +58,7 @@ export default function MapView({ topo, snap, lineFilter, selected, onSelect }) 
   const scale = view.w / W;
 
   return (
-    <div className="map-wrap">
+    <div className="dk-map-wrap">
       <svg ref={svgRef} viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} onWheel={onWheel} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp}
            onClick={() => { if (!drag.current?.moved) onSelect(null); }}>
         <g>
@@ -70,7 +70,7 @@ export default function MapView({ topo, snap, lineFilter, selected, onSelect }) 
             return <g key={i} opacity={dim(e.lines) ? 0.12 : 1}>
               <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={c} strokeWidth={3.2 * Math.max(0.5, scale)} strokeLinecap="round" opacity={isBlocked ? 0.35 : 0.95} />
               {e.lines.length > 1 && <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color[e.lines[1]]} strokeWidth={1.4 * Math.max(0.5, scale)} strokeLinecap="round" />}
-              {isBlocked && <line className="blocked" x1={x1} y1={y1} x2={x2} y2={y2} stroke="#ff4d4f" strokeWidth={5 * Math.max(0.5, scale)} strokeDasharray="6 5" strokeLinecap="round" />}
+              {isBlocked && <line className="dk-blocked" x1={x1} y1={y1} x2={x2} y2={y2} stroke="#ff4d4f" strokeWidth={5 * Math.max(0.5, scale)} strokeDasharray="6 5" strokeLinecap="round" />}
             </g>;
           })}
         </g>
@@ -88,21 +88,21 @@ export default function MapView({ topo, snap, lineFilter, selected, onSelect }) 
               {isSel && <circle cx={p[0]} cy={p[1]} r={r + 6 * Math.max(0.55, scale)} fill="none" stroke="#fff" strokeWidth={1.5} />}
               <circle cx={p[0]} cy={p[1]} r={r} fill={closed ? "#111827" : heat(d?.ratio)} stroke={s.lines.length > 1 ? "#fff" : "#0b1220"} strokeWidth={s.lines.length > 1 ? 1.6 : 1} />
               {closed && <text x={p[0]} y={p[1] + 4} textAnchor="middle" fontSize={11 * Math.max(0.6, scale)} fill="#ff4d4f" fontWeight="700">×</text>}
-              {(isSel || topIds.has(s.id) || (d?.ratio || 0) >= 2 || scale < 0.45 && s.lines.length > 1) && <text x={p[0] + r + 3} y={p[1] + 3} fontSize={10.5 * Math.max(0.65, scale)} fill="#e5e7eb" className="lbl">{s.name}</text>}
+              {(isSel || topIds.has(s.id) || (d?.ratio || 0) >= 2 || scale < 0.45 && s.lines.length > 1) && <text x={p[0] + r + 3} y={p[1] + 3} fontSize={10.5 * Math.max(0.65, scale)} fill="#e5e7eb" className="dk-lbl">{s.name}</text>}
             </g>;
           })}
         </g>
       </svg>
-      <div className="map-legend">
+      <div className="dk-map-legend">
         <span>load vs typical</span>
         {[["<0.7", 0.5], ["normal", 1], ["1.25×", 1.5], ["1.8×", 2], ["2.5×+", 3]].map(([t, v]) => <i key={t}><b style={{ background: heat(v) }} />{t}</i>)}
         <i><b style={{ background: "#111827", border: "1px solid #ff4d4f" }} />closed</i>
       </div>
-      <div className="map-zoom"><button onClick={() => zoomBy(1 / 1.3)}>+</button><button onClick={() => zoomBy(1.3)}>−</button><button onClick={() => setView({ x: 0, y: 0, w: W, h: H })}>⟲</button></div>
+      <div className="dk-map-zoom"><button onClick={() => zoomBy(1 / 1.3)}>+</button><button onClick={() => zoomBy(1.3)}>−</button><button onClick={() => setView({ x: 0, y: 0, w: W, h: H })}>⟲</button></div>
       {hover && (
-        <div className="tip" style={{ left: hover.x + 14, top: hover.y + 12 }}>
+        <div className="dk-tip" style={{ left: hover.x + 14, top: hover.y + 12 }}>
           <b>{hover.s.name}</b>
-          <div className="chips">{hover.s.lines.map((l) => <span key={l} className="chip" style={{ background: color[l] }}>{l}</span>)}</div>
+          <div className="dk-chips">{hover.s.lines.map((l) => <span key={l} className="dk-chip" style={{ background: color[l] }}>{l}</span>)}</div>
           {hover.d ? <div>{hover.d.v} passengers / 15 min<br />typical {hover.d.base}{hover.d.ratio ? ` · ${hover.d.ratio}×` : ""}</div> : <div>no flow data</div>}
         </div>
       )}

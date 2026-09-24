@@ -1,0 +1,2166 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "NextMove operator API",
+  "description": "Feedback loop (score of a response, what the operator did) and operator knowledge base for the Talk To My Train UI.",
+  "version": "1.0"
+ },
+ "paths": {
+  "/api/v1/chat": {
+   "post": {
+    "tags": [
+     "chat"
+    ],
+    "summary": "Chat",
+    "description": "Ask the agent. Returns the answer (Markdown) plus everything the desktop shows next to it: `turn_id` / `artifact_turn_id` / `requires_action` / `precedent` (for feedback),\n`steps` (operations log), `tools`, `llm`, `tokens` {in,out,total,estimated}, `timing` {supervisor_s (Dispatcher), worker_evaluator_s (Analyst + Inspector), mcp_s, writer_s, total_s}, `counts`.\n\n**One conversation = one situation.** With an existing `session_id` and `context_mode = auto`, a message that is not clearly about the conversation's situation (another kind of question,\nother line / station / event, or a vague short message) is NOT sent to the agent. The response is `{\"needs_choice\": true, \"relation\", \"reason\", \"anchor\", \"choices\", \"recommended\", \"message\"}`;\nthe UI shows two buttons and calls again with `context_mode = \"continue\"` (connect it to the previous topic) or `\"new\"` (start a new conversation: fresh session, no inherited context).\nThe response's `context` says what happened: `{mode: new|continue|resumed|auto, relation, reason, title}`.",
+    "operationId": "chat_api_v1_chat_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ChatBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Chat Api V1 Chat Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/chat/stream": {
+   "post": {
+    "tags": [
+     "chat"
+    ],
+    "summary": "Chat Stream",
+    "description": "Same as `/chat`, streamed as Server-Sent Events so the UI can show the operations while the agent works. Events (`event:` name \u2192 JSON `data:`):\n`choice` (the topic-switch question, then the stream ends) \u00b7 `step` {kind: route|tool|worker|evaluator|llm|writer, stage: dispatcher|analyst|inspector|writer, label, seconds, detail} \u00b7\n`answer` (the complete response, identical to `/chat`) \u00b7 `error` {message}.",
+    "operationId": "chat_stream_api_v1_chat_stream_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ChatBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/conversations": {
+   "get": {
+    "tags": [
+     "chat"
+    ],
+    "summary": "Conversations",
+    "description": "The chat history: one entry per conversation (a conversation resumed from the history is still one entry), newest first \u2014 `title` = the first question, `category`, `n_turns`,\n`started`, `last` (epoch seconds), `mean_score`, `resumed`, `session_ids`, `last_session_id`, `last_turn_id`.",
+    "operationId": "conversations_api_v1_conversations_get",
+    "parameters": [
+     {
+      "name": "operator_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Operator Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 100,
+       "minimum": 1,
+       "default": 30,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response Conversations Api V1 Conversations Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/conversations/{session_id}": {
+   "get": {
+    "tags": [
+     "chat"
+    ],
+    "summary": "Conversation",
+    "description": "All questions and answers of a conversation (and of the sessions it was resumed in), oldest first, with what the UI needs to show rating / action controls again\n(`turn_id`, `has_artifact`, `requires_action`, `operator_score`, `action_reported`), and `resume_turn_id`: send it as `link_turn_id` (no session_id) to continue the conversation.",
+    "operationId": "conversation_api_v1_conversations__session_id__get",
+    "parameters": [
+     {
+      "name": "session_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Session Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Conversation Api V1 Conversations  Session Id  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/status": {
+   "get": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "Api Status",
+    "description": "Liveness of the data layer and of the agent: {status, stations_count, flows_rows, data_window, lines, agent_up, models{role: model}, quality_db, knowledge_base}.",
+    "operationId": "api_status_api_v1_status_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Api Status Api V1 Status Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/stations": {
+   "get": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "Api Stations",
+    "description": "The 167 stations: {name (exact), short_name, lat, lon, lines[], daily_flow (mean passengers per day), betweenness, degree}.",
+    "operationId": "api_stations_api_v1_stations_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "type": "array",
+         "title": "Response Api Stations Api V1 Stations Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/network/edges": {
+   "get": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "Api Edges",
+    "description": "Track connections, one row per (edge, serving line): {line, from, to, from_lat, from_lon, to_lat, to_lon}.",
+    "operationId": "api_edges_api_v1_network_edges_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "type": "array",
+         "title": "Response Api Edges Api V1 Network Edges Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/flows/daily": {
+   "get": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "Api Flows Daily",
+    "description": "Network passengers per day (training + test window) with a 7-day rolling mean: {dates[], values[], rolling_mean[]}.",
+    "operationId": "api_flows_daily_api_v1_flows_daily_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Api Flows Daily Api V1 Flows Daily Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/flows/hourly-profile": {
+   "get": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "Api Hourly Profile",
+    "description": "Network passengers per hour of the day, mean over weekdays and over weekends: [{hour: 'HH:00', weekday, weekend}].",
+    "operationId": "api_hourly_profile_api_v1_flows_hourly_profile_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "type": "array",
+         "title": "Response Api Hourly Profile Api V1 Flows Hourly Profile Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/flows/heatmap": {
+   "get": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "Api Heatmap",
+    "description": "Mean passengers per hour per station: all stations of ONE line, else the 20 busiest of the selected lines (`lines=U1,U2`): {stations[], station_ids[], values[][24], max_value, count, lines}.",
+    "operationId": "api_heatmap_api_v1_flows_heatmap_get",
+    "parameters": [
+     {
+      "name": "lines",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Lines"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Api Heatmap Api V1 Flows Heatmap Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/flows/station/{name}": {
+   "get": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "Api Flow Station",
+    "description": "One station: hourly weekday / weekend profile, peak hours, daily totals.",
+    "operationId": "api_flow_station_api_v1_flows_station__name__get",
+    "parameters": [
+     {
+      "name": "name",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Name"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Api Flow Station Api V1 Flows Station  Name  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/closures": {
+   "get": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "Api Closures",
+    "description": "Recorded closures (training + test): {id, when, end, duration_hours, description, closure_type: line_suspension|station_closure, line, segment, reason}.",
+    "operationId": "api_closures_api_v1_closures_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "additionalProperties": true,
+          "type": "object"
+         },
+         "type": "array",
+         "title": "Response Api Closures Api V1 Closures Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/centrality": {
+   "get": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "Api Centrality",
+    "description": "The `n` busiest stations with daily flow and betweenness centrality.",
+    "operationId": "api_centrality_api_v1_centrality_get",
+    "parameters": [
+     {
+      "name": "n",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 167,
+       "minimum": 1,
+       "default": 15,
+       "title": "N"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response Api Centrality Api V1 Centrality Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/energy": {
+   "get": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "Api Energy",
+    "description": "Energy per passenger by line (Wh per passenger, worst first) with the evidence that explains it: {ranking:[{line, wh_per_pax, mwh_day, pax_day, n_stations, pax_per_station_day, corr_energy_pax,\nweekend_vs_weekday_*_pct, efficiency_rank, explanation}], unit, method, limits}. Same method as the agent's energy tool.",
+    "operationId": "api_energy_api_v1_energy_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Api Energy Api V1 Energy Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/cascade": {
+   "post": {
+    "tags": [
+     "analytics"
+    ],
+    "summary": "Api Cascade",
+    "description": "Passenger cascade simulator: which open stations receive the closed stations' passengers and how far above their typical load they go (`overflow_ratio`, `at_risk` \u2265 1.3\u00d7).\nAn assumption scenario (stated in `method` / `assumption`), not a measurement.",
+    "operationId": "api_cascade_api_v1_cascade_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CascadeBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Api Cascade Api V1 Cascade Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/ops/topology": {
+   "get": {
+    "tags": [
+     "desktop"
+    ],
+    "summary": "Ops Topology",
+    "description": "Stations (id, short name, lon/lat, lines), edges (with the lines that serve them) and line colours \u2014 enough to draw the network map.",
+    "operationId": "ops_topology_api_v1_ops_topology_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Ops Topology Api V1 Ops Topology Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/ops/timeline": {
+   "get": {
+    "tags": [
+     "desktop"
+    ],
+    "summary": "Ops Timeline",
+    "description": "The replay window (start, end, 15-minute step), a default time with an active closure, and all closures (for markers on the time bar). There is no live feed: the desktop replays recorded data.",
+    "operationId": "ops_timeline_api_v1_ops_timeline_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Ops Timeline Api V1 Ops Timeline Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/ops/snapshot": {
+   "get": {
+    "tags": [
+     "desktop"
+    ],
+    "summary": "Ops Snapshot",
+    "description": "The network at one 15-minute slot (ISO time): passengers per station vs the typical value for that weekday and slot, line loads, network total, busiest stations, closures active\nthen (with the blocked edges and unserved stations), events around then, weather, and alerts.",
+    "operationId": "ops_snapshot_api_v1_ops_snapshot_get",
+    "parameters": [
+     {
+      "name": "at",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "At"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Ops Snapshot Api V1 Ops Snapshot Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/ops/series": {
+   "get": {
+    "tags": [
+     "desktop"
+    ],
+    "summary": "Ops Series",
+    "description": "Network passengers per 15 minutes for one day (`YYYY-MM-DD`) with the typical value \u2014 the sparkline under the map.",
+    "operationId": "ops_series_api_v1_ops_series_get",
+    "parameters": [
+     {
+      "name": "date",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Date"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response Ops Series Api V1 Ops Series Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/health": {
+   "get": {
+    "tags": [
+     "meta"
+    ],
+    "summary": "Health",
+    "description": "Is the API up, and how much is stored.",
+    "operationId": "health_api_v1_health_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Health Api V1 Health Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/enums": {
+   "get": {
+    "tags": [
+     "meta"
+    ],
+    "summary": "Enums",
+    "description": "The allowed values, for building the form (labels are the UI's business).",
+    "operationId": "enums_api_v1_enums_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Enums Api V1 Enums Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/turns": {
+   "get": {
+    "tags": [
+     "turns"
+    ],
+    "summary": "List Turns",
+    "description": "Recent answers of an operator / session with `operator_score`, `n_feedback`, `requires_action`, `action_reported`, `has_report`, the brief-less summary fields the UI needs\nto show 'rate this answer' and 'tell us what you did'. `needs_action_report=true` = only accepted answers that asked for an action and have no action report yet.",
+    "operationId": "list_turns_api_v1_turns_get",
+    "parameters": [
+     {
+      "name": "operator_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Operator Id"
+      }
+     },
+     {
+      "name": "session_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Session Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 1,
+       "default": 30,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "needs_action_report",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "boolean",
+       "default": false,
+       "title": "Needs Action Report"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response List Turns Api V1 Turns Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/turns/{turn_id}": {
+   "get": {
+    "tags": [
+     "turns"
+    ],
+    "summary": "Get Turn",
+    "description": "One answer: question, the answer text as stored, confidence, recommended actions, precedent line, tools used, and all its feedback records.",
+    "operationId": "get_turn_api_v1_turns__turn_id__get",
+    "parameters": [
+     {
+      "name": "turn_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Turn Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Get Turn Api V1 Turns  Turn Id  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/turns/{turn_id}/artifact": {
+   "get": {
+    "tags": [
+     "turns"
+    ],
+    "summary": "Get Artifact",
+    "description": "The whole stored bundle of an answer (plan, every tool call with arguments / time / result preview, facts, confidence + reasons, checks, LLM calls, brief, report, precedents).",
+    "operationId": "get_artifact_api_v1_turns__turn_id__artifact_get",
+    "parameters": [
+     {
+      "name": "turn_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Turn Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Get Artifact Api V1 Turns  Turn Id  Artifact Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/turns/{turn_id}/report": {
+   "get": {
+    "tags": [
+     "turns"
+    ],
+    "summary": "Get Report",
+    "description": "The full report of an answer IF it was generated before (the operator asked why / evidence / tools in chat). It is not generated here: the UI sends \"why?\" to the agent\n(same session) \u2014 then the report is stored and this endpoint returns it. The deterministic 'how this was worked out' section is always available as `method`.",
+    "operationId": "get_report_api_v1_turns__turn_id__report_get",
+    "parameters": [
+     {
+      "name": "turn_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Turn Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Get Report Api V1 Turns  Turn Id  Report Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/feedback": {
+   "post": {
+    "tags": [
+     "feedback"
+    ],
+    "summary": "Post Feedback",
+    "description": "Score and / or action in one call. Feeds the knowledge base, the knowledge graph and (if configured) the memory agent. Returns the record and what it was fed to (`fed`).",
+    "operationId": "post_feedback_api_v1_feedback_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/FeedbackBody"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Post Feedback Api V1 Feedback Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/turns/{turn_id}/score": {
+   "post": {
+    "tags": [
+     "feedback"
+    ],
+    "summary": "Post Score",
+    "description": "Rate a response (1-5). A response rated 1-2 is no longer reused from history.",
+    "operationId": "post_score_api_v1_turns__turn_id__score_post",
+    "parameters": [
+     {
+      "name": "turn_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Turn Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ScoreBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Post Score Api V1 Turns  Turn Id  Score Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/turns/{turn_id}/action": {
+   "post": {
+    "tags": [
+     "feedback"
+    ],
+    "summary": "Post Action",
+    "description": "Report what was done about the situation (the field under an answer: 'what did you do?'). Stations and lines named in the text are extracted and linked in the graph; the action\nis matched against the actions the answer recommended. It becomes a precedent for similar situations.",
+    "operationId": "post_action_api_v1_turns__turn_id__action_post",
+    "parameters": [
+     {
+      "name": "turn_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Turn Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ActionBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Post Action Api V1 Turns  Turn Id  Action Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/turns/{turn_id}/feedback": {
+   "get": {
+    "tags": [
+     "feedback"
+    ],
+    "summary": "Turn Feedback",
+    "description": "All feedback records of one answer.",
+    "operationId": "turn_feedback_api_v1_turns__turn_id__feedback_get",
+    "parameters": [
+     {
+      "name": "turn_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Turn Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response Turn Feedback Api V1 Turns  Turn Id  Feedback Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/feedback/{feedback_id}": {
+   "patch": {
+    "tags": [
+     "feedback"
+    ],
+    "summary": "Patch Feedback",
+    "description": "Edit a record \u2014 typically add the `outcome` once it is known (\"it worked\" / \"did_not_work\"), or correct the action text. The graph is refreshed.",
+    "operationId": "patch_feedback_api_v1_feedback__feedback_id__patch",
+    "parameters": [
+     {
+      "name": "feedback_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Feedback Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PatchBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Patch Feedback Api V1 Feedback  Feedback Id  Patch"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "feedback"
+    ],
+    "summary": "Delete Feedback",
+    "description": "Withdraw a record (it no longer counts in scores or precedents).",
+    "operationId": "delete_feedback_api_v1_feedback__feedback_id__delete",
+    "parameters": [
+     {
+      "name": "feedback_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Feedback Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Delete Feedback Api V1 Feedback  Feedback Id  Delete"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/feedback/pending": {
+   "get": {
+    "tags": [
+     "feedback"
+    ],
+    "summary": "Pending",
+    "description": "Answers that asked for an action and still have no action report: the list behind a 'you have N situations to close' badge.",
+    "operationId": "pending_api_v1_feedback_pending_get",
+    "parameters": [
+     {
+      "name": "operator_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Operator Id"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 100,
+       "minimum": 1,
+       "default": 20,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response Pending Api V1 Feedback Pending Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/feedback/stats": {
+   "get": {
+    "tags": [
+     "feedback"
+    ],
+    "summary": "Stats",
+    "description": "Number and mean of scores, histogram, how often advice was followed, outcomes, by category, action-report rate.",
+    "operationId": "stats_api_v1_feedback_stats_get",
+    "parameters": [
+     {
+      "name": "operator_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Operator Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Stats Api V1 Feedback Stats Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/precedents": {
+   "get": {
+    "tags": [
+     "knowledge"
+    ],
+    "summary": "Get Precedents",
+    "description": "What operators did in situations similar to `question` and how it went, plus the ready-made one-line `precedent_line` the brief would show.",
+    "operationId": "get_precedents_api_v1_precedents_get",
+    "parameters": [
+     {
+      "name": "question",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Question"
+      }
+     },
+     {
+      "name": "category",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Category"
+      }
+     },
+     {
+      "name": "k",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 5,
+       "minimum": 1,
+       "default": 2,
+       "title": "K"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Get Precedents Api V1 Precedents Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/operator-actions": {
+   "get": {
+    "tags": [
+     "knowledge"
+    ],
+    "summary": "Operator Actions",
+    "description": "Every action operators reported (newest first), filtered by category / a station in the text / minimum score.",
+    "operationId": "operator_actions_api_v1_operator_actions_get",
+    "parameters": [
+     {
+      "name": "category",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Category"
+      }
+     },
+     {
+      "name": "station",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Station"
+      }
+     },
+     {
+      "name": "min_score",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "number"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Min Score"
+      }
+     },
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 200,
+       "minimum": 1,
+       "default": 30,
+       "title": "Limit"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response Operator Actions Api V1 Operator Actions Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/artifacts/search": {
+   "get": {
+    "tags": [
+     "knowledge"
+    ],
+    "summary": "Search Artifacts",
+    "description": "Past accepted answers that resemble `q` (operator knowledge base): brief, confidence, tools, whether a full report exists.",
+    "operationId": "search_artifacts_api_v1_artifacts_search_get",
+    "parameters": [
+     {
+      "name": "q",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Q"
+      }
+     },
+     {
+      "name": "category",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "default": "",
+       "title": "Category"
+      }
+     },
+     {
+      "name": "k",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 20,
+       "minimum": 1,
+       "default": 5,
+       "title": "K"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "type": "object",
+          "additionalProperties": true
+         },
+         "title": "Response Search Artifacts Api V1 Artifacts Search Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/graph/taxonomy": {
+   "get": {
+    "tags": [
+     "knowledge"
+    ],
+    "summary": "Graph Taxonomy",
+    "description": "The graph by category and domain (Events, Disruptions, Stations, Network, Energy, Diagnostics, Operations planning, Strategy): situations per category, and how often operators used each\nActionType (staff_deployment, replacement_bus, passenger_information, rerouting, crowd_control, monitoring, service_change, coordination, other).",
+    "operationId": "graph_taxonomy_api_v1_graph_taxonomy_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Graph Taxonomy Api V1 Graph Taxonomy Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/graph/audit": {
+   "get": {
+    "tags": [
+     "knowledge"
+    ],
+    "summary": "Graph Audit",
+    "description": "Wrong or uncategorised branches: problems without situation / category / kind, follow-up-shaped problems, untyped actions, orphan feedback.",
+    "operationId": "graph_audit_api_v1_graph_audit_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Graph Audit Api V1 Graph Audit Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/graph/repair": {
+   "post": {
+    "tags": [
+     "knowledge"
+    ],
+    "summary": "Graph Repair",
+    "description": "Repair what the audit finds (nothing is deleted): kinds, situations, categories with domains, follow-up marking, action types. Returns before / fixed / after.",
+    "operationId": "graph_repair_api_v1_graph_repair_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Graph Repair Api V1 Graph Repair Post"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/v1/graph/stats": {
+   "get": {
+    "tags": [
+     "knowledge"
+    ],
+    "summary": "Graph Stats",
+    "description": "Size of the knowledge graph by node / relationship type (Feedback, OperatorAction, Artifact \u2026 included).",
+    "operationId": "graph_stats_api_v1_graph_stats_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Graph Stats Api V1 Graph Stats Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "ActionBody": {
+    "properties": {
+     "operator_id": {
+      "type": "string",
+      "title": "Operator Id",
+      "default": ""
+     },
+     "action_text": {
+      "type": "string",
+      "maxLength": 1500,
+      "minLength": 3,
+      "title": "Action Text",
+      "description": "What the operator did about the situation, in their own words"
+     },
+     "followed": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "as_recommended",
+         "modified",
+         "different",
+         "none"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Followed",
+      "description": "Did the operator follow the advice? as_recommended | modified | different | none"
+     },
+     "outcome": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "worked",
+         "partly",
+         "did_not_work",
+         "unknown"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Outcome",
+      "description": "How it went, if known (can be added later with PATCH)"
+     },
+     "occurred_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Occurred At",
+      "description": "When it was done (ISO 8601 or free text); optional"
+     },
+     "score": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 5.0,
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Score",
+      "description": "Optionally rate the response in the same submission"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 1000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Comment"
+     }
+    },
+    "type": "object",
+    "required": [
+     "action_text"
+    ],
+    "title": "ActionBody"
+   },
+   "CascadeBody": {
+    "properties": {
+     "closed_stations": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "minItems": 1,
+      "title": "Closed Stations",
+      "description": "station names (exact or loose, e.g. 'Hallesches Tor')"
+     },
+     "timestamp": {
+      "type": "string",
+      "title": "Timestamp",
+      "description": "Berlin local time; the typical flow of that weekday and 15-minute slot is used",
+      "default": "2026-07-13 14:00:00"
+     },
+     "share": {
+      "type": "number",
+      "maximum": 1.0,
+      "minimum": 0.05,
+      "title": "Share",
+      "description": "share of the closed stations' typical flow that is diverted (the agent uses 0.25 / 0.5 / 0.75)",
+      "default": 0.5
+     },
+     "hops": {
+      "type": "integer",
+      "maximum": 4.0,
+      "minimum": 1.0,
+      "title": "Hops",
+      "default": 2
+     }
+    },
+    "type": "object",
+    "required": [
+     "closed_stations"
+    ],
+    "title": "CascadeBody"
+   },
+   "ChatBody": {
+    "properties": {
+     "message": {
+      "type": "string",
+      "maxLength": 1500,
+      "minLength": 1,
+      "title": "Message"
+     },
+     "operator_id": {
+      "type": "string",
+      "title": "Operator Id",
+      "description": "becomes the ADK user_id",
+      "default": "operator"
+     },
+     "session_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Session Id",
+      "description": "omit to start a new conversation; send the returned session_id to continue it (follow-ups, 'why?')"
+     },
+     "context_mode": {
+      "type": "string",
+      "enum": [
+       "auto",
+       "continue",
+       "new"
+      ],
+      "title": "Context Mode",
+      "description": "auto = ask the operator when the message does not look connected to the conversation's situation; continue = connect it anyway; new = start a new conversation (fresh context)",
+      "default": "auto"
+     },
+     "link_turn_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Link Turn Id",
+      "description": "only with no session_id: start the new session CONNECTED to this earlier answer (resume a conversation from the history)"
+     }
+    },
+    "type": "object",
+    "required": [
+     "message"
+    ],
+    "title": "ChatBody"
+   },
+   "FeedbackBody": {
+    "properties": {
+     "turn_id": {
+      "type": "integer",
+      "title": "Turn Id"
+     },
+     "operator_id": {
+      "type": "string",
+      "title": "Operator Id",
+      "default": ""
+     },
+     "score": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 5.0,
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Score"
+     },
+     "action_text": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 1500
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Action Text"
+     },
+     "followed": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "as_recommended",
+         "modified",
+         "different",
+         "none"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Followed"
+     },
+     "outcome": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "worked",
+         "partly",
+         "did_not_work",
+         "unknown"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Outcome"
+     },
+     "occurred_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Occurred At"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 1000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Comment"
+     }
+    },
+    "type": "object",
+    "required": [
+     "turn_id"
+    ],
+    "title": "FeedbackBody",
+    "description": "Score and / or action in one call (at least one of them)."
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "PatchBody": {
+    "properties": {
+     "score": {
+      "anyOf": [
+       {
+        "type": "integer",
+        "maximum": 5.0,
+        "minimum": 1.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Score"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Comment"
+     },
+     "action_text": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Action Text"
+     },
+     "followed": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "as_recommended",
+         "modified",
+         "different",
+         "none"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Followed"
+     },
+     "outcome": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "worked",
+         "partly",
+         "did_not_work",
+         "unknown"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Outcome"
+     },
+     "occurred_at": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Occurred At"
+     }
+    },
+    "type": "object",
+    "title": "PatchBody"
+   },
+   "ScoreBody": {
+    "properties": {
+     "operator_id": {
+      "type": "string",
+      "title": "Operator Id",
+      "description": "ADK user_id of the operator (defaults to the operator of the turn)",
+      "default": ""
+     },
+     "score": {
+      "type": "integer",
+      "maximum": 5.0,
+      "minimum": 1.0,
+      "title": "Score",
+      "description": "1 = useless / wrong \u2026 5 = exactly what I needed. A thumbs-up/down UI sends 5 / 1"
+     },
+     "comment": {
+      "anyOf": [
+       {
+        "type": "string",
+        "maxLength": 1000
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Comment"
+     }
+    },
+    "type": "object",
+    "required": [
+     "score"
+    ],
+    "title": "ScoreBody"
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "ctx": {
+      "type": "object",
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   }
+  }
+ }
+}

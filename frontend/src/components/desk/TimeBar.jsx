@@ -29,10 +29,10 @@ export default function TimeBar({ timeline, at, setAt, playing, setPlaying, spee
   }, [series, cur]);
 
   return (
-    <div className="timebar">
-      <div className="tb-controls">
+    <div className="dk-timebar">
+      <div className="dk-tb-controls">
         <button onClick={() => setAt(isoFrom(cur - 4 * STEP))} title="−1 h">⏮</button>
-        <button className="play" onClick={() => setPlaying(!playing)}>{playing ? "❚❚" : "▶"}</button>
+        <button className="dk-play" onClick={() => setPlaying(!playing)}>{playing ? "❚❚" : "▶"}</button>
         <button onClick={() => setAt(isoFrom(cur + 4 * STEP))} title="+1 h">⏭</button>
         <select value={speed} onChange={(e) => setSpeed(+e.target.value)} title="replay speed"><option value={1}>1×</option><option value={3}>3×</option><option value={8}>8×</option></select>
         <input type="date" value={fmtDate(cur)} min={fmtDate(t0)} max={fmtDate(t1)} onChange={(e) => e.target.value && setAt(`${e.target.value}T${fmtTime(cur)}:00`)} />
@@ -42,13 +42,13 @@ export default function TimeBar({ timeline, at, setAt, playing, setPlaying, spee
           {timeline.closures.map((c) => <option key={c.id} value={c.id}>{c.when.slice(5, 16).replace("T", " ")} · {c.label.replace(/ due to.*/, "").slice(0, 60)}</option>)}
         </select>
       </div>
-      <div className="tb-slider">
+      <div className="dk-tb-slider">
         <input type="range" min={t0} max={t1} step={STEP} value={cur} onChange={(e) => setAt(isoFrom(+e.target.value))} />
-        {timeline.closures.map((c) => <i key={c.id} className="tick" style={{ left: `${((slotMs(c.when) - t0) / (t1 - t0)) * 100}%` }} title={c.label} />)}
+        {timeline.closures.map((c) => <i key={c.id} className="dk-tick" style={{ left: `${((slotMs(c.when) - t0) / (t1 - t0)) * 100}%` }} title={c.label} />)}
       </div>
       {spark && (
-        <div className="spark" title="network passengers per 15 minutes on this day (line) vs typical (dashed)">
-          <svg viewBox="0 0 100 32" preserveAspectRatio="none"><path d={spark.typical} className="typ" /><path d={spark.total} className="tot" />{spark.cx != null && <line x1={spark.cx} x2={spark.cx} y1="0" y2="32" className="cur" />}</svg>
+        <div className="dk-spark" title="network passengers per 15 minutes on this day (line) vs typical (dashed)">
+          <svg viewBox="0 0 100 32" preserveAspectRatio="none"><path d={spark.typical} className="dk-typ" /><path d={spark.total} className="dk-tot" />{spark.cx != null && <line x1={spark.cx} x2={spark.cx} y1="0" y2="32" className="dk-cur" />}</svg>
         </div>
       )}
     </div>

@@ -1,0 +1,287 @@
+:root {
+  --bg: #020B0E;
+  --bg-radial: radial-gradient(circle at 50% 0%, #08242E 0%, #031218 45%, #01070A 100%);
+  --surface: rgba(5, 20, 26, 0.85);
+  --surface2: rgba(9, 31, 40, 0.7);
+  --surface3: rgba(14, 43, 56, 0.9);
+  
+  --teal: #00E5D4;
+  --teal-dim: rgba(0, 229, 212, 0.12);
+  --teal-glow: rgba(0, 229, 212, 0.28);
+  
+  --gold: #F5C518;
+  --gold-glow: rgba(245, 197, 24, 0.28);
+  --gold-dim: rgba(245, 197, 24, 0.12);
+  
+  --text: #F1F7F6;
+  --text-muted: #678A96;
+  --text-dim: #3F5B66;
+  --border: rgba(0, 229, 212, 0.14);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-amber: rgba(245, 197, 24, 0.35);
+  
+  --danger: #FF5C5C;
+  --danger-dim: rgba(255, 92, 92, 0.14);
+  
+  --radius-pill: 9999px;
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg-radial) fixed;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Space Grotesk', sans-serif;
+  letter-spacing: -0.02em;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 229, 212, 0.2);
+  border-radius: var(--radius-pill);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--teal);
+}
+
+.app {
+  display: flex;
+  flex-direction: row;
+  height: 100vh;
+  width: 100vw;
+  background: var(--bg-radial);
+  overflow: hidden;
+}
+
+/* Glass Cards */
+.card {
+  background: var(--surface);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card:hover {
+  border-color: rgba(0, 229, 212, 0.22);
+}
+
+/* Glow Amber Node (Inspired by Knowledge ACTIVE card in company UI) */
+.glow-amber-card {
+  background: rgba(8, 26, 32, 0.95);
+  border: 1px solid var(--border-amber);
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 20px -2px rgba(245, 197, 24, 0.22);
+  padding: 12px 16px;
+  transition: all 0.25s ease;
+}
+
+.glow-amber-card:hover {
+  box-shadow: 0 0 26px rgba(245, 197, 24, 0.35);
+}
+
+/* Capsule / Pill Buttons */
+.pill-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.pill-tab:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.pill-tab.active {
+  background: rgba(0, 229, 212, 0.12);
+  border-color: rgba(0, 229, 212, 0.35);
+  color: var(--teal);
+  box-shadow: 0 0 14px rgba(0, 229, 212, 0.2);
+}
+
+.pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.pill-badge.active {
+  background: rgba(245, 197, 24, 0.15);
+  color: var(--gold);
+  border: 1px solid rgba(245, 197, 24, 0.4);
+}
+
+.pill-badge.idle {
+  background: rgba(103, 138, 150, 0.15);
+  color: var(--text-muted);
+  border: 1px solid rgba(103, 138, 150, 0.25);
+}
+
+.pill-badge.teal {
+  background: rgba(0, 229, 212, 0.14);
+  color: var(--teal);
+  border: 1px solid rgba(0, 229, 212, 0.3);
+}
+
+/* Metric Card */
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.metric-card .label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+.metric-card .value {
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: var(--text);
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+/* Chat styles */
+.msg-user {
+  align-self: flex-end;
+  background: linear-gradient(135deg, rgba(0, 229, 212, 0.2) 0%, rgba(0, 180, 166, 0.12) 100%);
+  border: 1px solid rgba(0, 229, 212, 0.35);
+  border-radius: 16px 16px 4px 16px;
+  padding: 12px 18px;
+  max-width: 75%;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: #FFFFFF;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+}
+
+.msg-agent {
+  align-self: flex-start;
+  background: rgba(7, 24, 32, 0.85);
+  border: 1px solid rgba(0, 229, 212, 0.16);
+  border-radius: 16px 16px 16px 4px;
+  padding: 16px 20px;
+  max-width: 82%;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.msg-streaming::after {
+  content: '▋';
+  color: var(--teal);
+  animation: typingCursor 0.8s infinite;
+  margin-left: 4px;
+}
+
+/* Animations */
+@keyframes typingCursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Leaflet dark container styling */
+.leaflet-container {
+  background: #020B0E !important;
+  font-family: 'Inter', sans-serif !important;
+  border-radius: var(--radius-lg);
+}
+
+/* Clean up Leaflet popups */
+.leaflet-popup-content-wrapper {
+  background: rgba(5, 20, 26, 0.95) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--teal) !important;
+  border-radius: var(--radius-md) !important;
+  backdrop-filter: blur(12px) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+}
+
+.leaflet-popup-tip {
+  background: rgba(5, 20, 26, 0.95) !important;
+}
+
+/* ---- application shell (header with tabs, one visible page at a time; pages stay mounted so the conversation and the replay keep their state) ---- */
+.app-shell { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
+.app-top { display: flex; align-items: center; gap: 18px; padding: 10px 20px; border-bottom: 1px solid var(--border-subtle); background: rgba(2, 11, 14, 0.7); backdrop-filter: blur(10px); flex-wrap: wrap; }
+.app-top .brand { display: flex; align-items: center; gap: 12px; }
+.app-top .logo { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--teal-dim); border: 1px solid var(--border); }
+.app-top .title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: 0.04em; font-size: 0.98rem; display: flex; align-items: center; gap: 8px; }
+.app-top .brand p { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+.app-top .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin: 0 auto; }
+.app-top .right { display: flex; align-items: center; gap: 12px; }
+.app-top .model { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+.pulse { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulseGlow 2s infinite; }
+.app-main { flex: 1; min-height: 0; position: relative; }
+.app-main > .page { display: none; height: 100%; overflow: auto; }
+.app-main > .page.on { display: block; }
+.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+.spin { animation: spin 1s linear infinite; }
+code { background: rgba(0,0,0,.35); padding: 1px 6px; border-radius: 4px; }
+@media (max-width: 900px) { .app-top { padding: 8px 12px; } .app-top .brand p { display: none; } }
+.app-main > .page.pad { padding: 16px 20px 24px; }
+@media (max-width: 1600px) { .app-top .brand p { display: none; } }
+.app-top .pill-tab { padding: 6px 12px; white-space: nowrap; }
+.app-top .tabs { flex-wrap: nowrap; }
+.app-top { flex-wrap: nowrap; gap: 14px; } 
+@media (max-width: 1250px) { .app-top { flex-wrap: wrap; } .app-top .tabs { flex-wrap: wrap; } }
+
+.app-main > .page.pad > div > * { flex-shrink: 0; }
+.app-top .title { white-space: nowrap; }
+@media (max-width: 1500px) { .app-top .title .pill-badge { display: none; } .app-top .model span { display: none; } }

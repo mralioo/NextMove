@@ -99,6 +99,38 @@ def _short(t: str, n: int = 90) -> str:
     return threads.short_title(t or "", n)
 
 
+def _prepare_chat(body: ChatBody):
+    """Shared by /chat and /chat/stream: decide whether the message needs the operator's choice (topic switch), else which session / link to use.
+    Returns (needs_choice_payload | None, sid, link, started_new, relation, anchor)."""
+    import time as _t
+
+    import threads
+    kb = knowledge.kb()
+    sid, link, mode = body.session_id, body.link_turn_id, body.context_mode
+    anchor = (kb.session_anchor(sid) or (kb.turn_anchor(_SESSION_TURN[sid]) if sid in _SESSION_TURN else None)) if sid else (kb.turn_anchor(link) if link else None)
+    rel = threads.relation(body.message, anchor) if anchor else {"relation": "related", "reason": "first question of the conversation", "signals": {}}
+    if anchor and mode == "auto" and rel["relation"] != "related":
+        qents = rel["signals"].get("new_entities")
+        return ({"needs_choice": True, "relation": rel["relation"], "reason": rel["reason"], "message": body.message, "session_id": sid,
+                 "anchor": {"question": _short(anchor["first_question"]), "current": _short(anchor["question"]), "category": anchor["category"], "turn_id": anchor["turn_id"]},
+                 "choices": [{"id": "new", "label": "New conversation", "hint": "fresh context — recommended for a different topic"}, {"id": "continue", "label": "Continue this topic", "hint": "connect it to the previous question"}],
+                 "recommended": "new" if rel["relation"] == "unrelated" or qents else "continue"}, None, None, None, rel, anchor)
+    if mode == "new":
+        sid, link = None, None
+    started_new = sid is None
+    sid = sid or f"ui-{int(_t.time() * 1000)}"
+    return None, sid, link, started_new, rel, anchor
+
+
+def _finish_chat(out: dict, body: ChatBody, sid: str, link, started_new: bool, rel: dict, anchor) -> dict:
+    if out.get("artifact_turn_id"):                          # an answer reused from history stores no turn of its own: remember which situation the conversation is about
+        _SESSION_TURN[sid] = out["artifact_turn_id"]
+    mode = body.context_mode
+    out["context"] = {"mode": "new" if started_new and not link else ("resumed" if started_new else mode), "relation": rel["relation"], "reason": rel["reason"],
+                      "title": _short(anchor["first_question"] if anchor else body.message), "linked_turn_id": link if started_new else None}
+    return out
+
+
 @app.post("/api/v1/chat", tags=["chat"])
 def chat(body: ChatBody) -> dict:
     """Ask the agent. Returns the answer (Markdown) plus everything the desktop shows next to it: `turn_id` / `artifact_turn_id` / `requires_action` / `precedent` (for feedback),
@@ -107,34 +139,38 @@ def chat(body: ChatBody) -> dict:
     **One conversation = one situation.** With an existing `session_id` and `context_mode = auto`, a message that is not clearly about the conversation's situation (another kind of question,
     other line / station / event, or a vague short message) is NOT sent to the agent. The response is `{"needs_choice": true, "relation", "reason", "anchor", "choices", "recommended", "message"}`;
     the UI shows two buttons and calls again with `context_mode = "continue"` (connect it to the previous topic) or `"new"` (start a new conversation: fresh session, no inherited context).
-    The response's `context` says what happened: `{mode: new|continue|auto, relation, reason, title}`."""
-    import time as _t
-
+    The response's `context` says what happened: `{mode: new|continue|resumed|auto, relation, reason, title}`."""
     import chat_bridge
-    import threads
-    kb = knowledge.kb()
-    sid, link, mode = body.session_id, body.link_turn_id, body.context_mode
-    anchor = (kb.session_anchor(sid) or (kb.turn_anchor(_SESSION_TURN[sid]) if sid in _SESSION_TURN else None)) if sid else (kb.turn_anchor(link) if link else None)
-    rel = threads.relation(body.message, anchor) if anchor else {"relation": "related", "reason": "first question of the conversation", "signals": {}}
-    if anchor and mode == "auto" and rel["relation"] != "related":
-        qents = rel["signals"].get("new_entities")
-        return {"needs_choice": True, "relation": rel["relation"], "reason": rel["reason"], "message": body.message, "session_id": sid,
-                "anchor": {"question": _short(anchor["first_question"]), "current": _short(anchor["question"]), "category": anchor["category"], "turn_id": anchor["turn_id"]},
-                "choices": [{"id": "new", "label": "New conversation", "hint": "fresh context — recommended for a different topic"}, {"id": "continue", "label": "Continue this topic", "hint": "connect it to the previous question"}],
-                "recommended": "new" if rel["relation"] == "unrelated" or qents else "continue"}
-    if mode == "new":
-        sid, link = None, None
-    started_new = sid is None
-    sid = sid or f"ui-{int(_t.time() * 1000)}"
+    choice, sid, link, started_new, rel, anchor = _prepare_chat(body)
+    if choice:
+        return choice
     try:
         out = chat_bridge.ask(body.operator_id, sid, body.message, link_turn_id=link if started_new else None)
     except chat_bridge.AgentUnavailable as e:
         raise HTTPException(503, str(e))
-    if out.get("artifact_turn_id"):                          # an answer reused from history stores no turn of its own: remember which situation the conversation is about
-        _SESSION_TURN[sid] = out["artifact_turn_id"]
-    out["context"] = {"mode": "new" if started_new and not link else ("resumed" if started_new else mode), "relation": rel["relation"], "reason": rel["reason"],
-                      "title": _short(anchor["first_question"] if anchor else body.message), "linked_turn_id": link if started_new else None}
-    return out
+    return _finish_chat(out, body, sid, link, started_new, rel, anchor)
+
+
+@app.post("/api/v1/chat/stream", tags=["chat"])
+def chat_stream(body: ChatBody):
+    """Same as `/chat`, streamed as Server-Sent Events so the UI can show the operations while the agent works. Events (`event:` name → JSON `data:`):
+    `choice` (the topic-switch question, then the stream ends) · `step` {kind: route|tool|worker|evaluator|llm|writer, stage: dispatcher|analyst|inspector|writer, label, seconds, detail} ·
+    `answer` (the complete response, identical to `/chat`) · `error` {message}."""
+    import json as _json
+
+    import chat_bridge
+    from fastapi.responses import StreamingResponse
+    choice, sid, link, started_new, rel, anchor = _prepare_chat(body)
+
+    def gen():
+        if choice:
+            yield f"event: choice\ndata: {_json.dumps(choice)}\n\n"
+            return
+        for name, data in chat_bridge.ask_stream(body.operator_id, sid, body.message, link_turn_id=link if started_new else None):
+            if name == "answer":
+                data = _finish_chat(data, body, sid, link, started_new, rel, anchor)
+            yield f"event: {name}\ndata: {_json.dumps(data, default=str)}\n\n"
+    return StreamingResponse(gen(), media_type="text/event-stream", headers={"cache-control": "no-cache", "x-accel-buffering": "no"})
 
 
 @app.get("/api/v1/conversations", tags=["chat"])
@@ -156,6 +192,113 @@ def conversation(session_id: str) -> dict:
     anchor = kb.session_anchor(chain["last_session_id"]) or next((kb.turn_anchor(t["turn_id"]) for t in reversed(turns) if kb.turn_anchor(t["turn_id"])), None)
     return {**{k: chain[k] for k in ("conversation_id", "title", "category", "n_turns", "started", "last", "session_ids", "last_session_id", "resumed")}, "turns": turns,
             "anchor": anchor, "resume_turn_id": (anchor or {}).get("turn_id")}
+
+
+# ------------------------------------------------------------------------------------------------ analytics pages (network, flows, cascade, energy, closures)
+@app.get("/api/v1/status", tags=["analytics"])
+def api_status() -> dict:
+    """Liveness of the data layer and of the agent: {status, stations_count, flows_rows, data_window, lines, agent_up, models{role: model}, quality_db, knowledge_base}."""
+    import analytics_data
+    import chat_bridge
+    out = analytics_data.status()
+    try:
+        import urllib.request
+        out["agent_up"] = urllib.request.urlopen(chat_bridge.adk_url() + "/list-apps", timeout=2).status == 200
+    except Exception:
+        out["agent_up"] = False
+    try:
+        from llm_config import litellm_params
+        out["models"] = {r.lower(): (litellm_params(r) or [None])[0] for r in ("SUPERVISOR", "ROUTER", "WORKER", "EVALUATOR", "WRITER")}
+    except Exception:
+        out["models"] = {}
+    out["quality_db"] = (REPO / "data" / "quality" / "quality.db").exists()
+    out["knowledge_base"] = knowledge.kb().stats()["entries"]
+    return out
+
+
+@app.get("/api/v1/stations", tags=["analytics"])
+def api_stations() -> list[dict]:
+    """The 167 stations: {name (exact), short_name, lat, lon, lines[], daily_flow (mean passengers per day), betweenness, degree}."""
+    import analytics_data
+    return analytics_data.stations()
+
+
+@app.get("/api/v1/network/edges", tags=["analytics"])
+def api_edges() -> list[dict]:
+    """Track connections, one row per (edge, serving line): {line, from, to, from_lat, from_lon, to_lat, to_lon}."""
+    import analytics_data
+    return analytics_data.edges()
+
+
+@app.get("/api/v1/flows/daily", tags=["analytics"])
+def api_flows_daily() -> dict:
+    """Network passengers per day (training + test window) with a 7-day rolling mean: {dates[], values[], rolling_mean[]}."""
+    import analytics_data
+    return analytics_data.flows_daily()
+
+
+@app.get("/api/v1/flows/hourly-profile", tags=["analytics"])
+def api_hourly_profile() -> list[dict]:
+    """Network passengers per hour of the day, mean over weekdays and over weekends: [{hour: 'HH:00', weekday, weekend}]."""
+    import analytics_data
+    return analytics_data.hourly_profile()
+
+
+@app.get("/api/v1/flows/heatmap", tags=["analytics"])
+def api_heatmap(lines: str = "") -> dict:
+    """Mean passengers per hour per station: all stations of ONE line, else the 20 busiest of the selected lines (`lines=U1,U2`): {stations[], station_ids[], values[][24], max_value, count, lines}."""
+    import analytics_data
+    return analytics_data.heatmap([x for x in lines.split(",") if x])
+
+
+@app.get("/api/v1/flows/station/{name}", tags=["analytics"])
+def api_flow_station(name: str) -> dict:
+    """One station: hourly weekday / weekend profile, peak hours, daily totals."""
+    import analytics_data
+    r = analytics_data.station_flow(name)
+    if "error" in r:
+        raise HTTPException(404, r["error"])
+    return r
+
+
+@app.get("/api/v1/closures", tags=["analytics"])
+def api_closures() -> list[dict]:
+    """Recorded closures (training + test): {id, when, end, duration_hours, description, closure_type: line_suspension|station_closure, line, segment, reason}."""
+    import analytics_data
+    return analytics_data.closures()
+
+
+@app.get("/api/v1/centrality", tags=["analytics"])
+def api_centrality(n: int = Query(15, ge=1, le=167)) -> list[dict]:
+    """The `n` busiest stations with daily flow and betweenness centrality."""
+    import analytics_data
+    return analytics_data.centrality(n)
+
+
+@app.get("/api/v1/energy", tags=["analytics"])
+def api_energy() -> dict:
+    """Energy per passenger by line (Wh per passenger, worst first) with the evidence that explains it: {ranking:[{line, wh_per_pax, mwh_day, pax_day, n_stations, pax_per_station_day, corr_energy_pax,
+    weekend_vs_weekday_*_pct, efficiency_rank, explanation}], unit, method, limits}. Same method as the agent's energy tool."""
+    import analytics_data
+    return analytics_data.energy()
+
+
+class CascadeBody(BaseModel):
+    closed_stations: list[str] = Field(..., min_length=1, description="station names (exact or loose, e.g. 'Hallesches Tor')")
+    timestamp: str = Field("2026-07-13 14:00:00", description="Berlin local time; the typical flow of that weekday and 15-minute slot is used")
+    share: float = Field(0.5, ge=0.05, le=1.0, description="share of the closed stations' typical flow that is diverted (the agent uses 0.25 / 0.5 / 0.75)")
+    hops: int = Field(2, ge=1, le=4)
+
+
+@app.post("/api/v1/cascade", tags=["analytics"])
+def api_cascade(body: CascadeBody) -> dict:
+    """Passenger cascade simulator: which open stations receive the closed stations' passengers and how far above their typical load they go (`overflow_ratio`, `at_risk` ≥ 1.3×).
+    An assumption scenario (stated in `method` / `assumption`), not a measurement."""
+    import analytics_data
+    r = analytics_data.cascade(body.closed_stations, body.timestamp, body.share, body.hops)
+    if "error" in r:
+        raise HTTPException(422, r["error"])
+    return r
 
 
 @app.get("/api/v1/ops/topology", tags=["desktop"])
