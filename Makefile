@@ -17,7 +17,7 @@ EVAL_MODEL ?= gpt-4o-mini
 FREE_PORT   = $(shell $(if $(wildcard $(PY)),$(PY),python3) -c "import socket,sys; p=int(sys.argv[1]); print(next(q for q in range(p, p+200) if socket.socket().connect_ex(('127.0.0.1', q))))" $(PORT))
 
 .DEFAULT_GOAL := help
-.PHONY: help up down status logs resources cognee-graph neo4j-up neo4j-down neo4j-sync adk-evalset venv install install-ml install-mcp install-agent install-all \
+.PHONY: help up down status logs resources cognee-graph neo4j-up neo4j-down neo4j-sync adk-evalset ls-status ls-dataset ls-run venv install install-ml install-mcp install-agent install-all \
         run build docker-run docker-stop docker-logs \
         train-overcrowding train-disruption train-all checkpoints validate-pressure \
         mcp-server mcp-knowledge agent-query agent-cli agent-web demo \
@@ -186,6 +186,15 @@ eval:  ## Score the agent (LLM judge + deterministic gates). Default: ONE brutal
 
 ls-eval:  ## LangSmith-style evaluation (openevals LLM judges + run metrics) of the latest stored runs, offline; ARGS="--upload" sends to LangSmith
 	$(PY) evaluation/langsmith_eval.py $(ARGS)
+
+ls-status:  ## LangSmith: is LANGSMITH_API_KEY set and valid, which datasets exist
+	$(PY) evaluation/langsmith_run.py status
+
+ls-dataset:  ## LangSmith: create / update the test dataset `nextmove-eval` (8 questions with approximate reference answers; uploads them)
+	$(PY) evaluation/langsmith_run.py dataset
+
+ls-run:  ## LangSmith: run the agent on the 3 core examples and upload the experiment (ARGS=--all for all 8, ARGS=--offline to score without uploading; small models only)
+	$(PY) evaluation/langsmith_run.py run $(ARGS)
 
 bench:  ## Latency benchmark (8 questions, warm server); add ARGS="--show" to print the answers
 	$(PY) agent/bench.py --wait $(ARGS)

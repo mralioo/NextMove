@@ -60,6 +60,7 @@ It also warns if `.env` is missing. Keys the agent needs in `.env`: `TABPFN_API_
 | See every resource and whether it works (Cognee, KB, graph, Neo4j, MCP tools, models, keys) and **open its UI** | `make resources` · dashboard page **Resources** ("Open the UIs") |
 | Cognee's interactive memory graph as a local file | `make cognee-graph` → `.run/cognee_graph.html` (also embedded on the Resources page) |
 | Load the graph into Neo4j / bring it level | `make neo4j-up` (first time) · `make neo4j-sync` |
+| LangSmith: test dataset + live experiment | add `LANGSMITH_API_KEY` to `.env` → `make ls-status` → `make ls-dataset` → `make ls-run` (`ARGS=--all` for 8 examples, `ARGS=--offline` to try it without uploading) |
 | Load the 3 ADK eval cases (approximate answers) | `make adk-evalset` → ADK UI → Evals → `eval_set_1` |
 | Rebuild knowledge after the Sept 22–30 data arrives | `make kb-build && make kb-sync && make kg-seed` |
 | Back up the trace database before big runs | `make backup-obs` |
