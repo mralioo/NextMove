@@ -1,76 +1,73 @@
 # Running the whole system
 
-One command starts everything; one stops it.
+Four `make` commands. Everything else is a task listed by one script.
 
 ```bash
-make install-all      # once: .venv + all dependencies
-make up               # prepare + start dashboard, ADK chat UI, knowledge MCP server
-make status           # what runs, on which port, healthy or not
-make logs             # follow the logs (make logs S=dashboard for one service)
-make down             # stop everything `make up` started
+make install     # once: .venv + every dependency (dashboard, ML, MCP, agent, evaluation)
+make up          # run everything (prepares the knowledge base + graph first)
+make down        # stop everything `make up` started
+make check       # unit tests + guardrail suite + router accuracy — no LLM, no network
 ```
 
-`make up` prints the addresses (the next free port is used if a default is taken). Nothing needs Docker.
+All other tasks: `./.venv/bin/python scripts/tasks.py` lists them with descriptions; `scripts/tasks.py <task> [args]` runs one, e.g.
+`scripts/tasks.py eval --suite challenge --ids CH1,CH3 --cheap` · `scripts/tasks.py agent-query "Line U9 is suspended ... why?"` · `scripts/tasks.py status`.
 
-## What starts
+## What `make up` starts
+
+`make up` prints the addresses (the next free port is used if a default is taken; `tasks.py status` shows them again). Options: `NO_ADK=1`, `NO_NEO4J=1`, `WITH_DATA_MCP=1`, `PORT=9000`, `ADK_PORT=9001`.
 
 | Service | Default address | What it is for |
 | --- | --- | --- |
-| **dashboard** | http://localhost:8501 | Streamlit: data pages, ML engine, Observability, Evaluation, Experiments and the **Agent Workflow** page (workflow diagram, supervisor tester, guardrails, schemas, loop traces, knowledge graph) |
-| **adk-web** | http://localhost:8000 | ADK dev UI: **chat with the agent** (select the app `agent`), see every event, tool call and timing |
-| **mcp-knowledge** | http://127.0.0.1:8766/mcp | MCP server (streamable HTTP): ground truth, boundaries, `sanity_check`, history, Cognee recall, `kg_*` graph tools — for evaluators and other agents |
-| **neo4j** | bolt://localhost:7687 · browser http://localhost:7474 | The knowledge graph as a queryable copy (Docker container `nextmove-neo4j`, created once by `make neo4j-up`; user `neo4j`, password in `.env`). `make up NO_NEO4J=1` skips it |
-| mcp-data *(optional)* | http://127.0.0.1:8765/mcp | MCP server: datasets, analytics, TabPFN tools. Start with `make up WITH_DATA_MCP=1`. The agent does **not** need it: it starts its own stdio copy on the first question (~30 s warm-up) |
+| **dashboard** | http://localhost:8501 | Streamlit: data pages, ML engine, Observability, Evaluation, Experiments, **Agent Workflow** (diagram, supervisor tester, guardrails, schemas, loop traces, knowledge graph) and **Resources** (every resource, its health and links to its UI) |
+| **adk-web** | http://localhost:8000 | ADK UI: **chat with the agent**, events, tool calls, and the **Evals** tab (`eval_set_1`) |
+| **mcp-knowledge** | http://127.0.0.1:8766/mcp | MCP server: ground truth, boundaries, `sanity_check`, history, Cognee recall, `kg_*` graph tools |
+| **neo4j** | bolt://localhost:7687 · browser http://localhost:7474 | The knowledge graph as a queryable copy (Docker `nextmove-neo4j`, user `neo4j`, password in `.env`; created once by `tasks.py neo4j-up`) |
+| mcp-data *(optional)* | http://127.0.0.1:8765/mcp | Data + analytics + TabPFN MCP server for external clients. The agent starts its own copy on the first question (~30 s warm-up) |
 
-Options: `make up NO_ADK=1` (skip the chat UI) · `make up WITH_DATA_MCP=1` · `PORT=9000 make up` · `ADK_PORT=9001 make up`.
+Before starting, it builds the **knowledge base** (`knowledge/knowledge.json`) and the **knowledge graph** (`observability/kgraph.db`, without the LLM step) if they are missing, and warns if `.env` is absent. Keys the agent needs in `.env`: `TABPFN_API_TOKEN`, the LLM settings (`SUPERVISOR_*`, `WORKER_*`, see `agent/llm_config.py`), for memory `COGNEE_ENABLED`, `COGNEE_API_BASE_URL`, `COGNEE_API_KEY`, for Neo4j `NEO4J_URI`, `NEO4J_USER`, `NEO4J_PASSWORD`, optionally `LANGSMITH_API_KEY`. The first question after a cold start waits ~30 s for the TabPFN model; later ones take 2–5 s.
 
 ## Where the UIs are
 
-The **Resources** page (and `make resources`) lists every UI with a working link once `make up` has run:
-
 | Resource | UI | Link |
 | --- | --- | --- |
-| Dashboard | Streamlit pages incl. Agent Workflow, Observability, Evaluation | http://localhost:8501 (actual port from `make status`) |
-| ADK agent | Chat, events, traces, **Evals** tab (`eval_set_1`) | `http://localhost:<adk port>/dev-ui/?app=agent` · API docs `/docs` |
-| Neo4j | Neo4j Browser — explore the graph, Cypher (user `neo4j`) | http://localhost:7474 |
-| Cognee Cloud | Web app (memory, datasets, graph; sign-in) · API docs of your tenant (`<COGNEE_API_BASE_URL>/docs`) · **graph visualisation** saved as a local page by `make cognee-graph` | https://platform.cognee.ai |
-| Knowledge MCP server | no web page; inspect the tools with `npx @modelcontextprotocol/inspector` and the endpoint shown by `make status` | — |
-| LangSmith | only if `LANGSMITH_API_KEY` is set and you upload | https://smith.langchain.com |
-
-## What `make up` prepares
-
-Before starting, `scripts/services.py` makes sure two things exist and builds them if not:
-1. the **knowledge base** — `knowledge/knowledge.json` (`make kb-build`, ~10 s);
-2. the **knowledge graph** — `observability/kgraph.db` (`make kg-seed ARGS=--no-llm`, no LLM calls; run `make kg-seed` once for the LLM-extracted part).
-
-It also warns if `.env` is missing. Keys the agent needs in `.env`: `TABPFN_API_TOKEN`, the LLM settings (`SUPERVISOR_*`, `WORKER_*`, see `agent/llm_config.py`), and for memory `COGNEE_ENABLED`, `COGNEE_API_BASE_URL`, `COGNEE_API_KEY`. The first question after a cold start waits ~30 s for the TabPFN model; later ones take 2–5 s.
+| Dashboard | Streamlit pages | http://localhost:8501 |
+| ADK agent | Chat, events, traces, Evals (`eval_set_1`) | `http://localhost:<adk port>/dev-ui/?app=agent` · API docs `/docs` |
+| Neo4j | Neo4j Browser — explore the graph, Cypher | http://localhost:7474 |
+| Cognee Cloud | Web app (sign-in) · API docs `<COGNEE_API_BASE_URL>/docs` · graph visualisation saved by `tasks.py cognee-graph` | https://platform.cognee.ai |
+| Knowledge MCP server | no web page — `npx @modelcontextprotocol/inspector` | — |
+| LangSmith | only with `LANGSMITH_API_KEY` | https://smith.langchain.com |
 
 ## Talking to it
 
-* **Chat:** open the ADK UI, pick `agent`, ask e.g. *"There is a sold-out concert at Mercedes-Benz Arena tonight at 21:00. What does the flow look like at Hermannplatz, and what should we do at 23:15 when it ends?"* — then *"What about if it ends at 22:30?"* (follow-up) and *"Why do you say that?"* (explanation).
-* **Terminal:** `make agent-query Q="..."` (one question) · `make agent-cli` (chat) · `make demo` (scripted 6-turn conversation, small models).
-* **MCP client:** connect to the knowledge server URL above, e.g. `sanity_check`, `kg_similar`, `kb_boundaries`.
+* **Chat:** the ADK UI, app `agent`: *"There is a sold-out concert at Mercedes-Benz Arena tonight at 21:00. What does the flow look like at Hermannplatz, and what should we do at 23:15 when it ends?"* → *"What about if it ends at 22:30?"* (follow-up) → *"Why do you say that?"* (explanation).
+* **Terminal:** `scripts/tasks.py agent-query "..."` · `agent-cli` · `demo` (scripted 6 turns, small models).
 
-## Everything else, in the order you will need it
+## Tasks (`./.venv/bin/python scripts/tasks.py <task>`)
 
-| Goal | Command |
+| Goal | Task |
 | --- | --- |
-| Check the code without any LLM or network | `make check` (unit tests + guardrail suite + router accuracy) |
-| Score answers (small model) | `make eval ARGS="--suite challenge --ids CH1,CH3 --cheap"` · `make ls-eval` |
-| See every resource and whether it works (Cognee, KB, graph, Neo4j, MCP tools, models, keys) and **open its UI** | `make resources` · dashboard page **Resources** ("Open the UIs") |
-| Cognee's interactive memory graph as a local file | `make cognee-graph` → `.run/cognee_graph.html` (also embedded on the Resources page) |
-| Load the graph into Neo4j / bring it level | `make neo4j-up` (first time) · `make neo4j-sync` |
-| LangSmith: test dataset + live experiment | add `LANGSMITH_API_KEY` to `.env` → `make ls-status` → `make ls-dataset` → `make ls-run` (`ARGS=--all` for 8 examples, `ARGS=--offline` to try it without uploading) |
-| Load the 3 ADK eval cases (approximate answers) | `make adk-evalset` → ADK UI → Evals → `eval_set_1` |
-| Rebuild knowledge after the Sept 22–30 data arrives | `make kb-build && make kb-sync && make kg-seed` |
-| Back up the trace database before big runs | `make backup-obs` |
-| All commands with descriptions | `make help` |
+| Services: status, ports, health · follow logs | `status` · `logs [service]` |
+| Every resource, whether it works, links to its UI · Cognee memory graph as a file | `resources` · `cognee-graph` |
+| Neo4j: start + load the graph · bring it level · stop | `neo4j-up` · `neo4j-sync [--clear]` · `neo4j-down` |
+| Knowledge base from the raw CSVs · push to Cognee | `kb-build` · `kb-sync` |
+| Knowledge graph: seed · export Cypher | `kg-seed [--no-llm]` · `kg-export` |
+| JSON Schemas of the agent messages | `schemas` |
+| Score the agent (small model): one brutal question, or `--suite challenge --ids CH1,CH3`, `--suite training --allow-many`, `--cheap` | `eval` |
+| Routing / scope decisions on a labelled set · router accuracy (no LLM) | `guardrail-suite` · `eval-router` |
+| ADK eval set (3 approximate-answer cases) | `adk-evalset` |
+| LangSmith: check key · create dataset · run + upload the experiment (`--all`, `--offline`) · offline scoring of stored runs | `ls-status` · `ls-dataset` · `ls-run` · `ls-eval` |
+| Component study and its report | `experiments [--list]` · `experiments-report` |
+| TabPFN: checkpoints · train · pressure-ranking skill | `checkpoints [--force]` · `train-disruption` · `train-overcrowding` · `validate-pressure` |
+| Trace database: back up before big runs · delete | `backup-obs` · `clean-obs` |
+| Dashboard in Docker (no make target) | `docker build -t ubahn-flow-dashboard dashboard` |
 
-Architecture, schemas and guardrails: [`agent_architecture_v3.md`](agent_architecture_v3.md).
+**After the Sept 22–30 dataset arrives** (drop the files under `data/`, they are merged): `tasks.py kb-build`, `kb-sync`, `kg-seed`, `neo4j-sync --clear`.
 
 ## Troubleshooting
 
-* *A service shows `starting` for a long time* — `make logs S=<name>`; the dashboard and MCP servers load pandas / the data on first start.
-* *Port already in use* — `make up` picks the next free port and prints it; `make status` shows the real one.
+* *A service shows `starting`* — `tasks.py logs <service>`; the dashboard and MCP servers load pandas / the data on first start.
+* *Port already in use* — `make up` picks the next free port; `tasks.py status` shows the real one.
 * *Stale state after a crash* — `make down` (safe to run twice), then `make up`.
-* *Answers say "outside the data"* — the agent only knows 2026-06-10 to 2026-09-22 until the new dataset is added under `data/` (files are merged automatically).
+* *Answers say "outside the data"* — the agent knows 2026-06-10 to 2026-09-22 until the new dataset is added.
+
+Architecture, schemas and guardrails: [`agent_architecture_v3.md`](agent_architecture_v3.md).

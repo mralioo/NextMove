@@ -1,6 +1,6 @@
 """Accuracy of the deterministic router on docs/test_questions.md (no LLM, no network).
 
-    make eval-router
+    ./.venv/bin/python scripts/tasks.py eval-router
 
 Expected category = the letter in the question ID (A1 -> A). Follow-ups may route to FOLLOW; Traps
 may route to OOS; both count as correct. Cross-cutting R-questions are skipped (they mix categories).

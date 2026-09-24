@@ -514,7 +514,7 @@ def register(mcp, folder: str, get_feature_table: Callable[[], pd.DataFrame], ge
         1.0 at neighbours mean NO measurable extra load — i.e. no rerouting behaviour is visible in this data."""
         p = REPO_ROOT / "ml" / "output" / "disruption_baseline_report.json"
         if not p.exists():
-            return {"status": "unavailable", "note": "run `make train-disruption` to create the case-study report"}
+            return {"status": "unavailable", "note": "run `./.venv/bin/python scripts/tasks.py train-disruption` to create the case-study report"}
         rep = json.loads(p.read_text())["case_study_summary"]
         keep = {k: {"rows": v["rows"], "observed_over_expected": v["observed_over_expected"], "share_above_q90": v["share_above_q90"]} for k, v in rep.items()}
         return {"status": "ok", "groups": keep, "noise_share_above_q90": 0.10,

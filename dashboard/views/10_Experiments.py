@@ -13,7 +13,7 @@ page_header(
     "Two questions, run through 12 configurations of the workflow. Each configuration ('arm') changes ONE component of the baseline "
     "(router, memory, MCP transport, ML engine, writer) so every difference can be attributed to that change.",
 )
-st.caption(f"Read from `{DB_PATH}` (tables `exp_runs`, `exp_turns`). Produced by `make experiments`. Design and hypotheses: `docs/experiments_plan.md`.")
+st.caption(f"Read from `{DB_PATH}` (tables `exp_runs`, `exp_turns`). Produced by `./.venv/bin/python scripts/tasks.py experiments`. Design and hypotheses: `docs/experiments_plan.md`.")
 
 PRED, BASE, ACTUAL, REF, GOOD, BAD = "#3b82f6", "#a855f7", "#f59e0b", "#9ca3af", "#22c55e", "#ef4444"
 FACTOR_COLOR = {"-": REF, "router": PRED, "memory": BASE, "mcp": ACTUAL, "engine": GOOD, "writer": BAD}
@@ -29,7 +29,7 @@ def explain(what: str, read: str, verdict: tuple[str, str] | None = None) -> Non
 
 runs = load_exp_runs(key()) if db_exists() else pd.DataFrame()
 if runs.empty:
-    st.warning("No experiments yet. Run the suite with:\n\n```\nmake experiments ARGS=\"--list\"     # show the design\nmake experiments                   # run all 12 arms (~8 min)\n```")
+    st.warning("No experiments yet. Run the suite with:\n\n```\n./.venv/bin/python scripts/tasks.py experiments \"--list\     # show the design\n./.venv/bin/python scripts/tasks.py experiments                   # run all 12 arms (~8 min)\n```")
     st.stop()
 
 with st.expander("📖 The design in one minute", expanded=False):

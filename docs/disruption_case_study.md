@@ -9,7 +9,7 @@ passengers reroute, which stations get overloaded, where do I deploy staff?"*
 Code: `ml/disruption.py` (graph/closure logic) · `ml/demand_baseline.py` (TabPFN model) ·
 `ml/scenario.py` (redistribution + pressure) · `ml/train_disruption_baseline.py` (train/eval/case
 study) · `mcp_server/disruption_tools.py` (MCP wrapper). Regenerate all numbers below with
-`make train-disruption`; visual, chart-by-chart explanation with good/bad verdicts vs the baselines is on the
+`./.venv/bin/python scripts/tasks.py train-disruption`; visual, chart-by-chart explanation with good/bad verdicts vs the baselines is on the
 dashboard's **ML Engine** page.
 
 ---
@@ -163,13 +163,13 @@ list (`ml/disruption.py::ASSUMPTIONS`).
 ## 7. Model checkpoints (inference without refitting)
 
 TabPFN is served through an API, so there are no local weights: fitting uploads the training rows and
-returns a server `model_id`. `make checkpoints` saves, per model, in `ml/checkpoints/<name>/`:
+returns a server `model_id`. `./.venv/bin/python scripts/tasks.py checkpoints` saves, per model, in `ml/checkpoints/<name>/`:
 `model.json` (the client's `save_model()` record: model id + hyperparameters, no data),
 `train_sample.csv.gz` (the exact fit rows) and `meta.json` (features, fingerprint, metrics).
 Models: `demand_baseline` (Category C), `overcrowding_classifier` and `expected_flow_regressor`
 (the MCP predict tools). The MCP server restores them at start-up — `loaded` if the TabPFN server
 still has the fit, `refit-from-checkpoint` (same data/settings, new id) if it has forgotten it, and a
 fingerprint mismatch (different dataset, features, split or model version) marks the checkpoint stale
-so a new dataset can never be served by an old model. `make checkpoints FORCE=1` refits everything.
+so a new dataset can never be served by an old model. `./.venv/bin/python scripts/tasks.py checkpoints --force` refits everything.
 Loading requires the same TabPFN account/token that fitted the model. Verified: second run restores
 all three with unchanged ids; a corrupted id triggers a clean refit from the saved sample.

@@ -19,7 +19,7 @@
 | **Writer**: verdict first, then evidence and references, argument only if asked | `agent/writer.py`: `**Verdict:** → **Evidence:** (each bullet cites its source) → **Do now:** → **Caveat:** → **Argument:** (only when the operator asks why) → **Sources:**` (built deterministically from the datasets, tools, model and knowledge-base entries actually used, plus confidence and the evaluator's verdict) | done |
 | Datasets, Cognee graph, knowledge graph and **ML engine all reachable through MCP** | `ubahn-flow-data` (datasets, analytics, TabPFN tools) and `nextmove-knowledge` (ground truth, boundaries, sanity check, history, Cognee recall, **`kg_*` graph tools**); the evaluator can also ask for `ml_engine="empirical"` as a cross-check via the tools' new `engine` argument | done |
 | **Guardrails and hard failsafes**, no unrelated topics | three layers (input / process / output), §4 | done |
-| **Knowledge graph** that maps problems to answers, actions and options, grows over time, seeded for the cold start, built like the **Neo4j LLM Graph Builder** | `agent/kgraph.py` (local property graph: SQLite + NetworkX) using **LangChain's `LLMGraphTransformer`** — the Graph Builder's extraction engine — plus deterministic case recording; seeded by `make kg-seed`; exportable as Cypher and mirrored to Neo4j | done, **Neo4j runs locally in Docker and mirrors the graph live** (§5) |
+| **Knowledge graph** that maps problems to answers, actions and options, grows over time, seeded for the cold start, built like the **Neo4j LLM Graph Builder** | `agent/kgraph.py` (local property graph: SQLite + NetworkX) using **LangChain's `LLMGraphTransformer`** — the Graph Builder's extraction engine — plus deterministic case recording; seeded by `./.venv/bin/python scripts/tasks.py kg-seed`; exportable as Cypher and mirrored to Neo4j | done, **Neo4j runs locally in Docker and mirrors the graph live** (§5) |
 | **Unify the data schema** | `agent/schemas.py`: 21 pydantic models, `extra="forbid"`, versioned, validated at every hand-over; JSON Schemas in `docs/schemas/` | done |
 
 ## 2. The flow
@@ -50,7 +50,7 @@ ADK agents: `supervisor` → `worker` (runs the loop, events `worker:<specialist
 
 ## 3. The unified schema (`agent/schemas.py`)
 
-All models: `extra="forbid"`, `schema_version = "1.0"`, JSON Schema in `docs/schemas/<Name>.schema.json` (`make schemas`).
+All models: `extra="forbid"`, `schema_version = "1.0"`, JSON Schema in `docs/schemas/<Name>.schema.json` (`./.venv/bin/python scripts/tasks.py schemas`).
 
 | Message | Direction | Key fields |
 | --- | --- | --- |
@@ -98,7 +98,7 @@ Modelled on the Neo4j LLM Knowledge Graph Builder: typed nodes and relationships
 (Document)-[:FROM_DOCUMENT]->(entity)       LLM-extracted: Concept / Station / Line / … with RELATED_TO, SUPPORTED_BY
 ```
 
-Edge `weight` counts how often a link was accepted (frequently chosen actions rank first); provenance (`source`) is never overwritten. **Seeded (`make kg-seed`, ≈ 1 min):**
+Edge `weight` counts how often a link was accepted (frequently chosen actions rank first); provenance (`source`) is never overwritten. **Seeded (`./.venv/bin/python scripts/tasks.py kg-seed`, ≈ 1 min):**
 
 | Seed | What |
 | --- | --- |
@@ -107,14 +107,14 @@ Edge `weight` counts how often a link was accepted (frequently chosen actions ra
 | `seed:bank` (69) | the question bank: question + what a good answer contains (guidance, no answer yet) |
 | `llm-graph-builder` | 22 knowledge-base texts (boundaries, insights, ground truth) and 6 accepted answers turned into **161 nodes / 145 relationships** by `LLMGraphTransformer` (small model) |
 
-Result: **564 nodes, 823 relationships** (112 problems, 122 answers, 73 actions, 36 options, 57 stations, 103 concepts). It **grows at run time**: every accepted answer adds or reinforces a case (`runtime`). `similar()` — token overlap, category, shared stations/lines — is what the evaluator receives as `similar_cases`. MCP tools on `nextmove-knowledge`: `kg_similar`, `kg_top_actions`, `kg_neighbors`, `kg_add_case`, `kg_stats`. **Neo4j** (`make neo4j-up`: Docker `neo4j:5.26-community`, data volume kept, ports bound to 127.0.0.1) holds a second copy: `make neo4j-sync` loads the whole graph with batched `UNWIND … MERGE` (567 nodes / 836 relationships, identical to SQLite), and while the agent runs a background thread mirrors every new node / relationship (verified with a test problem → answer → action chain that appeared in Neo4j within seconds). Browser: http://localhost:7474 (user `neo4j`). SQLite stays the source of truth; a Neo4j outage only pauses the mirror. `make kg-export` still writes the Cypher file. Evaluation runs (`TMT_HISTORY=off`) do not write to the graph.
+Result: **564 nodes, 823 relationships** (112 problems, 122 answers, 73 actions, 36 options, 57 stations, 103 concepts). It **grows at run time**: every accepted answer adds or reinforces a case (`runtime`). `similar()` — token overlap, category, shared stations/lines — is what the evaluator receives as `similar_cases`. MCP tools on `nextmove-knowledge`: `kg_similar`, `kg_top_actions`, `kg_neighbors`, `kg_add_case`, `kg_stats`. **Neo4j** (`./.venv/bin/python scripts/tasks.py neo4j-up`: Docker `neo4j:5.26-community`, data volume kept, ports bound to 127.0.0.1) holds a second copy: `./.venv/bin/python scripts/tasks.py neo4j-sync` loads the whole graph with batched `UNWIND … MERGE` (567 nodes / 836 relationships, identical to SQLite), and while the agent runs a background thread mirrors every new node / relationship (verified with a test problem → answer → action chain that appeared in Neo4j within seconds). Browser: http://localhost:7474 (user `neo4j`). SQLite stays the source of truth; a Neo4j outage only pauses the mirror. `./.venv/bin/python scripts/tasks.py kg-export` still writes the Cypher file. Evaluation runs (`TMT_HISTORY=off`) do not write to the graph.
 
 ## 6. Measured results
 
 | Check | Result |
 | --- | --- |
 | Unit tests | **90 pass** (24 new: schemas, guardrails, supervisor decisions, history, follow-up, confidence, evaluator, loop, graph, writer sources) |
-| Guardrail / routing suite (`make guardrail-suite`, no LLM, 0.2 s) | **46/46**: answerable 15/15 (incl. one German question), unsupported → decline 5/5, unrelated → bounce 18/18, question + injection 2/2, follow-ups with a previous turn 6/6. *Caveat:* the first run missed 2 (the German question, "which trains are delayed") and I added rules for them — the set is small and partly tuned to itself; treat 100 % as "no known misses", not as an accuracy estimate. |
+| Guardrail / routing suite (`./.venv/bin/python scripts/tasks.py guardrail-suite`, no LLM, 0.2 s) | **46/46**: answerable 15/15 (incl. one German question), unsupported → decline 5/5, unrelated → bounce 18/18, question + injection 2/2, follow-ups with a previous turn 6/6. *Caveat:* the first run missed 2 (the German question, "which trains are delayed") and I added rules for them — the set is small and partly tuned to itself; treat 100 % as "no known misses", not as an accuracy estimate. |
 | Router bank accuracy (75 questions) | 71/75 (95 %) — unchanged from the v2 review |
 | Scripted 6-turn conversation (`evaluation/conversation_demo.py`, real ADK app) | T1 event question **3.4 s** (proceed, deterministic evaluator, confidence 0.87) · T2 "what about if it ends at 22:30?" **2.8 s** (rerun: inherited venue/alias/station, `times` → 21:00 + 22:30) · T3 "why do you say Hermannplatz is not affected?" **2.1 s** (explain, from the earlier facts) · T4 the T1 question again **0.0 s** (`answer_from_history`, exact) · T5 "capital of France" **0.7 s** (bounce, no worker, no LLM) · T6 "how many passengers can Mehringdamm hold" **1.1 s** (decline) |
 | Two challenge questions, full pipeline, evaluator = small model in `auto` (`ev-20260924-121705`) | CH1 (U8 Hermannplatz–Neukölln) and CH3 (InnoTrans, 3 stations): overall **0.93**, relevance 0.93, reliability 0.90, stress 0.97; answered 2/2; judge completeness CH1 0.8, CH3 1.0; sanity checks 2/2; latency 3.4 s and 5.9 s; both accepted (confidence 0.60 and 0.57 — both above the 0.55 threshold, so the LLM evaluator was **not** invoked in this run) |
@@ -138,20 +138,20 @@ Result: **564 nodes, 823 relationships** (112 problems, 122 answers, 73 actions,
 * **Similarity is lexical** (token overlap + category + shared entities), not embeddings, so paraphrases with different words score low.
 * **The evaluator's requirement checks cover the objective's facts, not the prose.** Whether the *written* answer is good is still the job of the sanity check, the number guard and the offline judges; the small-model judge remains lenient (v2 report §7).
 * **Answers got longer.** Verdict + evidence + caveat + assumed + sources push some answers past the old 150-word readability limit (raised to 190 for the metric); CH1 with five disclosed assumptions is the extreme.
-* **Rebuilding needed for the final-day dataset:** `make kb-build kb-sync kg-seed` after the Sept 22–30 data arrives; until then the knowledge base and graph describe the training data, and the history lookup already refuses answers from a different data window.
+* **Rebuilding needed for the final-day dataset:** `./.venv/bin/python scripts/tasks.py kb-build kb-sync kg-seed` after the Sept 22–30 data arrives; until then the knowledge base and graph describe the training data, and the history lookup already refuses answers from a different data window.
 * The observability database's `spans` table was corrupted earlier in this session (v2 report §6, item 11); still open.
 
 ## 8. Run it
 
 ```
-make schemas            # JSON Schemas of every message → docs/schemas/
-make guardrail-suite    # 46 routing / scope / follow-up checks, no LLM
-make kg-seed            # seed the knowledge graph (ARGS=--no-llm skips the LLM extraction)
-make kg-stats | make kg-export
-make mcp-knowledge      # MCP server: ground truth, sanity check, history, Cognee recall, kg_* tools
+./.venv/bin/python scripts/tasks.py schemas            # JSON Schemas of every message → docs/schemas/
+./.venv/bin/python scripts/tasks.py guardrail-suite    # 46 routing / scope / follow-up checks, no LLM
+./.venv/bin/python scripts/tasks.py kg-seed            # seed the knowledge graph (ARGS=--no-llm skips the LLM extraction)
+make kg-stats | ./.venv/bin/python scripts/tasks.py kg-export
+./.venv/bin/python scripts/tasks.py mcp-knowledge      # MCP server: ground truth, sanity check, history, Cognee recall, kg_* tools
 EVALUATOR_LITELLM_MODEL=gpt-4o-mini ./.venv/bin/python evaluation/conversation_demo.py     # 6-turn demo, small models
-EVALUATOR_LITELLM_MODEL=gpt-4o-mini make eval ARGS="--suite challenge --ids CH1,CH3 --cheap"   # two questions
-make run                # dashboard → Agent Workflow (diagram, supervisor tester, guardrails, schemas, loop traces, knowledge graph)
+EVALUATOR_LITELLM_MODEL=gpt-4o-mini ./.venv/bin/python scripts/tasks.py eval --suite challenge --ids CH1,CH3 --cheap   # two questions
+make up                # dashboard → Agent Workflow (diagram, supervisor tester, guardrails, schemas, loop traces, knowledge graph)
 ```
 
 Environment: `EVALUATOR_MODE=auto|always|off`, `EVALUATOR_LITELLM_MODEL`, `LOOP_MAX_ITERS`, `LOOP_DEADLINE_S`, `GUARD_*`, `TMT_HISTORY=off`, `NEO4J_URI/USER/PASSWORD` (optional sink).

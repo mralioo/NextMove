@@ -1,7 +1,7 @@
 """Fill the RESULTS block of docs/experiments_plan.md from the observability database.
 
-    make experiments-report              # latest experiment run
-    make experiments-report EXP=exp-20260923-225649
+    ./.venv/bin/python scripts/tasks.py experiments-report              # latest experiment run
+    ./.venv/bin/python scripts/tasks.py experiments-report exp-20260923-225649
 
 Everything between <!-- RESULTS:START --> and <!-- RESULTS:END --> is regenerated (tables only — numbers come from the
 database, never typed by hand). The human-written FINDINGS section of the document is left alone.

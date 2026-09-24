@@ -12,9 +12,9 @@
 
 | Step | Command / evidence | Stored run |
 | --- | --- | --- |
-| The 3 challenge questions **verbatim** + 3 variants where the operator supplies the date the data can resolve (+1 what-if phrasing) — scored by the LLM judge on *ideal-answer* criteria | `make eval ARGS="--suite challenge --cheap --allow-many"` | `ev-20260924-081324` |
-| Consistency: the Q1 what-if phrasing, 3 repeats | `make eval ARGS="--suite challenge --ids CH1w --repeat 3 --cheap"` | `ev-20260924-081515` |
-| The 11 organiser training questions (workbook) | `make eval ARGS="--suite training --cheap --allow-many"` | `ev-20260924-081555` |
+| The 3 challenge questions **verbatim** + 3 variants where the operator supplies the date the data can resolve (+1 what-if phrasing) — scored by the LLM judge on *ideal-answer* criteria | `./.venv/bin/python scripts/tasks.py eval --suite challenge --cheap --allow-many` | `ev-20260924-081324` |
+| Consistency: the Q1 what-if phrasing, 3 repeats | `./.venv/bin/python scripts/tasks.py eval --suite challenge --ids CH1w --repeat 3 --cheap` | `ev-20260924-081515` |
+| The 11 organiser training questions (workbook) | `./.venv/bin/python scripts/tasks.py eval --suite training --cheap --allow-many` | `ev-20260924-081555` |
 | Earlier evidence re-used: brutal 6-part question, 38-question stress suite (re-scored by the judge), 12-arm component experiment | `ev-20260923-233001`, `ev-20260923-222257`, `exp-20260923-225649` | see [`observability_and_evaluation.md`](observability_and_evaluation.md) |
 | Manual read of every challenge answer against the tool facts stored in the trace (`runs.facts_json`) | §3 | — |
 | Data checks from the raw CSVs (rain / event signal, venue names, U8 topology, two-file data drop) | §3, §5 | — |
@@ -30,7 +30,7 @@ New in the repo for this review: a `challenge` suite (`evaluation/dataset.py`, `
 
 | Requirement (problem statement) | Status | Evidence |
 | --- | --- | --- |
-| Conversational AI agent | ✅ | Google ADK app (`agent/agent.py`), CLI (`make agent-cli`), ADK dev UI (`make agent-web`). ❌ **No operator chat UI** in the Streamlit dashboard (`grep chat_input dashboard/` → none). |
+| Conversational AI agent | ✅ | Google ADK app (`agent/agent.py`), CLI (`./.venv/bin/python scripts/tasks.py agent-cli`), ADK dev UI (`make agent-web`). ❌ **No operator chat UI** in the Streamlit dashboard (`grep chat_input dashboard/` → none). |
 | "Preferably on an open-source framework and MCP infrastructure" | ✅ | ADK (Apache-2.0), FastMCP 4, LiteLLM; MCP over stdio / in-memory / HTTP (experiment arms A00 / C1 / C2 all answered). 10 MCP tools. ⚠️ The ML engine (TabPFN) runs through a **hosted client API** (`TABPFN_API_TOKEN`), not local. |
 | Helps operators "understand, anticipate, and respond … in real time" | ⚠️ | Latency is real-time-grade (§6) but the system is **batch over a static dataset**: no live feed, no notion of "now" (`tonight`, `next 20 minutes` are not resolvable — see CH1/CH2). |
 | Answers "the questions operators actually ask" (the 3 challenge questions) | ⚠️ / ❌ | Q1 partially (with silent errors), Q2 ❌, Q3 ❌ — §3. |
@@ -151,7 +151,7 @@ Acceptance tests are measurable and re-runnable with the harness added in this r
 
 | Pri | Change | Fixes | Acceptance test |
 | --- | --- | --- | --- |
-| **P0-1** | **Never substitute a closure silently.** Treat the stated closure as a *what-if* unless line + **both** stations + date/time match a record; if a near-match exists, say "closest recorded closure was X on date Y; I simulated your scenario instead". Separate `horizon_min` ("next 20 minutes") from `duration`. | D1, D2 | `make eval ARGS="--suite challenge --ids CH1,CH1g,CH1w --cheap"`: facts `cl.from` = the stated date/time, `press` non-empty, ≥ 1 at-risk station in 3/3 repeats; unit tests for both parsers. |
+| **P0-1** | **Never substitute a closure silently.** Treat the stated closure as a *what-if* unless line + **both** stations + date/time match a record; if a near-match exists, say "closest recorded closure was X on date Y; I simulated your scenario instead". Separate `horizon_min` ("next 20 minutes") from `duration`. | D1, D2 | `./.venv/bin/python scripts/tasks.py eval --suite challenge --ids CH1,CH1g,CH1w --cheap`: facts `cl.from` = the stated date/time, `press` non-empty, ≥ 1 at-risk station in 3/3 repeats; unit tests for both parsers. |
 | **P0-2** | **Data-drop safety:** merge *all* matching `flows*/events*/weather*/closures*/energy*` files (concat + dedupe on timestamp), refresh coverage from the merged data, invalidate feature/prediction caches and TabPFN train samples by data hash; add a `make check-data DIR=…` smoke test. | D4 | Two-file simulated drop loads old + new rows; `describe_dataset` reports the new end date; Sept 30 question no longer declines. |
 | **P0-3** | **Split trap words from intent.** "capacity" / "tonight" should annotate the plan (caveat, ask for date) instead of forcing OOS; answer the supported part and flag the rest. | D3 | CH3 and CH2 no longer route to OOS; L01 sub-asks met ≥ 5/6. |
 | **P1-1** | **Category A tool (events):** venue→station mapping (nearest stations by coordinates; alias "Mercedes-Benz Arena" = "Uber Arena"), event window vs same-weekday baseline (the data shows **7.8× at Warschauer Str.**), end-of-event staffing advice; ask for the date when "tonight" is given. | CH2, CH2g, training Q1, Bonus 2 | CH2g: names Guns N' Roses, 23 June, ≈1 996 attendees, Warschauer Str./Schlesisches Tor with a ratio vs baseline, and a 23:15-style action list; judged ≥ 4/5 criteria. |
@@ -161,7 +161,7 @@ Acceptance tests are measurable and re-runnable with the harness added in this r
 | **P2-1** | **Operator UX:** a chat page in the dashboard (streaming answer + trace link); remove internal-status sentences from answers; tailor the decline text to what *is* possible next. | D6, D7 | Answer text contains no "tool"/"analysis tool" wording; screenshot in the pitch. |
 | **P2-2** | **Judge calibration:** add a "restating the question does not count" rule, pass `cl.from` etc. explicitly for contradiction checks, spot-check with the main model on ≤ 10 answers, report human-vs-judge agreement. | D8 | Judge vs manual gap on the verbatim challenge answers ≤ 0.10 (today 0.30). |
 | **P2-3** | **Deployment & data-egress note** (for the Impact criterion): reference architecture (MCP server next to the data, ADK service, dashboard), where each model runs, what leaves the network (Azure LLM, OpenAI worker, TabPFN service, optional JEV), and the path to fully local (local LLM, local TabPFN). | Impact | Doc reviewed against the criterion text. |
-| **P2-4** | JEV: obtain a valid key (401 today), then `make experiments ARGS="--arms A00,R3"`. | D9 | R3 row filled with a noise-aware verdict. |
+| **P2-4** | JEV: obtain a valid key (401 today), then `./.venv/bin/python scripts/tasks.py experiments --arms A00,R3`. | D9 | R3 row filled with a noise-aware verdict. |
 
 ---
 

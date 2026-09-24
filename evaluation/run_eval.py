@@ -1,7 +1,7 @@
 """Run the agent workflow over the evaluation dataset and score it.
 
-    make eval                      # ONE brutal multi-part question (default): 1 call to the shared LLM endpoint
-    make eval ARGS="--suite training --allow-many"     # the 11 workbook questions (~11 LLM calls)
+    ./.venv/bin/python scripts/tasks.py eval                      # ONE brutal multi-part question (default): 1 call to the shared LLM endpoint
+    ./.venv/bin/python scripts/tasks.py eval --suite training --allow-many     # the 11 workbook questions (~11 LLM calls)
     ./.venv/bin/python evaluation/run_eval.py --suite limit --cheap      # same, but with the small worker model
 
 The LLM endpoint (SUPERVISOR/WRITER model) is shared, so the harness refuses to run more than MAX_CALLS (5)

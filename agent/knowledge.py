@@ -7,7 +7,7 @@
                     (b) semantic recall for evaluators and follow-ups, never as a blocking step in front of the operator.
 
 Why local-first: an operator answer must not wait for a network memory service, and the boundaries ("no capacity data",
-"data ends 2026-09-22") must be enforced even when the service is down. The same content is pushed to Cognee (`make kb-sync`)
+"data ends 2026-09-22") must be enforced even when the service is down. The same content is pushed to Cognee (`./.venv/bin/python scripts/tasks.py kb-sync`)
 so it also lives in a graph that other agents / evaluators can query through MCP (mcp_server/knowledge_server.py).
 
 Cognee is used only if COGNEE_ENABLED is true and COGNEE_API_BASE_URL / COGNEE_API_KEY are set; after two consecutive failures it is

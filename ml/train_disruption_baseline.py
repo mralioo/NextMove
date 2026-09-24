@@ -2,7 +2,7 @@
 response), then run the 26-closure case study.
 
 Usage:
-    make train-disruption
+    ./.venv/bin/python scripts/tasks.py train-disruption
     # or: ./.venv/bin/python ml/train_disruption_baseline.py
 
 Requires TABPFN_API_TOKEN (same as ml/train_overcrowding_classifier.py).

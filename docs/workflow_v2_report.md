@@ -142,7 +142,7 @@ v1: routed as a whole to out-of-scope; 3/6 sub-asks (only the three refusals). *
 
 ## 4. LangSmith-style evaluation (offline)
 
-`make ls-eval` runs `langsmith.evaluate(..., upload_results=False)` — LangSmith's own runner, nothing uploaded — with the prebuilt `openevals` LLM-judge prompts (continuous 0–1 scores, small model), plus the deterministic `sanity` evaluator and run metrics. `--upload` sends runs and feedback to LangSmith **only** if `LANGSMITH_API_KEY` is set (it is not; nothing left this machine).
+`./.venv/bin/python scripts/tasks.py ls-eval` runs `langsmith.evaluate(..., upload_results=False)` — LangSmith's own runner, nothing uploaded — with the prebuilt `openevals` LLM-judge prompts (continuous 0–1 scores, small model), plus the deterministic `sanity` evaluator and run metrics. `--upload` sends runs and feedback to LangSmith **only** if `LANGSMITH_API_KEY` is set (it is not; nothing left this machine).
 
 | Suite (stored run) | correctness | groundedness | helpfulness | relevance | conciseness | sanity | latency p50 / p95 | tokens in+out | est. cost |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- | ---: |
@@ -199,21 +199,21 @@ Implication, stated in the knowledge base (`I-P-SKILL`) and in every P answer: t
 * **Date defaults are assumptions.** With no date the system uses the latest full weekday at 17:00 for a closure, and says so. That is a design choice, not something in the data.
 * **InnoTrans day 1 = 22 Sept 2026** is operator context (the events file has no InnoTrans event) and is stated as an assumption in the answer.
 * **Cold-start cost:** first call after start-up waits for the TabPFN checkpoint (≈ 35 s in one run); scenarios on unseen dates cost 6–13 s.
-* **Cognee:** curated knowledge and session QA are sent to your Cognee tenant (dataset `next_move`); recall is slow (seconds). If the final-day dataset changes the numbers, `make kb-build && make kb-sync` must be re-run — until then the KB describes the training data.
+* **Cognee:** curated knowledge and session QA are sent to your Cognee tenant (dataset `next_move`); recall is slow (seconds). If the final-day dataset changes the numbers, `./.venv/bin/python scripts/tasks.py kb-build && ./.venv/bin/python scripts/tasks.py kb-sync` must be re-run — until then the KB describes the training data.
 
 ---
 
 ## 8. How to run it
 
 ```
-make kb-build          # ground truth / boundaries / insights from the raw CSVs
-make kb-sync           # push to Cognee (server-side graph build, ~1–2 min)
+./.venv/bin/python scripts/tasks.py kb-build          # ground truth / boundaries / insights from the raw CSVs
+./.venv/bin/python scripts/tasks.py kb-sync           # push to Cognee (server-side graph build, ~1–2 min)
 make kb-stats          # sizes, stored turns, Cognee connectivity
-make mcp-knowledge     # the knowledge / sanity MCP server (stdio)
-make eval ARGS="--suite challenge --ids CH1,CH3 --cheap"     # two questions, small model
-make ls-eval           # LangSmith-style evaluation of the latest stored runs (offline)
-make validate-pressure # skill of the pressure ranking on replay days (~2 min, TabPFN API)
-make run               # dashboard → "Agent Workflow" page
+./.venv/bin/python scripts/tasks.py mcp-knowledge     # the knowledge / sanity MCP server (stdio)
+./.venv/bin/python scripts/tasks.py eval --suite challenge --ids CH1,CH3 --cheap     # two questions, small model
+./.venv/bin/python scripts/tasks.py ls-eval           # LangSmith-style evaluation of the latest stored runs (offline)
+./.venv/bin/python scripts/tasks.py validate-pressure # skill of the pressure ranking on replay days (~2 min, TabPFN API)
+make up               # dashboard → "Agent Workflow" page
 ```
 
 ## 9. Self-assessment against the five criteria (estimate, same caveats as the review)
@@ -231,7 +231,7 @@ Weighted: 0.65 + 2.0 + 2.4 + 4.5 + 2.0 = **11.6 of 19.25 (≈ 60 %)**, up from �
 ## 10. Next steps, in order of value
 
 1. Reroute advice for hypothetical closures: label proximity links as such and prefer alternatives on other lines (open defect 12).
-2. Cold-latency: pre-compute the closure-window and busy-day predictions the final questions are likely to need once the Sept 22–30 data arrives (the checkpoint refits on new data; run `make kb-build kb-sync` after it).
+2. Cold-latency: pre-compute the closure-window and busy-day predictions the final questions are likely to need once the Sept 22–30 data arrives (the checkpoint refits on new data; run `./.venv/bin/python scripts/tasks.py kb-build kb-sync` after it).
 3. Independent ground truth for B and A (a second implementation of the anomaly and uplift calculation) so those answers can be sanity-checked like C–F.
 4. Back up / isolate the observability DB (defect 11).
 5. A chat page in the dashboard for the operator, and a deployment / data-egress note (Azure LLM, OpenAI worker, TabPFN service, Cognee).

@@ -4,14 +4,14 @@
 This suite measures — quantitatively and qualitatively — what each choice changes, using **two questions** and one
 configuration ("arm") per choice. It is also a template: adding a component to the study means adding one arm.
 
-The earlier evaluation on the organiser workbook's questions (`make eval`, suites `limit`, `training`, `stress`, …) is unchanged and
+The earlier evaluation on the organiser workbook's questions (`./.venv/bin/python scripts/tasks.py eval`, suites `limit`, `training`, `stress`, …) is unchanged and
 independent of this suite.
 
 ```
-make experiments ARGS="--list"          # show the design (arms, parameters, hypotheses) without running anything
-make experiments                        # run all arms, one process each (~9 min; the shared main model is used by ONE arm, 3 calls)
-make experiments ARGS="--arms A00,R3"   # a subset (e.g. baseline + the JEV router)
-make experiments-report                 # regenerate the RESULTS block below from the database
+./.venv/bin/python scripts/tasks.py experiments --list          # show the design (arms, parameters, hypotheses) without running anything
+./.venv/bin/python scripts/tasks.py experiments                        # run all arms, one process each (~9 min; the shared main model is used by ONE arm, 3 calls)
+./.venv/bin/python scripts/tasks.py experiments --arms A00,R3   # a subset (e.g. baseline + the JEV router)
+./.venv/bin/python scripts/tasks.py experiments-report                 # regenerate the RESULTS block below from the database
 make jev-check                          # verify JEV_API_KEY and the response format (sends one public question to the JEV API)
 dashboard → "Experiments"               # comparison, noise-aware verdicts, answers side by side
 ```
@@ -64,7 +64,7 @@ process (own caches, own memory store, own MCP server).
 question categories A–H, X, OOS; the answer's `choice` and `confidence` become the plan's category and confidence).
 
 To run the arm: add `JEV_API_KEY=…` (and `JEV_API_URL=…` if the endpoint differs) to the repo's `.env`, run `make jev-check` once to confirm the key and
-the response shape, then `make experiments ARGS="--arms A00,R3"` (baseline and JEV in the same run, so they are directly comparable). Without a key the arm is
+the response shape, then `./.venv/bin/python scripts/tasks.py experiments --arms A00,R3` (baseline and JEV in the same run, so they are directly comparable). Without a key the arm is
 recorded as *skipped*, as in the results below.
 
 Things to keep in mind: the adapter follows the documented format but has only been tested against a mocked response (no key was available while building it);
@@ -269,7 +269,7 @@ answer that says "measured pressure", see finding 1). Every difference below is 
 ## 8. Extending the study
 
 * **Add an arm:** add a level to `agent/config.py` (`CHOICES`), implement it where the configuration is read, add `_arm(...)` with a hypothesis in `experiments/arms.py`, run
-  `make experiments ARGS="--arms A00,<new>"`, then `make experiments-report`.
+  `./.venv/bin/python scripts/tasks.py experiments --arms A00,<new>`, then `./.venv/bin/python scripts/tasks.py experiments-report`.
 * **Next experiments:** (1) a factorial or fractional design over memory × writer × engine; (2) more questions across categories (the 75-question bank) using only the
   deterministic/TF-IDF/JEV routers (no LLM cost); (3) ≥ 3 repeats per arm with a real variance estimate; (4) a hybrid writer; (5) pre-train the TF-IDF router at start-up and re-measure;
   (6) a two-rater human rubric to calibrate the judge (agreement with human raters, not only with the old regex).

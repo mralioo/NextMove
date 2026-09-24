@@ -36,8 +36,8 @@ runs = load_runs(key()) if db_exists() else pd.DataFrame()
 if runs.empty:
     st.warning(
         "No runs recorded yet. Ask the agent a question and it appears here:\n\n"
-        "```\nmake agent-query Q=\"At what time does the commute flow peak at Rudow station usually take place?\"\n"
-        "make bench          # 8 varied questions\nmake eval           # the workbook's TRAINING questions, scored\n```"
+        "```\n./.venv/bin/python scripts/tasks.py agent-query \"At what time does the commute flow peak at Rudow station usually take place?\"\n"
+        "./.venv/bin/python scripts/tasks.py eval           # the workbook's TRAINING questions, scored\n```"
     )
     st.stop()
 
@@ -45,7 +45,7 @@ if runs.empty:
 with st.sidebar:
     st.markdown("### 🔭 Filters")
     src = st.multiselect("Source", sorted(runs["source"].dropna().unique()), default=sorted(runs["source"].dropna().unique()),
-                         help="cli = make agent-query · web = adk web · bench = make bench · eval = make eval")
+                         help="cli = ./.venv/bin/python scripts/tasks.py agent-query · web = adk web · eval = ./.venv/bin/python scripts/tasks.py eval")
     mode = st.multiselect("Agent mode", sorted(runs["mode"].unique()), default=sorted(runs["mode"].unique()),
                           help="fast = router→executor→writer pipeline · llm = original supervisor loop")
     cats = st.multiselect("Category", sorted(runs["category"].dropna().unique()), default=sorted(runs["category"].dropna().unique()))

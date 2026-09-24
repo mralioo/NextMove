@@ -211,7 +211,7 @@ def _fit_models() -> dict:
     """Restore (or, first time only, fit and checkpoint) the TabPFN classifier + regressor.
 
     Checkpoints live in ml/checkpoints/ (see ml/checkpoints.py): a server restart reuses the
-    saved models instead of re-fitting, and `make checkpoints` pre-builds them. The training
+    saved models instead of re-fitting, and `./.venv/bin/python scripts/tasks.py checkpoints` pre-builds them. The training
     sample is the same stratified chronological-train-pool sample that
     ml/train_overcrowding_classifier.py evaluates, so a live prediction is directly comparable
     to that script's offline evaluation."""

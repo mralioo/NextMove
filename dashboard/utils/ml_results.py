@@ -1,5 +1,5 @@
 """Loaders for the TabPFN ML-engine result files written by the training scripts
-(`make train-overcrowding`, `make train-disruption`) into `ml/output/`.
+(`./.venv/bin/python scripts/tasks.py train-overcrowding`, `./.venv/bin/python scripts/tasks.py train-disruption`) into `ml/output/`.
 
 The dashboard only ever READS these files — it never calls the TabPFN API — so the
 page renders instantly and works offline / in Docker. Override the location with
@@ -60,6 +60,6 @@ def load_report() -> dict | None:
 
 
 def load_manifest() -> list[dict] | None:
-    """Model-checkpoint registry written by `make checkpoints` (ml/checkpoints/manifest.json)."""
+    """Model-checkpoint registry written by `./.venv/bin/python scripts/tasks.py checkpoints` (ml/checkpoints/manifest.json)."""
     p = CHECKPOINT_DIR / "manifest.json"
     return _read_json(str(p), p.stat().st_mtime) if p.exists() else None

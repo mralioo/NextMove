@@ -209,7 +209,7 @@ distribution per 15-min slot, trained on a 10k-row sample of non-closure rows wi
 profile features. Held-out MAE 74.6 (vs 77.9 profile-mean baseline), 80/90/95 % interval coverage
 78.6/89.7/94.8 %. `scenario.run_scenario` layers explicit redistribution assumptions on top and
 returns per-station P(> own p95). Full method, numbers, and the 26-closure case study:
-`docs/disruption_case_study.md`. Train/evaluate: `make train-disruption`.
+`docs/disruption_case_study.md`. Train/evaluate: `./.venv/bin/python scripts/tasks.py train-disruption`.
 
 MCP tools (`mcp_server/disruption_tools.py`, registered on the same server):
 `resolve_closure`, `apply_closure`, `alternate_paths`, `scenario_flow`. After the first
@@ -495,12 +495,12 @@ sequenceDiagram
 ## 8. How to run
 
 ```
-make install-mcp      # mcp_server/requirements.txt
-make install-agent    # agent/requirements.txt (google-adk, mcp, litellm)
-make mcp-server        # run the MCP server standalone (stdio) for manual testing
+make install      # mcp_server/requirements.txt
+make install    # agent/requirements.txt (google-adk, mcp, litellm)
+./.venv/bin/python scripts/tasks.py mcp-server        # run the MCP server standalone (stdio) for manual testing
 make agent-web         # ADK dev UI — visualize the conversation + every tool call
-make agent-cli          # interactive terminal chat
-make agent-query Q="..." # one-shot, plain-text answer
+./.venv/bin/python scripts/tasks.py agent-cli          # interactive terminal chat
+./.venv/bin/python scripts/tasks.py agent-query "..." # one-shot, plain-text answer
 ```
 
 `agent-web`/`agent-cli`/`agent-query` all import `agent/agent.py`'s `root_agent`

@@ -20,15 +20,15 @@
     "network_active_closures"
   ],
   "tabpfn_model": "v3.5_default",
-  "fingerprint": "792431925c058ebc",
-  "dataset_folder": "data/training dataset",
+  "fingerprint": "b3b5d3d996eaa5ea",
+  "dataset_folder": "/home/alioo/Desktop/hackathon/innotrans/NextMove/data/training dataset",
   "train_days_before": "2026-09-02",
   "task": "regression",
   "target": "passengers (per station per 15 min)",
   "description": "Expected-flow regressor behind predict_expected_flow",
   "name": "expected_flow_regressor",
-  "saved_at": "2026-09-24T11:04:10+00:00",
+  "saved_at": "2026-09-24T11:28:42+00:00",
   "tabpfn_client_version": "0.6.0",
-  "model_id": "01a0d316-4aa3-7722-a490-a0a1c9eb1402",
+  "model_id": "01a0d32c-bf95-7411-9b83-5486d57efcbd",
   "n_train_rows": 8000
 }

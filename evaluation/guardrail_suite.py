@@ -1,6 +1,6 @@
 """Deterministic test set for the supervisor's guardrails and routing decisions — no LLM, no network, ~1 s.
 
-    make guardrail-suite
+    ./.venv/bin/python scripts/tasks.py guardrail-suite
 
 Each item: (question, expected decision, expected category or None). Groups:
   answerable   in scope, a specialist exists           -> proceed

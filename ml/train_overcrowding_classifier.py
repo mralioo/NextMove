@@ -1,7 +1,7 @@
 """Train a TabPFN classifier to predict station-timeslot overcrowding risk.
 
 Usage:
-    make train-overcrowding
+    ./.venv/bin/python scripts/tasks.py train-overcrowding
     # or directly:
     ./.venv/bin/python ml/train_overcrowding_classifier.py
 

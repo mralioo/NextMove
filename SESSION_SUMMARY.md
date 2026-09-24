@@ -59,7 +59,7 @@ Shared logic in `dashboard/utils/data_loader.py` — every downstream consumer (
 server, ML pipeline) reads through this same module, so nothing can silently disagree
 about how a timestamp/closure/station name is parsed.
 
-**Run it:** `make run` (local) or `make docker-run` (Docker, builds `dashboard/Dockerfile`).
+**Run it:** `make up` (local) or `make docker-run` (Docker, builds `dashboard/Dockerfile`).
 Last run manually on port **8502** (8501 was occupied by something outside this session).
 
 ---
@@ -84,7 +84,7 @@ Last run manually on port **8502** (8501 was occupied by something outside this 
   - Output already generated once: `ml/output/overcrowding_predictions.csv` (gitignored).
 - **Requires `TABPFN_API_TOKEN`** — you set this yourself in `.env` this session.
 
-**Run it:** `make install-ml && make train-overcrowding`
+**Run it:** `make install && ./.venv/bin/python scripts/tasks.py train-overcrowding`
 
 ---
 
@@ -107,7 +107,7 @@ for process lifetime) and report `seen_in_training_sample` so a prediction is ne
 presented as held-out when it wasn't. Full JSON schemas (dumped live) in
 `docs/system_design.md` §5.
 
-**Run it standalone:** `make install-mcp && make mcp-server`
+**Run it standalone:** `make install && ./.venv/bin/python scripts/tasks.py mcp-server`
 
 ---
 
@@ -152,10 +152,10 @@ has twice false-flagged a number that was literally the tool's own JSON field as
 
 **Run it:**
 ```
-make install-agent
+make install
 make agent-web              # ADK dev UI, visualize tool calls — http://localhost:8000
-make agent-cli               # interactive terminal chat
-make agent-query Q="..."     # one-shot plain-text answer
+./.venv/bin/python scripts/tasks.py agent-cli               # interactive terminal chat
+./.venv/bin/python scripts/tasks.py agent-query "..."     # one-shot plain-text answer
 ```
 
 ---
@@ -252,19 +252,19 @@ Details, held-out metrics and the 26-closure case study: **`docs/disruption_case
 Key finding: the dataset has no measurable redistribution around closures, so the solver reports
 assumption-based scenarios (low/base/high), never a capacity claim.
 Files: `ml/disruption.py`, `ml/demand_baseline.py`, `ml/scenario.py`,
-`ml/train_disruption_baseline.py`, `mcp_server/disruption_tools.py`; `make train-disruption`.
+`ml/train_disruption_baseline.py`, `mcp_server/disruption_tools.py`; `./.venv/bin/python scripts/tasks.py train-disruption`.
 Also fixed: `agent/agent.py` now passes env + import path to the MCP child process.
 
 Dashboard update (same session): new **ML Engine** page (`dashboard/views/7_ML_Engine.py`, loader
 `dashboard/utils/ml_results.py`) plots TabPFN predictions vs ground truth — regression scatter,
 interval reliability, error/hour breakdowns, prediction band vs the real series, classifier
 ROC/PR/confusion with a live threshold slider, and the 26-closure observed-vs-predicted explorer.
-It only reads files in `ml/output/` (written by `make train-disruption` / `make train-overcrowding`).
+It only reads files in `ml/output/` (written by `./.venv/bin/python scripts/tasks.py train-disruption` / `./.venv/bin/python scripts/tasks.py train-overcrowding`).
 Dashboard fixes: `app.py` is now an `st.navigation` router (home moved to `home.py`; sidebar no longer
-shows "app"); `make run` now `cd`s into `dashboard/` so `.streamlit/config.toml` (theme) is applied;
+shows "app"); `make up` now `cd`s into `dashboard/` so `.streamlit/config.toml` (theme) is applied;
 Docker mounts `ml/output` as `RESULTS_DIR`.
 
-Checkpoints & ML Engine explanations (same session): `make checkpoints` saves the three inference
+Checkpoints & ML Engine explanations (same session): `./.venv/bin/python scripts/tasks.py checkpoints` saves the three inference
 models to `ml/checkpoints/` (server model id + exact training sample + fingerprint) and the MCP server
 restores them instead of refitting (`ml/checkpoints.py`, `ml/inference_models.py`,
 `ml/save_checkpoints.py`). The ML Engine page now shows a scoreboard vs naive baselines and a
@@ -278,6 +278,6 @@ LLM fallback) → executor (parallel MCP playbooks, no LLM, compact facts JSON) 
 deterministic number guard**. Warm mean **3.8 s**, cold single-shot 16.7 s. ML/MCP side: parquet-cached
 feature table, one TabPFN call instead of two, prediction cache pre-warmed for all 26 closures, persistent
 pre-warmed MCP server. Full details/measurements: `docs/latency_optimization.md`; commands: `make bench`,
-`make eval-router`; old loop: `AGENT_MODE=llm`. The "JEV model" was not integrated (no model card/weights;
+`./.venv/bin/python scripts/tasks.py eval-router`; old loop: `AGENT_MODE=llm`. The "JEV model" was not integrated (no model card/weights;
 unverifiable third-party endpoint). Files: `agent/{router,executor,writer,fast_agent,mcp_runtime,llm_config,bench,eval_router}.py`,
 `ml/table_cache.py`.

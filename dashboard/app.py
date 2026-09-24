@@ -1,6 +1,6 @@
 """Entrypoint / router. Uses st.navigation so the sidebar shows readable page
 titles (Streamlit would otherwise label the home page after this file: "app").
-Run with `streamlit run dashboard/app.py` (Makefile `make run`, Docker ENTRYPOINT)."""
+Run with `streamlit run dashboard/app.py` (Makefile `make up`, Docker ENTRYPOINT)."""
 import streamlit as st
 
 pages = [

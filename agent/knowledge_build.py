@@ -1,6 +1,6 @@
 """Build the curated KNOWLEDGE BASE (ground truth, boundaries, insights) from the RAW data files.
 
-    make kb-build        ->  knowledge/knowledge.json  (machine use: retrieval, sanity checks, MCP)
+    ./.venv/bin/python scripts/tasks.py kb-build        ->  knowledge/knowledge.json  (machine use: retrieval, sanity checks, MCP)
                              knowledge/knowledge.md    (human use + the text pushed to Cognee)
 
 Every number is computed here from the CSVs with plain pandas — never typed by hand and never taken from the agent's own

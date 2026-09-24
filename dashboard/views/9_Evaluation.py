@@ -13,7 +13,7 @@ page_header(
     "The organiser's answer workbook is the evaluation dataset: each question is run through the real agent and scored on the "
     "hackathon's own criteria. Every scored answer links back to its stored trace.",
 )
-st.caption(f"Read from `{DB_PATH}` (tables `eval_runs`, `eval_items`). Produced by `make eval`.")
+st.caption(f"Read from `{DB_PATH}` (tables `eval_runs`, `eval_items`). Produced by `./.venv/bin/python scripts/tasks.py eval`.")
 
 PRED, BASE, REF, GOOD, BAD = "#3b82f6", "#a855f7", "#9ca3af", "#22c55e", "#ef4444"
 CRITERIA = {"relevance": 0.30, "reliability": 0.30, "stress": 0.20}
@@ -53,9 +53,9 @@ def explain(what: str, read: str, verdict: tuple[str, str] | None = None) -> Non
 
 ev = load_eval_runs(key()) if db_exists() else pd.DataFrame()
 if ev.empty:
-    st.warning("No evaluation runs yet. Run one with:\n\n```\nmake eval                                   # ONE brutal multi-part question, LLM-judged\n"
-               "make eval ARGS=\"--suite training --allow-many\"   # the 11 workbook questions\n"
-               "make eval ARGS=\"--suite training --allow-many --repeat 3 --export-xlsx\"   # + consistency, fill the workbook\n```")
+    st.warning("No evaluation runs yet. Run one with:\n\n```\n./.venv/bin/python scripts/tasks.py eval                                   # ONE brutal multi-part question, LLM-judged\n"
+               "./.venv/bin/python scripts/tasks.py eval \"--suite training --allow-many\"   # the 11 workbook questions\n"
+               "./.venv/bin/python scripts/tasks.py eval \"--suite training --allow-many --repeat 3 --export-xlsx\"   # + consistency, fill the workbook\n```")
     st.stop()
 
 with st.expander("📖 The dataset and the criteria", expanded=False):

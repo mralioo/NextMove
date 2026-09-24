@@ -1,7 +1,7 @@
 """Inventory of every resource the system uses and whether it is working — Cognee, the knowledge base, the knowledge graph (SQLite + Neo4j),
 the MCP servers and their tools, the models, the datasets and the TabPFN checkpoints.
 
-    make resources          # printed report (also used by the dashboard's Resources page)
+    ./.venv/bin/python scripts/tasks.py resources          # printed report (also used by the dashboard's Resources page)
 
 Every probe is read-only, short-timeout and failure-tolerant: a resource that is down is reported as down, never raised.
 """
@@ -137,16 +137,16 @@ def links() -> list[dict]:
     add("ADK agent UI", "Chat with the agent · events · traces · Evals tab (eval_set_1)", f"http://localhost:{adk}/dev-ui/?app=agent" if adk else None, "ui", adk and _port_open(adk), "" if adk else "not running: make up")
     add("ADK agent UI", "ADK API documentation (Swagger)", f"http://localhost:{adk}/docs" if adk else None, "api", adk and _port_open(adk))
     add("Neo4j (knowledge graph)", "Neo4j Browser — explore the graph, run Cypher (user neo4j, password in .env)", "http://localhost:7474/browser/?connectURL=neo4j%3A%2F%2Flocalhost%3A7687", "ui", neo_up,
-        "" if neo_up else "not running: make neo4j-up")
+        "" if neo_up else "not running: ./.venv/bin/python scripts/tasks.py neo4j-up")
     snap = graph_snapshot_path()
     add("Cognee Cloud (memory)", "Cognee web app — memory, datasets, graph (sign-in required)", "https://platform.cognee.ai", "ui", c.configured, "" if c.configured else "COGNEE_* not set")
     add("Cognee Cloud (memory)", "Cognee API documentation for your tenant (Swagger)", f"{c.base}/docs" if c.base else None, "api", c.configured)
     add("Cognee Cloud (memory)", "Cognee API reference (ReDoc)", f"{c.base}/redoc" if c.base else None, "api", c.configured)
     add("Cognee Cloud (memory)", "Cognee knowledge-graph visualisation (local snapshot of the tenant's page)", str(snap), "snapshot", snap.exists(),
-        "" if snap.exists() else "create it: make cognee-graph (or the button below)")
+        "" if snap.exists() else "create it: ./.venv/bin/python scripts/tasks.py cognee-graph (or the button below)")
     add("Knowledge MCP server", "MCP endpoint (for MCP clients; not a web page)", f"http://127.0.0.1:{kn}/mcp" if kn else None, "api", kn and _port_open(kn), "" if kn else "not running: make up")
     add("Knowledge MCP server", "Inspect the tools in a browser", "npx @modelcontextprotocol/inspector", "command", True, f"then connect to http://127.0.0.1:{kn or 8766}/mcp (streamable HTTP)")
-    add("LangSmith", "LangSmith (only if you run `make ls-eval ARGS=--upload`)", "https://smith.langchain.com", "ui", bool(os.environ.get("LANGSMITH_API_KEY")), "" if os.environ.get("LANGSMITH_API_KEY") else "LANGSMITH_API_KEY not set: evaluations stay offline")
+    add("LangSmith", "LangSmith (only if you run `./.venv/bin/python scripts/tasks.py ls-eval --upload`)", "https://smith.langchain.com", "ui", bool(os.environ.get("LANGSMITH_API_KEY")), "" if os.environ.get("LANGSMITH_API_KEY") else "LANGSMITH_API_KEY not set: evaluations stay offline")
     return out
 
 

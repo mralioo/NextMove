@@ -195,7 +195,7 @@ st.json(dict((n, m) for n, m, _ in FLOW)[pick_m].model_json_schema(), expanded=F
 st.header("3 · Results")
 ev = load_eval_runs(key()) if db_exists() else pd.DataFrame()
 if ev.empty:
-    st.warning("No evaluation runs yet. Run `make eval ARGS=\"--suite challenge --cheap --allow-many\"` and `make eval ARGS=\"--suite training --cheap --allow-many\"`.")
+    st.warning("No evaluation runs yet. Run `./.venv/bin/python scripts/tasks.py eval \"--suite challenge --cheap --allow-many\"` and `./.venv/bin/python scripts/tasks.py eval \"--suite training --cheap --allow-many\"`.")
     st.stop()
 ev = ev.sort_values("ts")
 suites = [s for s in ("challenge", "training", "limit", "stress") if s in set(ev["suite"])]
@@ -276,13 +276,13 @@ if rows_l:
         rr = next(r for r in runs_all.itertuples() if f"{r.when:%m-%d %H:%M:%S} · {(r.question or '')[:70]}" == sel_run)
         st.json(json.loads(rr.timing_json).get("loop"), expanded=True)
 else:
-    st.info("No runs of the v3 pipeline yet: run `./.venv/bin/python evaluation/conversation_demo.py` or a `make eval`.")
+    st.info("No runs of the v3 pipeline yet: run `./.venv/bin/python evaluation/conversation_demo.py` or a `./.venv/bin/python scripts/tasks.py eval`.")
 
 # =========================================================================================== 4 · langsmith-style
 st.header("4 · LangSmith-style metrics (LLM judges from `openevals` + run metrics)")
 ls = _query("SELECT * FROM ls_runs ORDER BY ts DESC") if db_exists() else pd.DataFrame()
 if ls.empty:
-    st.info("No LangSmith-style evaluation yet: run `make ls-eval` (offline by default — nothing is uploaded).")
+    st.info("No LangSmith-style evaluation yet: run `./.venv/bin/python scripts/tasks.py ls-eval` (offline by default — nothing is uploaded).")
 else:
     ls["summary"] = ls["summary_json"].apply(json.loads)
     cur = ls[ls["eval_id"] == A["eval_id"]]
@@ -349,7 +349,7 @@ try:
         except Exception as e:
             st.error(f"Could not run the check: {type(e).__name__}: {e}")
 except Exception as e:
-    st.warning(f"Knowledge base not available ({type(e).__name__}: {e}). Run `make kb-build`.")
+    st.warning(f"Knowledge base not available ({type(e).__name__}: {e}). Run `./.venv/bin/python scripts/tasks.py kb-build`.")
 
 
 # =========================================================================================== 5b · knowledge graph
@@ -357,7 +357,7 @@ st.header("5b · Knowledge graph — problems, answers, actions, options")
 explain("A local property graph in the style of the Neo4j LLM Knowledge Graph Builder: `Problem → Answer → Action / Option`, linked to stations, lines, venues and events. It is seeded (cold start) with the "
         "26 recorded closures and their solutions, accepted answers to the training and challenge questions, the question bank and entities an LLM extracted from the knowledge-base texts "
         "(LangChain's LLMGraphTransformer, the Graph Builder's extraction engine). Every accepted answer adds or reinforces a case; the evaluator compares new results with the most similar past cases.",
-        "Edge weights count how often a link was accepted, so the actions recommended most often rank first. `make kg-export` writes Cypher for Neo4j.")
+        "Edge weights count how often a link was accepted, so the actions recommended most often rank first. `./.venv/bin/python scripts/tasks.py kg-export` writes Cypher for Neo4j.")
 try:
     from kgraph import kg as _kg
     G = _kg()
@@ -416,7 +416,7 @@ try:
                         dot.append(f'{nid} -> {add(e2["label"], e2["key"])} [label="{e2["rel"]}"];')
         st.graphviz_chart("\n".join(dot) + "}", use_container_width=True)
 except Exception as e:
-    st.warning(f"Knowledge graph not available ({type(e).__name__}: {e}). Run `make kg-seed`.")
+    st.warning(f"Knowledge graph not available ({type(e).__name__}: {e}). Run `./.venv/bin/python scripts/tasks.py kg-seed`.")
 
 # =========================================================================================== 6 · what is missing
 st.header("6 · What is still missing")

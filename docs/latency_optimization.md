@@ -2,7 +2,7 @@
 
 The challenge has a response-time limit; the original agent needed **59 s** for the training Q3
 (disruption) question. This document records where the time went, what was changed, and what it costs.
-Reproduce every number with `make bench`, `make eval-router`, `make test`.
+Reproduce every number with `make bench`, `./.venv/bin/python scripts/tasks.py eval-router`, `make test`.
 
 ## 1. Where the 59 s went (measured, per ADK event)
 
@@ -59,7 +59,7 @@ error) so the writer never has to do arithmetic.
 | Prepared baseline table cached (`DemandBaseline.prepare`) | 2.2 s → ~0.3 s |
 | Checkpoint restored **without** a verification probe; lazy refit if the server forgot the fit | −2.8 s |
 | **One** dense-quantile TabPFN call instead of two (quantiles + mean); the mean is integrated from the quantile function (within 1.2 % of TabPFN's own mean, r = 0.9999; the 13 quantiles are bit-identical) | 2 API calls → 1 |
-| Prediction cache per (station, timestamp), on disk; `make checkpoints` pre-warms all 26 dataset closures | cached closure: `scenario_flow` 9 s → **0.3 s**; a new what-if costs one 2–3 s API call |
+| Prediction cache per (station, timestamp), on disk; `./.venv/bin/python scripts/tasks.py checkpoints` pre-warms all 26 dataset closures | cached closure: `scenario_flow` 9 s → **0.3 s**; a new what-if costs one 2–3 s API call |
 | One persistent, pre-warmed MCP server per agent process (background thread) instead of a new process per specialist | no per-question spawn; warm-up overlaps start-up |
 | Server warms itself in threads at start-up (Category C model first) with separate locks | first tool call no longer blocks behind unrelated loading |
 
@@ -81,7 +81,7 @@ Warm process (what `adk web` / a served agent looks like), `make bench`:
 
 ¹ Q3: the original 59 s measurement, before any speed-up. Q4: measured later, with the ML/MCP speed-ups already applied (so the old loop's Q3 is 37 s on today's tool stack).
 
-Cold start of a fresh process (`make agent-query`): **16.7 s** for Q3 (7.8 s of it waiting for the server
+Cold start of a fresh process (`./.venv/bin/python scripts/tasks.py agent-query`): **16.7 s** for Q3 (7.8 s of it waiting for the server
 warm-up, paid once per process). The old loop with only the ML/MCP speed-ups: **37 s**.
 
 Router: **96 % correct (72/75)** on the question bank (`docs/test_questions.md`) at ~1 ms per question;

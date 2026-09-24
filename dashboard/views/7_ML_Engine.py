@@ -90,7 +90,7 @@ page_header(
     "never saw — and with a simple baseline it has to beat.",
 )
 st.caption(
-    f"Results read from `{RESULTS_DIR}` (written by `make train-disruption` / `make train-overcrowding`); "
+    f"Results read from `{RESULTS_DIR}` (written by `./.venv/bin/python scripts/tasks.py train-disruption` / `./.venv/bin/python scripts/tasks.py train-overcrowding`); "
     f"model checkpoints from `{CHECKPOINT_DIR}`. This page never calls the TabPFN API."
 )
 
@@ -125,7 +125,7 @@ manifest = load_manifest()
 if report is None and held is None and clf is None:
     st.warning(
         "No ML result files found yet. Generate them with:\n\n"
-        "```\nmake train-all      # regression / Category C engine + overcrowding classifier\n```"
+        "```\n./.venv/bin/python scripts/tasks.py train-disruption   # Category C engine\n./.venv/bin/python scripts/tasks.py train-overcrowding # overcrowding classifier\n```"
     )
     st.stop()
 
@@ -145,9 +145,9 @@ with tab_reg:
     m = (report or {}).get("heldout_metrics")
     has_base = bool(m and "baseline_station_slot_median" in m and held is not None and "baseline_median" in held.columns)
     if held is None or m is None:
-        st.info("Run `make train-disruption` to generate the held-out predictions.")
+        st.info("Run `./.venv/bin/python scripts/tasks.py train-disruption` to generate the held-out predictions.")
     elif not has_base:
-        st.info("Result files predate the baseline comparison — re-run `make train-disruption`.")
+        st.info("Result files predate the baseline comparison — re-run `./.venv/bin/python scripts/tasks.py train-disruption`.")
     else:
         # ---------------------------------------------------------------- scoreboard
         st.markdown("### Scoreboard — TabPFN vs the naive baseline")
@@ -333,7 +333,7 @@ with tab_reg:
             day_sel = c2.multiselect("Days", days, default=days)
             has_b = "b_q0100" in show.columns
             show_b = c3.checkbox("Show baseline band", value=False, disabled=not has_b,
-                                 help="Overlay the naive baseline's 80% interval (purple)." if has_b else "Re-run `make train-disruption`.")
+                                 help="Overlay the naive baseline's 80% interval (purple)." if has_b else "Re-run `./.venv/bin/python scripts/tasks.py train-disruption`.")
             sub = sub[sub["timestamp"].dt.date.isin(day_sel)] if day_sel else sub
             present = set(sub["timestamp"].dt.date)
             all_days = pd.date_range(sub["timestamp"].min().normalize(), sub["timestamp"].max().normalize())
@@ -387,7 +387,7 @@ with tab_clf:
         "demand-pressure label — the dataset has no real capacity figure."
     )
     if clf is None:
-        st.info("Run `make train-overcrowding` to generate the classifier's held-out predictions.")
+        st.info("Run `./.venv/bin/python scripts/tasks.py train-overcrowding` to generate the classifier's held-out predictions.")
     else:
         y = clf["overcrowded"].to_numpy(int)
         p = clf["overcrowd_probability"].to_numpy(float)
@@ -405,7 +405,7 @@ with tab_clf:
         f1_v = verdict_higher_better(T["f1"], B["f1"]) if has_b else None
         rows.append({"Metric": "ROC-AUC ↑", "Plain meaning": "chance a random overcrowded slot is ranked above a normal one (0.5 = coin flip)",
                      "TabPFN": round(T["auc"], 3), "Baseline": round(B["auc"], 3) if has_b else "n/a",
-                     "Change": f"{auc_v[2]:+.3f}" if has_b else "", "Verdict": auc_v[1] if has_b else "run make train-overcrowding"})
+                     "Change": f"{auc_v[2]:+.3f}" if has_b else "", "Verdict": auc_v[1] if has_b else "run ./.venv/bin/python scripts/tasks.py train-overcrowding"})
         rows.append({"Metric": "PR-AUC ↑", "Plain meaning": f"precision across recall levels (random guessing = base rate {base_rate:.0%})",
                      "TabPFN": round(T["ap"], 3), "Baseline": round(B["ap"], 3) if has_b else "n/a",
                      "Change": f"{ap_v[2]:+.3f}" if has_b else "", "Verdict": ap_v[1] if has_b else ""})
@@ -535,7 +535,7 @@ with tab_case:
         "more than the 10% of the time that pure noise gives."
     )
     if case is None or report is None:
-        st.info("Run `make train-disruption` to generate the closure case study.")
+        st.info("Run `./.venv/bin/python scripts/tasks.py train-disruption` to generate the closure case study.")
     else:
         summ = pd.DataFrame(report["case_study_summary"]).T.reset_index().rename(columns={"index": "group"})
         summ["label"] = summ["group"].str.replace("_", " ").str.replace("/", " — ")
@@ -644,10 +644,10 @@ with tab_ckpt:
         "On start-up the MCP server (and `scenario_flow`) restores these instead of re-fitting: if the server still has the fit it is "
         "**loaded**; if not it is **refit from the checkpoint** with identical data and settings; if the fingerprint no longer matches "
         "(new dataset, changed features) the checkpoint is treated as stale and a fresh one is fitted and saved. "
-        "Build or verify them with `make checkpoints` (`FORCE=1` to refit)."
+        "Build or verify them with `./.venv/bin/python scripts/tasks.py checkpoints` (`FORCE=1` to refit)."
     )
     if not manifest:
-        st.info("No checkpoints yet. Run `make checkpoints` (needs `TABPFN_API_TOKEN`).")
+        st.info("No checkpoints yet. Run `./.venv/bin/python scripts/tasks.py checkpoints` (needs `TABPFN_API_TOKEN`).")
     else:
         mf = pd.DataFrame(manifest)
         mf["saved_at"] = mf["saved_at"].astype(str).str.replace("T", " ").str.replace("+00:00", " UTC")

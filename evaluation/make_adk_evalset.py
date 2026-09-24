@@ -1,6 +1,6 @@
 """Write the 3 evaluation questions (with approximate reference answers) into the ADK UI's eval set `eval_set_1`.
 
-    make adk-evalset            # then open the ADK UI (make up / make agent-web) -> Evals -> eval_set_1 -> run
+    ./.venv/bin/python scripts/tasks.py adk-evalset            # then open the ADK UI (make up) -> Evals -> eval_set_1 -> run
 
 The same questions and reference answers are documented in docs/test_questions.md ("ADK eval set"). The reference answers are APPROXIMATE on purpose:
 ADK compares the agent's final response with them (response match score) and, because our tools run behind MCP inside the pipeline rather than as ADK

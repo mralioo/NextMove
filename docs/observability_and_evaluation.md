@@ -11,7 +11,7 @@ Everything lands in one SQLite file, `observability/agent_obs.db` (override with
 | **Evaluation** | `evaluation/run_eval.py` | `eval_runs`, `eval_items` | scores per run and per question, linked to `runs` and the trace |
 
 It works for every entry point: the agent module exports an ADK `App(root_agent, plugins=[…])`, which `adk web` and
-`adk run` load in preference to a bare agent, and our own runners (`make agent-query`, `make bench`, `make eval`)
+`adk run` load in preference to a bare agent, and our own runners (`./.venv/bin/python scripts/tasks.py agent-query`, `make bench`, `./.venv/bin/python scripts/tasks.py eval`)
 pass the same `app`. Span export is batched on a background thread; the per-question DB write is a few milliseconds.
 
 The dashboard's **Observability** page shows KPIs (mean / p50 / p95, within-budget share, guard outcomes), latency per
@@ -26,7 +26,7 @@ T01–T11), **FINAL_TEST** (5 blank slots, loaded automatically once filled, ids
 (`evaluation/output/team_answers_filled.xlsx`); the original is never modified.
 
 The shared LLM endpoint is not free to hammer, so the default evaluation is **one deliberately brutal question**
-(`make eval` → 1 LLM call). The other suites (`training`, `stress`, `bank`, `all`) exist but refuse to run
+(`./.venv/bin/python scripts/tasks.py eval` → 1 LLM call). The other suites (`training`, `stress`, `bank`, `all`) exist but refuse to run
 unless `--allow-many` is passed; `--cheap` uses the small worker model instead of the shared main one.
 
 **The limit question (L01)** packs six sub-asks into one message: closure reason/duration (U6, checkable against
@@ -92,15 +92,15 @@ Numbers are the **LLM-judge scores** (stored runs were re-scored with `evaluatio
 ## 5. Commands
 
 ```
-make eval                                        # the one brutal question (1 LLM call)
-make eval ARGS="--cheap"                         # same, small worker model as writer too
-make eval ARGS="--no-judge"                      # regex rubric only (fallback / calibration)
-make eval ARGS="--judge-model main"              # spot-check the judge with the shared main model
+./.venv/bin/python scripts/tasks.py eval                                        # the one brutal question (1 LLM call)
+./.venv/bin/python scripts/tasks.py eval --cheap                         # same, small worker model as writer too
+./.venv/bin/python scripts/tasks.py eval --no-judge                      # regex rubric only (fallback / calibration)
+./.venv/bin/python scripts/tasks.py eval --judge-model main              # spot-check the judge with the shared main model
 ./.venv/bin/python evaluation/rejudge.py         # re-score stored eval runs with the LLM judge (no agent re-run)
 ./.venv/bin/python experiments/rescore.py        # same for the stored experiment turns
-make eval ARGS="--suite training --allow-many"   # the 11 workbook questions (~11 LLM calls)
-make eval ARGS="--suite training --allow-many --repeat 3 --export-xlsx --team MyTeam"
+./.venv/bin/python scripts/tasks.py eval --suite training --allow-many   # the 11 workbook questions (~11 LLM calls)
+./.venv/bin/python scripts/tasks.py eval --suite training --allow-many --repeat 3 --export-xlsx --team MyTeam
 make bench                                       # 8 varied questions, prints stage timings
-make clean-obs                                   # start with an empty observability database
-make run                                         # dashboard: Observability + Evaluation pages
+./.venv/bin/python scripts/tasks.py clean-obs                                   # start with an empty observability database
+make up                                         # dashboard: Observability + Evaluation pages
 ```

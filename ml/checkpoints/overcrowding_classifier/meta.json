@@ -20,15 +20,15 @@
     "network_active_closures"
   ],
   "tabpfn_model": "v3.5_default",
-  "fingerprint": "792431925c058ebc",
-  "dataset_folder": "data/training dataset",
+  "fingerprint": "b3b5d3d996eaa5ea",
+  "dataset_folder": "/home/alioo/Desktop/hackathon/innotrans/NextMove/data/training dataset",
   "train_days_before": "2026-09-02",
   "task": "classification",
   "target": "overcrowded (flow >= station's own p90)",
   "description": "Overcrowding-risk classifier behind predict_overcrowding_risk",
   "name": "overcrowding_classifier",
-  "saved_at": "2026-09-24T11:04:10+00:00",
+  "saved_at": "2026-09-24T11:28:42+00:00",
   "tabpfn_client_version": "0.6.0",
-  "model_id": "01a0d316-3b0c-7240-b3fa-f075e94ed488",
+  "model_id": "01a0d32c-b83f-7920-9f49-427c56d99eb1",
   "n_train_rows": 8000
 }

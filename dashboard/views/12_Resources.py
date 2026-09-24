@@ -69,11 +69,11 @@ with st.expander("Cognee memory graph (Cognee's own visualisation)", expanded=Fa
         (st.success if ok_ else st.error)(msg)
         collect.clear()
     if snap.exists():
-        st.caption(f"Snapshot saved {pd.Timestamp(snap.stat().st_mtime, unit='s'):%Y-%m-%d %H:%M} — {snap.stat().st_size / 1e6:.1f} MB (interactive; drag, zoom, click nodes). `make cognee-graph` refreshes it.")
+        st.caption(f"Snapshot saved {pd.Timestamp(snap.stat().st_mtime, unit='s'):%Y-%m-%d %H:%M} — {snap.stat().st_size / 1e6:.1f} MB (interactive; drag, zoom, click nodes). `./.venv/bin/python scripts/tasks.py cognee-graph` refreshes it.")
         components.html(snap.read_text(), height=720, scrolling=True)
         st.download_button("Download the snapshot", snap.read_bytes(), file_name="cognee_graph.html", mime="text/html")
     else:
-        st.info("No snapshot yet: press the button (needs COGNEE_* in .env), or run `make cognee-graph`.")
+        st.info("No snapshot yet: press the button (needs COGNEE_* in .env), or run `./.venv/bin/python scripts/tasks.py cognee-graph`.")
 
 # ------------------------------------------------------------------------------------------ Cognee
 st.header("Cognee Cloud")
@@ -101,7 +101,7 @@ else:
 # ------------------------------------------------------------------------------------------ knowledge base
 st.header("Knowledge base (local, mirrored to Cognee)")
 st.markdown(f"{kb['entries']} entries — {kb['kinds']} — plus {kb['turns']} stored turns in {kb['sessions']} sessions. Boundaries: " + ", ".join(f"`{i}`" for i in kb["boundaries"]))
-st.caption("Ground truth is recomputed from the raw CSVs by `make kb-build`; `make kb-sync` pushes it to Cognee.")
+st.caption("Ground truth is recomputed from the raw CSVs by `./.venv/bin/python scripts/tasks.py kb-build`; `./.venv/bin/python scripts/tasks.py kb-sync` pushes it to Cognee.")
 
 # ------------------------------------------------------------------------------------------ knowledge graph
 st.header("Knowledge graph — local SQLite copy and Neo4j")
@@ -120,9 +120,9 @@ with b:
             st.markdown("**Most recommended actions (from Neo4j)**")
             st.dataframe(pd.DataFrame(n["top_actions"]), use_container_width=True, hide_index=True)
     else:
-        st.warning(f"Neo4j is not reachable ({n.get('error') or 'not configured'}). Start it with `make neo4j-up`, then `make neo4j-sync`.")
+        st.warning(f"Neo4j is not reachable ({n.get('error') or 'not configured'}). Start it with `./.venv/bin/python scripts/tasks.py neo4j-up`, then `./.venv/bin/python scripts/tasks.py neo4j-sync`.")
 if n.get("reachable") and (n["nodes"] != lg["nodes"] or n["relationships"] != lg["edges"]):
-    st.info("The two copies differ in size: run `make neo4j-sync` to bring Neo4j level with the local graph.")
+    st.info("The two copies differ in size: run `./.venv/bin/python scripts/tasks.py neo4j-sync` to bring Neo4j level with the local graph.")
 
 # ------------------------------------------------------------------------------------------ MCP
 st.header("MCP servers and tools")

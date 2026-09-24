@@ -1,4 +1,4 @@
-"""Start / stop / inspect every service of the system with one command (used by `make up`, `make down`, `make status`, `make logs`).
+"""Start / stop / inspect every service of the system with one command (used by `make up`, `make down`, `./.venv/bin/python scripts/tasks.py status`, `./.venv/bin/python scripts/tasks.py logs`).
 
     services.py up [--with-data-mcp] [--no-adk]     prepare (knowledge base, graph) and start everything in the background
     services.py down                                stop everything this script started
@@ -9,7 +9,7 @@ Services
     dashboard       Streamlit dashboard incl. the Agent Workflow page          http://localhost:8501 (next free port if taken)
     adk-web         ADK dev UI: chat with the agent, see every event / tool    http://localhost:8000
     mcp-knowledge   MCP server: ground truth, sanity check, history, graph     http://127.0.0.1:8766/mcp   (streamable HTTP)
-    neo4j           Neo4j (Docker container nextmove-neo4j, made by `make neo4j-up`)   bolt://localhost:7687, browser :7474
+    neo4j           Neo4j (Docker container nextmove-neo4j, made by `./.venv/bin/python scripts/tasks.py neo4j-up`)   bolt://localhost:7687, browser :7474
     mcp-data        MCP server: datasets, analytics, TabPFN tools (optional)    http://127.0.0.1:8765/mcp   (--with-data-mcp; the agent itself
                     starts its own stdio copy of this server, so this one is only for external MCP clients)
 
@@ -73,12 +73,12 @@ def healthy(name: str, port: int) -> bool:
 
 
 def docker_neo4j(action: str) -> str:
-    """start | stop the local Neo4j container (created once by `make neo4j-up`). Returns a status word."""
+    """start | stop the local Neo4j container (created once by `./.venv/bin/python scripts/tasks.py neo4j-up`). Returns a status word."""
     try:
         have = subprocess.run(["docker", "ps", "-a", "--filter", "name=^nextmove-neo4j$", "--format", "{{.Names}}"], capture_output=True, text=True, timeout=8).stdout.strip()
         if action == "start":
             if not have:
-                return "missing (run: make neo4j-up)"
+                return "missing (run: ./.venv/bin/python scripts/tasks.py neo4j-up)"
             subprocess.run(["docker", "start", "nextmove-neo4j"], capture_output=True, timeout=30)
             return "started"
         if have:
@@ -93,11 +93,11 @@ def prepare() -> None:
     """Things the agent needs before it can answer well: the knowledge base and the seeded knowledge graph."""
     env = {**os.environ, "PYTHONUNBUFFERED": "1"}
     if not (REPO / "knowledge" / "knowledge.json").exists():
-        print("· building the knowledge base from the raw CSVs (make kb-build) ...")
+        print("· building the knowledge base from the raw CSVs (./.venv/bin/python scripts/tasks.py kb-build) ...")
         subprocess.run([PY, "agent/knowledge_build.py"], cwd=REPO, env=env, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     kg = REPO / "observability" / "kgraph.db"
     if not kg.exists():
-        print("· seeding the knowledge graph without the LLM step (make kg-seed ARGS=--no-llm) ...")
+        print("· seeding the knowledge graph without the LLM step (./.venv/bin/python scripts/tasks.py kg-seed --no-llm) ...")
         subprocess.run([PY, "agent/kgraph_build.py", "--no-llm"], cwd=REPO, env=env, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if not (REPO / ".env").exists():
         print("! no .env found: the agent needs TABPFN_API_TOKEN and LLM keys (see README); the dashboard and MCP servers still start.")
@@ -144,7 +144,7 @@ def up(with_data: bool, adk: bool, neo: bool = True) -> None:
         time.sleep(1.5)
     status()
     if pending:
-        print(f"\n! not answering yet: {', '.join(pending)} — see `make logs` (the data MCP server needs ~30 s to warm up).")
+        print(f"\n! not answering yet: {', '.join(pending)} — see `./.venv/bin/python scripts/tasks.py logs` (the data MCP server needs ~30 s to warm up).")
 
 
 def status() -> None:

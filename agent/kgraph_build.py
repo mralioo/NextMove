@@ -1,8 +1,8 @@
 """Seed the knowledge graph (cold start): history problems, their solutions and the actions taken.
 
-    make kg-seed            # categories + 26 recorded closures + accepted training/challenge answers + question bank + LLM extraction
-    make kg-seed ARGS=--no-llm
-    make kg-export          # knowledge/kg_export.cypher + knowledge/kg_csv/ for Neo4j / the LLM Graph Builder
+    ./.venv/bin/python scripts/tasks.py kg-seed            # categories + 26 recorded closures + accepted training/challenge answers + question bank + LLM extraction
+    ./.venv/bin/python scripts/tasks.py kg-seed --no-llm
+    ./.venv/bin/python scripts/tasks.py kg-export          # knowledge/kg_export.cypher + knowledge/kg_csv/ for Neo4j / the LLM Graph Builder
 
 Sources, each tagged on the Problem node (`source`):
   seed:closure   the 26 recorded closures — problem = the closure, solution = reason/duration + reroute (rail detour / replacement bus) + actions,

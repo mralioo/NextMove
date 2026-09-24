@@ -8,8 +8,8 @@ checkable, grounded answer — or, where the data cannot support one, a checkabl
 **How to use it**
 
 ```bash
-make agent-query Q="<paste a question>"      # one-shot through the full agent
-make up                                      # dashboard + ADK chat UI + MCP servers + Neo4j (make agent-web = ADK UI only)
+./.venv/bin/python scripts/tasks.py agent-query "<paste a question>"      # one-shot through the full agent
+make up                                      # dashboard + ADK chat UI + MCP servers + Neo4j
 ```
 
 Grade each answer with the checklist in [§10](#10-grading-checklist). The final evaluation (Sept 25) uses **new
@@ -47,7 +47,7 @@ Questions for the ❌ category are still worth asking: the **correct** behaviour
 
 ## ADK eval set (`eval_set_1`) — three questions with approximate answers
 
-Loaded into the ADK UI (Evals tab) by `make adk-evalset` (`evaluation/make_adk_evalset.py`; file `agent/eval_set_1.evalset.json`). Each case is a single-turn conversation with a **reference final response**; the references are approximate on purpose (numbers rounded, wording free) and were taken from the raw data / the knowledge base's ground truth.
+Loaded into the ADK UI (Evals tab) by `./.venv/bin/python scripts/tasks.py adk-evalset` (`evaluation/make_adk_evalset.py`; file `agent/eval_set_1.evalset.json`). Each case is a single-turn conversation with a **reference final response**; the references are approximate on purpose (numbers rounded, wording free) and were taken from the raw data / the knowledge base's ground truth.
 
 | Case id | Question | Approximate reference answer | Where the numbers come from |
 | --- | --- | --- | --- |

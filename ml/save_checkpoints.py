@@ -1,8 +1,8 @@
 """Build (or verify) the checkpoints of every TabPFN model used at inference time.
 
 Usage:
-    make checkpoints                 # reuse valid checkpoints, fit + save only what is missing/stale
-    make checkpoints FORCE=1         # refit everything and overwrite
+    ./.venv/bin/python scripts/tasks.py checkpoints                 # reuse valid checkpoints, fit + save only what is missing/stale
+    ./.venv/bin/python scripts/tasks.py checkpoints --force         # refit everything and overwrite
 
 Checkpoints (ml/checkpoints/<name>/, see ml/checkpoints.py for the format):
     demand_baseline           TabPFNRegressor  quantile demand baseline  (Category C, scenario_flow)
