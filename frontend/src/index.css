@@ -259,7 +259,7 @@ h1, h2, h3, h4, h5, h6 {
 .app-shell { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
 .app-top { display: flex; align-items: center; gap: 18px; padding: 10px 20px; border-bottom: 1px solid var(--border-subtle); background: rgba(2, 11, 14, 0.7); backdrop-filter: blur(10px); flex-wrap: wrap; }
 .app-top .brand { display: flex; align-items: center; gap: 12px; }
-.app-top .logo { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--teal-dim); border: 1px solid var(--border); }
+.app-top .logo { height: 46px; width: auto; border-radius: 12px; background: #fff; padding: 2px 8px; display: block; box-shadow: 0 0 18px var(--teal-glow); }
 .app-top .title { font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: 0.04em; font-size: 0.98rem; display: flex; align-items: center; gap: 8px; }
 .app-top .brand p { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
 .app-top .tabs { display: flex; gap: 4px; flex-wrap: wrap; margin: 0 auto; }
