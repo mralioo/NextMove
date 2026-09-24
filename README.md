@@ -287,8 +287,10 @@ Start with [`docs/README.md`](docs/README.md). Most useful: [`docs/modules/`](do
   </tr>
   <tr>
     <td align="center" valign="middle">
-      <a href="https://github.com/mralioo">@mralioo</a><br>
-      Till Determann
+      Ali Alouane<br>
+      Till Determann<br>
+      Harsh Patel<br>
+      Kawther Ramadan
     </td>
     <td align="center" valign="middle">
       <img src="frontend/assets/ALSTOM_CORPORATE_LOGO_2_COLOURS_TRANSPARENT.png" alt="Alstom" height="50"><br>
