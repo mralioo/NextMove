@@ -16,7 +16,7 @@
       consistency         repeated runs give the same category and the same key numbers
   STRESS TESTING (0.20) usable by a real operator under pressure
       latency_ok          answered within the latency budget (default 20 s, EVAL_LATENCY_BUDGET_S)
-      readability_ok      short (<=150 words), no JSON/keys leaking, structured
+      readability_ok      short (<=190 words incl. the Sources line), no JSON/keys leaking, structured
       (+ pass rate on the Edge/Trap/typo/German 'stress' suite)
 
 INNOVATION (0.10) and IMPACT (0.10) are team-level evidence, not scored per question.
@@ -47,7 +47,7 @@ WEIGHTS = {"relevance": 0.30, "reliability": 0.30, "stress": 0.20}
 GROUPS = {
     "relevance": ["answered", "completeness", "route_correct", "judge_relevance"],
     "reliability": ["hallucination_free", "fact_accuracy", "honest_scope", "decline_quality", "assumption_disclosed",
-                    "traceable", "consistency", "judge_faithfulness", "judge_grounded"],
+                    "traceable", "consistency", "sanity_ok", "judge_faithfulness", "judge_grounded"],
     "stress": ["latency_ok", "readability_ok", "judge_clarity"],
 }
 EXTRA_METRICS = ["latency_s", "guard_intervened", "judge_usefulness", "judge_agreement", "regex_completeness", "judge_used"]
@@ -58,6 +58,20 @@ CAVEAT = re.compile(r"assum|estimate|scenario|not (a )?(measured|prediction|capa
 
 
 # ----------------------------------------------------------------------------------- expectations
+def _training_criteria() -> dict:
+    import dataset
+    return dataset.TRAINING_CRITERIA
+
+
+def _kb_text(ids: list[str]) -> str:
+    """Ground-truth text for the judge, from the knowledge base built from the raw CSVs (agent/knowledge_build.py)."""
+    p = Path(__file__).resolve().parent.parent / "knowledge" / "knowledge.json"
+    if not p.exists():
+        return ""
+    by = {e["id"]: e["text"] for e in json.loads(p.read_text())}
+    return " ".join(by[i] for i in ids if i in by)
+
+
 def _closure_criteria(c: dict) -> dict[str, str]:
     return {
         "reason": f"States the recorded reason for the closure: '{c['reason']}'.",
@@ -78,7 +92,15 @@ def expectations(item, truth: dict | None) -> dict:
     `truth` comes from evaluation/ground_truth.py."""
     cat = item.expected_cat
     e: dict = {"cat": cat, "supported": cat in ("C", "D") and item.kind != "Trap", "facts": [], "rubric": {}, "criteria": {}, "truth_text": None}
-    if item.id == "T03" and truth:
+    if item.stage == "TRAINING" and item.id in _training_criteria():
+        cat_, crit, kb_ids = _training_criteria()[item.id]
+        e.update(cat=cat_, supported=True, criteria=dict(crit), rubric={k: (lambda a, f: False) for k in crit}, truth_text=_kb_text(kb_ids))
+        item.kind = item.kind or "Ideal"
+    elif item.stage == "CHALLENGE":      # ideal-answer criteria (operator value); regex has no opinion here -> judge only
+        e.update(supported=True, criteria=dict(item.meta["criteria"]), rubric={k: (lambda a, f: False) for k in item.meta["criteria"]},
+                 truth_text="Data: 2026-06-10..2026-09-22; events file has venue 'Uber Arena' (14 events) and no InnoTrans/Messe event; no platform-capacity data; "
+                            "U8 does not serve Neukölln stations (Rathaus Neukölln / Neukölln are U7); the recorded U8 closure is Leinestr.-Hermannplatz 11 July.")
+    elif item.id == "T03" and truth:
         c = truth["closure"]
         e.update(cat="C", supported=True)
         e["facts"] = [("cl.why", "eq", c["reason"]), ("cl.h", "eq", c["hours"]),
@@ -204,6 +226,10 @@ def score_item(item, run: dict, exp: dict, spans: dict, judge: dict | None = Non
     if exp["cat"]:
         check("router picked expected category", plan.get("cat") in ok_cats, f"expected {sorted(ok_cats)}, got {plan.get('cat')}")
     status = facts.get("status")
+    fp = facts                                                    # facts used for ground-truth path lookups
+    if status == "multi":                                         # several questions in one message: the lead (answerable) part carries the ground-truth facts
+        fp = next((p_ for p_ in facts.get("parts", []) if p_.get("status") == "ok"), {})
+        status = "ok" if fp else "oos"
     jc = (judge or {}).get("criteria", {})
     regex_hits = {k: bool(fn(answer, facts)) for k, fn in exp["rubric"].items()}
     hits = {k: (jc[k]["met"] if k in jc else regex_hits[k]) for k in exp["rubric"]}     # judge decides; regex only if the judge skipped a criterion
@@ -223,6 +249,8 @@ def score_item(item, run: dict, exp: dict, spans: dict, judge: dict | None = Non
         m["regex_completeness"] = mean(regex_hits.values())
         both = [regex_hits[k] == jc[k]["met"] for k in exp["rubric"] if k in jc]
         m["judge_agreement"] = mean(both) if both else None
+    if item.stage == "CHALLENGE" or (item.stage == "TRAINING" and item.id in _training_criteria()):       # no regex opinion exists for these ideal-answer criteria
+        m["regex_completeness"] = m["judge_agreement"] = None
     m["judge_used"] = float(bool(judge))
     if judge:
         for k in ("relevance", "faithfulness", "clarity", "usefulness"):
@@ -238,13 +266,13 @@ def score_item(item, run: dict, exp: dict, spans: dict, judge: dict | None = Non
     m["hallucination_free"] = float(not bad and not banned and bool(answer))
     check("all numbers grounded, no capacity/bus claims", not bad and not banned, f"ungrounded={bad[:5]} banned={banned}")
     if exp["facts"]:
-        res = [(p, _cmp(_get(facts, p), op, want)) for p, op, want in exp["facts"]]
+        res = [(p, _cmp(_get(fp, p), op, want)) for p, op, want in exp["facts"]]
         for (p, ok), (_, op, want) in zip(res, exp["facts"]):
-            check(f"fact {p} {op} ground truth", ok, f"truth={want}, agent={_get(facts, p)}")
+            check(f"fact {p} {op} ground truth", ok, f"truth={want}, agent={_get(fp, p)}")
         m["fact_accuracy"] = mean(ok for _, ok in res)
     else:
         m["fact_accuracy"] = None
-    if plan.get("cat") == "C" and status == "ok":
+    if plan.get("cat") == "C" and status == "ok" and fp.get("cat", "C") == "C":
         disclosed = hits["caveat"] if "caveat" in hits else bool(CAVEAT.search(answer))
         m["assumption_disclosed"] = float(disclosed)
         check("assumption-based estimate disclosed", disclosed)
@@ -252,6 +280,10 @@ def score_item(item, run: dict, exp: dict, spans: dict, judge: dict | None = Non
         m["assumption_disclosed"] = None
     traced = bool(run.get("trace_id")) and spans.get("n", 0) >= 4 and (spans.get("tools", 0) >= 1 or status != "ok")   # tool spans expected when tools ran
     m["traceable"] = float(traced)
+    san = (json.loads(run["timing_json"]).get("sanity") if run.get("timing_json") else None) or {}
+    m["sanity_ok"] = None if san.get("ok") is None else float(bool(san["ok"]))
+    if san.get("ok") is not None:
+        check("knowledge-base sanity check (grounded, stations exist, labelled, equals ground truth)", san["ok"], f"score {san.get('score')} · failed: {san.get('fails') or 'none'}")
     check("stored trace with tool spans", traced, f"spans={spans}")
     m["consistency"] = None     # filled across repeats by aggregate_repeats()
 
@@ -261,7 +293,7 @@ def score_item(item, run: dict, exp: dict, spans: dict, judge: dict | None = Non
     m["latency_ok"] = float(lat <= BUDGET_S)
     check(f"answered within {BUDGET_S:.0f}s", lat <= BUDGET_S, f"{lat:.1f}s")
     words = len(answer.split())
-    readable = 0 < words <= 150 and not re.search(r"[{}]|\bjson\b|\bfacts?\b\[|status\":", answer, re.I)
+    readable = 0 < words <= 190 and not re.search(r"[{}]|\bjson\b|\bfacts?\b\[|status\":", answer, re.I)
     m["readability_ok"] = float(readable)
     check("short, plain, no leaked JSON/keys", readable, f"{words} words")
     m["guard_intervened"] = float(str(run.get("guard", "")).split(" ")[0] not in ("pass", ""))

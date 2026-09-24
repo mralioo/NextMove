@@ -62,6 +62,12 @@ CREATE TABLE IF NOT EXISTS eval_items (
   run_id TEXT, trace_id TEXT, answer TEXT, latency_s REAL, metrics_json TEXT, checks_json TEXT, judge_json TEXT,
   PRIMARY KEY (eval_id, item_id, repeat_idx)
 );
+CREATE TABLE IF NOT EXISTS ls_runs (
+  ls_id TEXT PRIMARY KEY, ts REAL, eval_id TEXT, suite TEXT, judge_model TEXT, n_items INTEGER, uploaded INTEGER, summary_json TEXT
+);
+CREATE TABLE IF NOT EXISTS ls_feedback (
+  ls_id TEXT, item_id TEXT, key TEXT, score REAL, comment TEXT, PRIMARY KEY (ls_id, item_id, key)
+);
 """
 
 _db_lock = threading.Lock()
@@ -226,17 +232,16 @@ def _question(ctx) -> str:
 def record_run(ctx, live: dict, error: str | None, source: str | None) -> None:
     state = dict(ctx.session.state)
     plan, timing, facts = state.get("plan") or {}, state.get("timing") or {}, state.get("facts") or {}
-    fast = bool(plan)
     events = live["events"]
     n_llm = (sum(1 for e in events if e["tok_in"] is not None) + (1 if timing.get("model") not in (None, "template") else 0)
-             + (1 if fast and plan.get("tier") == 1 else 0))     # writer call + (LLM router call when tier 1)
-    n_tool = len(timing.get("calls", [])) if fast else sum(len(e["calls"]) for e in events if e["author"] != "supervisor")
+             + (1 if plan.get("tier") == 1 else 0) + int(timing.get("evaluator_llm_calls", 0)))     # writer call + LLM router (tier 1) + LLM evaluator rounds
+    n_tool = len(timing.get("calls", []))
     tok_in = (timing.get("tok_in") or 0) + sum(e["tok_in"] or 0 for e in events)
     tok_out = (timing.get("tok_out") or 0) + sum(e["tok_out"] or 0 for e in events)
     total = time.time() - live["t0"]
     _write(
         "INSERT OR REPLACE INTO runs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-        (ctx.invocation_id, ctx.session.id, live["trace_id"], live["t0"], "fast" if fast else "llm",
+        (ctx.invocation_id, ctx.session.id, live["trace_id"], live["t0"], "fast",
          source or os.environ.get("OBS_SOURCE", "web"), live["question"], live["answer"],
          "error" if error else "ok", error, plan.get("cat"), plan.get("conf"), plan.get("tier"),
          facts.get("status"), timing.get("guard"), round(total, 3), timing.get("route_ms"),

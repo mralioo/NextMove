@@ -1,6 +1,6 @@
 """Latency benchmark for the fast pipeline: one warm process, a sequence of questions.
 
-    make bench            # or: ./.venv/bin/python agent/bench.py [--llm]  (--llm = old supervisor loop)
+    make bench            # or: ./.venv/bin/python agent/bench.py [--wait]
 
 Prints per-question wall time and the stage breakdown (route / tools / write), plus the guard result.
 The first question includes the MCP server warm-up if it hasn't finished (as in a freshly started server);
@@ -36,13 +36,14 @@ QUESTIONS = [
 
 async def main() -> None:
     os.environ.setdefault("OBS_SOURCE", "bench")
+    os.environ["TMT_HISTORY"] = "off"
     from agent import app
     from mcp_runtime import get_runtime
 
     t_boot = time.time()
     agent = app
-    rt = get_runtime() if "--llm" not in sys.argv else None
-    if rt and "--wait" in sys.argv:
+    rt = get_runtime()
+    if "--wait" in sys.argv:
         await asyncio.get_running_loop().run_in_executor(None, rt._ready.wait)
         await asyncio.sleep(9)   # let the server's background warm-up (models, caches) finish
     print(f"boot {time.time() - t_boot:.1f}s\n")

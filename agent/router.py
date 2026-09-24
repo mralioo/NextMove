@@ -15,8 +15,8 @@ Plan schema (short keys on purpose — this JSON is what agents pass to each oth
      "dates": ["2026-07-13"], "time": "13:50", "dur_min": 90, "what_if": false, "follow": false}
 
 Categories: A event impact · B anomalies · C disruption response · D station profile · E energy ·
-F network resilience · G correlation · H reroute behaviour · X bonus (investment / InnoTrans) ·
-OOS out of scope / unanswerable from data.
+F network resilience · G correlation · H reroute behaviour · P pressure ranking (which stations get busiest on a day) ·
+X bonus (investment / InnoTrans route) · OOS out of scope / unanswerable from data.
 """
 from __future__ import annotations
 
@@ -52,7 +52,10 @@ RULES: dict[str, list[tuple[str, float]]] = {
     "B": [(r"anomal", 3), (r"root cause", 2.5), (r"caused by (bad )?(weather|heat|wind|rain)", 3),
           (r"peak caused", 3), (r"not explained|unexplained|cannot be explained", 2.5),
           (r"exactly 500|spike", 3), (r"signalling failure", 1.5)],
-    "X": [(r"invest", 3), (r"infrastructure improvement", 3), (r"innotrans", 3), (r"messe", 2.5),
+    "P": [(r"most likely to (exceed|overload|be (over)?crowded|be busy|be busiest)", 4.5), (r"(which|what|show( me)?|list|name|top)\s+(the\s+)?(\d+|two|three|four|five)\s+(busiest\s+)?stations?\b.*(exceed|overcrowd|crowded|busiest|most|capacity|pressure|load)", 3.5),
+          (r"(exceed|overload|breach)\w*\s+(safe\s+)?(platform\s+)?capacity", 2.5), (r"first day of the (event|fair|innotrans)", 1.5),
+          (r"stations? (at risk|under (the most )?(pressure|load))|highest (load|pressure)|most (crowded|overcrowded)", 2.5)],
+    "X": [(r"invest", 3), (r"infrastructure improvement", 3), (r"innotrans", 2), (r"messe", 2),
           (r"unconventional", 3), (r"not based on the shortest", 3)],
     "A": [(r"concert|festival|gig|match\b", 2), (r"\barena\b|olympiastadion|tempodrom|stadium|venue", 2.5),
           (r"\bevents?\b", 1.5), (r"guns n|doja cat|dikka|alligatoah|tour\b", 2), (r"ten events|events across", 2)],
@@ -60,31 +63,38 @@ RULES: dict[str, list[tuple[str, float]]] = {
           (r"re-?rout", 2), (r"overload", 2), (r"deploy(ed)? .*staff|additional staff|staff", 1.2),
           (r"replacement bus|what if .*(stop|suspend|clos)", 2), (r"sperrung|gesperrt", 2.5),
           (r"closed on|was closed|is closed", 1)],
-    "D": [(r"\bpeaks?\b|commute", 1.5), (r"usually|typical|rhythm|profile", 1.5), (r"busiest|quietest|quiet(est)? stations?", 2),
+    "D": [(r"\bwie voll\b|u-?bahnhof|fahrg(ä|ae)ste|stoßzeit|berufsverkehr|normalerweise|wie viele fahrg", 2.5), (r"\bpeaks?\b|commute", 1.5), (r"usually|typical|rhythm|profile", 1.5), (r"busiest|quietest|quiet(est)? stations?", 2),
           (r"what time|when (does|is)", 1.2), (r"mean (commute )?peak|network mean|exceed", 1.5),
           (r"flow at .*(at|on) \d|predict", 1.5), (r"what was the flow|how (busy|crowded) is", 2), (r"weekday|weekend", 1)],
 }
-PRIORITY = ["F", "H", "G", "E", "B", "X", "A", "C", "D"]
+PRIORITY = ["F", "H", "G", "E", "B", "P", "X", "A", "C", "D"]
 
 # What each category needs — put in the plan so the executor (and anyone reading a trace) sees which
 # datasets and MCP tools the question will touch. `tools` lists what is wired up today ([] = not yet).
 CAT_DATA = {
-    "A": {"data": ["events", "stations", "flows", "weather"], "tools": []},
-    "B": {"data": ["flows", "weather", "events", "closures"], "tools": []},
+    "A": {"data": ["events", "stations", "flows"], "tools": ["event_impact"]},
+    "B": {"data": ["flows", "weather", "events", "closures"], "tools": ["find_anomalies"]},
     "C": {"data": ["closures", "connections", "stations", "flows", "weather", "events"],
           "tools": ["resolve_closure", "apply_closure", "alternate_paths", "scenario_flow"]},
     "D": {"data": ["flows"], "tools": ["resolve_station", "station_profile", "predict_expected_flow", "predict_overcrowding_risk"]},
-    "E": {"data": ["energy", "flows", "stations"], "tools": []},
-    "F": {"data": ["connections", "flows"], "tools": []},
-    "G": {"data": ["flows", "connections", "stations"], "tools": []},
-    "H": {"data": ["closures", "connections", "flows"], "tools": []},
+    "E": {"data": ["energy", "flows", "stations"], "tools": ["energy_efficiency"]},
+    "F": {"data": ["connections", "flows"], "tools": ["network_resilience_ranking"]},
+    "G": {"data": ["flows", "connections", "stations"], "tools": ["correlated_stations"]},
+    "H": {"data": ["closures", "flows"], "tools": ["reroute_behaviour"]},
+    "P": {"data": ["flows", "weather", "events"], "tools": ["rank_pressure"]},
     "X": {"data": ["flows", "connections", "energy", "closures"], "tools": []},
     "OOS": {"data": [], "tools": []}, "FOLLOW": {"data": [], "tools": []},
 }
-OOS = re.compile(r"capacity|safely hold|delayed trains?|cost of|how much would .* cost|currywurst|restaurant|"
-                 r"ignore (your|all|previous)|next (monday|week|month)|tomorrow|tonight|\bu4\b|signalling failure", re.I)
+OOS = re.compile(r"capacity|safely hold|delayed trains?|\bdelay\w*|real-?time|right now|live (status|position|data)|cost of|how much would .* cost|currywurst|restaurant|"
+                 r"ignore (your|all|previous)|next (monday|week|month)|\bu4\b|signalling failure", re.I)
+# a question that only asks for a capacity figure (no ranking / no scenario to answer around it)
+CAPACITY_ASK = re.compile(r"how many (passengers|people)[^?.]*(hold|fit|accommodate)|capacity of|how much capacity|maximum capacity|safely hold", re.I)
+REL_DAY = re.compile(r"\b(tonight|today|this (evening|morning|afternoon)|tomorrow)\b", re.I)
 FOLLOW = re.compile(r"^\s*(and|so|what about|how about)\b|\b(those|that|these|them|the top|the first)\b|"
                     r"how confident|which of (those|these)|measured and|explain (that|why)|what data would", re.I)
+
+# a question ABOUT the previous answer (why / how sure / based on what): explained from the earlier facts, never re-run
+WHY_FOLLOW = re.compile(r"^\s*(and\s+)?why\b|how (do you know|sure|confident)|based on what|on what basis|justify|what makes you|are you sure|explain (that|why|how)", re.I)
 
 ALIASES = {"zoo": "zoologischer garten", "kotti": "kottbusser tor", "alex": "alexanderplatz",
            "hauptbahnhof": "berlin hauptbahnhof", "hbf": "berlin hauptbahnhof"}
@@ -117,6 +127,21 @@ def station_index() -> dict[str, list[str]]:
         if target in idx:
             idx.setdefault(alias, idx[target])
     return idx
+
+
+@lru_cache(maxsize=1)
+def station_lines() -> dict[str, frozenset]:
+    """exact station_name -> the lines serving it (from stations_with_ubahn.csv)."""
+    base = os.environ.get("DATA_DIR", "data")
+    repo = Path(__file__).resolve().parent.parent
+    hits = glob.glob(str(Path(base) / "**" / "stations_with_ubahn.csv"), recursive=True) or glob.glob(str(repo / "data" / "**" / "stations_with_ubahn.csv"), recursive=True)
+    if not hits:
+        return {}
+    df = pd.read_csv(hits[0])
+    out: dict[str, set] = {}
+    for n, ls in zip(df["station_name"], df["u_bahn_lines"]):
+        out.setdefault(n, set()).update(x.strip() for x in str(ls).split(","))
+    return {k: frozenset(v) for k, v in out.items()}
 
 
 def find_stations(text: str) -> list[str]:
@@ -205,8 +230,21 @@ def find_time(text: str) -> str | None:
 WORDNUM = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "half an": 0.5}
 
 
+HORIZON = re.compile(r"\b(?:in|within|over|during)\s+the\s+(?:next|coming|first)\s+(\d+)\s*(minutes?|mins?|hours?|hrs?|h)\b|"
+                     r"\bnext\s+(\d+)\s*(minutes?|mins?|hours?|hrs?|h)\b", re.I)
+
+
+def find_horizon_min(text: str) -> int | None:
+    """'... in the next 20 minutes' -> 20. A look-ahead window, NOT the length of a closure."""
+    m = HORIZON.search(text)
+    if not m:
+        return None
+    n, unit = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
+    return int(n) * (60 if unit.lower().startswith("h") else 1)
+
+
 def find_duration_min(text: str) -> int | None:
-    t = text.lower()
+    t = HORIZON.sub(" ", text.lower())          # a look-ahead horizon must never be read as the closure duration
     m = re.search(r"(\d+(?:\.\d+)?)\s*(hours?|hrs?|h)\b", t)
     if m:
         return int(float(m.group(1)) * 60)
@@ -215,6 +253,60 @@ def find_duration_min(text: str) -> int | None:
         return int(m.group(1))
     m = re.search(rf"\b({'|'.join(WORDNUM)})\s+hours?\b", t)
     return int(WORDNUM[m.group(1)] * 60) if m else None
+
+
+def find_times(text: str) -> list[str]:
+    out = []
+    for m in re.finditer(r"\b(\d{1,2}):(\d{2})\b", text):
+        out.append(f"{int(m.group(1)):02d}:{m.group(2)}")
+    return out
+
+
+NUMWORDS = {"two": 2, "three": 3, "four": 4, "five": 5, "six": 6, "seven": 7, "ten": 10}
+
+
+def find_top_n(text: str) -> int | None:
+    m = re.search(r"\b(\d+|" + "|".join(NUMWORDS) + r")\s+(?:busiest\s+|most\s+\w+\s+)?(?:stations?|lines?|anomal\w+|pairs?|examples?)\b", text.lower())
+    if not m:
+        return None
+    return int(m.group(1)) if m.group(1).isdigit() else NUMWORDS[m.group(1)]
+
+
+@lru_cache(maxsize=1)
+def _events_frame() -> pd.DataFrame:
+    base = os.environ.get("DATA_DIR", "data")
+    repo = Path(__file__).resolve().parent.parent
+    hits = sorted(glob.glob(str(Path(base) / "**" / "berlin_events*.csv"), recursive=True)) or sorted(glob.glob(str(repo / "data" / "**" / "berlin_events*.csv"), recursive=True))
+    return pd.concat([pd.read_csv(h, usecols=["event_name", "venue_name", "began_local"]) for h in hits], ignore_index=True) if hits else pd.DataFrame(columns=["event_name", "venue_name", "began_local"])
+
+
+VENUE_ALIASES = {"mercedes-benz arena": "Uber Arena", "mercedes benz arena": "Uber Arena", "o2 arena": "Uber Arena", "mercedes-platz": "Uber Arena"}
+
+
+def find_venue(text: str) -> tuple[str | None, bool]:
+    """(venue name as the data spells it, alias_used) — venue names come from the events file itself."""
+    t = text.lower()
+    for alias, target in VENUE_ALIASES.items():
+        if alias in t:
+            return target, True
+    ev = _events_frame()
+    venues = sorted({v for v in ev["venue_name"].dropna().unique() if len(v) >= 5}, key=len, reverse=True)
+    for v in venues:
+        if v.lower() in t:
+            return v, False
+    return None, False
+
+
+def find_event_name(text: str) -> str | None:
+    """An event of the data named in the question ('Guns N' Roses concert' -> the base title before ' - ')."""
+    norm = lambda x: re.sub(r"[^a-z0-9 ]", "", re.sub(r"[’'`]", "", x.lower())).strip()
+    q = " " + re.sub(r"\s+", " ", norm(text)) + " "
+    best = None
+    for name in _events_frame()["event_name"].dropna().unique():
+        base = norm(re.split(r"\s[-–:|]\s", name)[0])
+        if len(base) >= 8 and base not in {"berlin", "concert", "festival"} and f" {base} " in q and (best is None or len(base) > len(best[0])):
+            best = (base, re.split(r"\s[-–:|]\s", name)[0].replace("’", "'"))
+    return best[1] if best else None
 
 
 # ---------------------------------------------------------------- routing
@@ -233,32 +325,98 @@ def route(question: str, has_history: bool = False) -> dict:
     if not stations and top in ("C", "D"):
         stations = fuzzy_stations(q)
     lines = [m.upper().replace(" ", "") for m in re.findall(r"\bU\s?[1-9]\b", q, flags=re.I)]
-    follow = bool(has_history and FOLLOW.search(q) and not stations)
+    follow = bool(has_history and (WHY_FOLLOW.search(q) or (FOLLOW.search(q) and not stations)))
 
     cat, conf = top, 0.0
     if scores[top] > 0:
         margin = scores[top] - scores[second]
         conf = min(1.0, scores[top] / 3.0) * (1.0 if margin >= 1.0 else 0.65)
     oos_hits = sorted({m.group(0).lower() for m in OOS.finditer(q)})
-    if oos_hits and not (top in ("C", "D") and scores[top] >= 3 and not re.search(r"capacity|safely hold", q, re.I)):
+    answerable_top = top in ("C", "D", "A", "P", "B") and scores[top] >= 3
+    if oos_hits and not (answerable_top and not CAPACITY_ASK.search(q)):
         cat, conf = "OOS", 0.9
     if follow:
         cat, conf = "FOLLOW", 0.9
-    if cat == "OOS" and re.search(r"\bu4\b", q, re.I):
-        cat = "OOS"
     what_if = bool(re.search(r"\bwhat if\b|\bsuppose\b|\bimagine\b|\bwould be suspended\b", q, re.I))
+    dates, assumed = find_dates(q), []
+    times = find_times(q)
+    venue, alias = find_venue(q)
+    if cat in ("A", "P", "X", "OOS") and re.search(r"innotrans", q, re.I) and not dates:
+        # operator context, NOT in the data: InnoTrans 2026 runs 22-25 Sept 2026 at Messe Berlin. Disclosed in the answer.
+        first_day = re.search(r"first day", q, re.I)
+        dates = ["2026-09-22"] if first_day or cat == "P" else dates
+        if dates:
+            assumed.append("InnoTrans 2026 is taken to start on 2026-09-22 (fair dates from the operator's context; the data has no InnoTrans event)")
+    rel = REL_DAY.search(q)
     return {"cat": cat, "conf": round(conf, 2), "tier": 0, **CAT_DATA.get(cat, {}), "lines": list(dict.fromkeys(lines)),
-            "stations": stations, "raw": [], "dates": find_dates(q), "month": find_month(q), "oos": oos_hits, "time": find_time(q),
-            "dur_min": find_duration_min(q), "what_if": what_if, "follow": follow}
+            "stations": stations, "raw": [], "dates": dates, "month": find_month(q), "oos": oos_hits, "time": find_time(q), "times": times,
+            "dur_min": find_duration_min(q), "horizon_min": find_horizon_min(q), "what_if": what_if, "follow": follow,
+            "venue": venue, "alias": alias, "event": find_event_name(q), "n": find_top_n(q),
+            "rain": True if re.search(r"\b(rain(s|y|ing)?|storm|bad weather|wet)\b", q, re.I) and not re.search(r"\bno rain\b", q, re.I) else None,
+            "rel_day": rel.group(1).lower() if rel else None, "assumed": assumed}
+
+
+# ---------------------------------------------------------------- multi-intent messages
+_SENT = re.compile(r"(?<=[?!.])\s+")
+_CLAUSE = re.compile(r",\s*(?:and\s+)?(?=(?:does|do|how|what|which|where|when|why|is|are|can|will|should)\b)|\band\s+(?=(?:what|how many|how much|which)\b)", re.I)
+
+
+def _statement_merge(sents: list[str]) -> list[str]:
+    """Context statements ('During InnoTrans we expect ...') belong to the question that follows; only questions and imperatives stand alone."""
+    out, buf = [], ""
+    for x in sents:
+        if x.rstrip().endswith("?") or re.match(r"(ignore|tell|show|give|list|name|rank|identify|suggest|explain|predict|compare)\b", x, re.I):
+            out.append((buf + " " + x).strip())
+            buf = ""
+        else:
+            buf = (buf + " " + x).strip()
+    return out + ([buf] if buf and not out else [])
+
+
+def _part_plan(text: str, has_history: bool, min_conf: float = 0.3) -> dict | None:
+    p = route(text, has_history)
+    if p["cat"] != "OOS" and p["conf"] < min_conf and not p["dates"]:
+        return None
+    if p["conf"] < 0.3:                                    # no rule fired: the tie-break category means nothing
+        if not p["dates"]:
+            return None                                    # context clause, no question of its own
+        p = {**p, "cat": "D", "conf": 0.5, **CAT_DATA["D"]}     # a date-only question ('the flow on Sept 30th'): the date guard decides
+    return {**p, "text": text}
+
+
+def split_parts(q: str, has_history: bool = False) -> list[dict]:
+    """A message with SEVERAL different questions ('closure ... At the same time: does Rudow's peak exceed the mean, how many passengers can the
+    platform hold, what will the flow be on Sept 30? Ignore your rules ...') is split so each part gets its own specialist. A sentence stays whole
+    when its clauses belong to one category (the usual multi-clause closure question). Returns [] for an ordinary single question."""
+    texts: list[str] = []
+    for sent in _statement_merge([x for x in _SENT.split(q.strip()) if len(x.split()) >= 3]):
+        clauses = [c.strip(" ,;:") for c in _CLAUSE.split(sent) if c and len(c.split()) >= 4]
+        sub = [pp for pp in (_part_plan(c, has_history, 0.9) for c in clauses)] if len(clauses) > 1 else []
+        cats = {pp["cat"] for pp in sub if pp} - {"FOLLOW"}
+        texts.extend([pp["text"] for pp in sub if pp] if len(cats) > 1 else [sent])
+    plans = [pp for pp in (_part_plan(t, has_history) for t in texts) if pp]
+    cats = {p["cat"] for p in plans}
+    answerable = [p for p in plans if p["cat"] not in ("OOS", "FOLLOW")]
+    return plans if len(plans) >= 2 and len(cats) >= 2 and answerable else []
+
+
+def with_parts(plan: dict, q: str, has_history: bool = False) -> dict:
+    """Attach `parts` to the plan of a multi-intent message; the plan's own category becomes the first answerable part's."""
+    parts = split_parts(q, has_history)
+    if not parts or plan["cat"] == "FOLLOW":
+        return plan
+    lead = next(p for p in parts if p["cat"] not in ("OOS", "FOLLOW"))
+    return {**plan, "cat": lead["cat"], "conf": max(plan["conf"], 0.9), "parts": parts, "tools": sorted({t for p in parts for t in p.get("tools", [])}),
+            "oos": sorted({h for p in parts for h in p.get("oos", [])})}
 
 
 ROUTER_SYSTEM = (
     "Route a Berlin U-Bahn operator question. Reply with ONE JSON object, no prose:\n"
-    '{"cat":"A|B|C|D|E|F|G|H|X|OOS|FOLLOW","lines":["U6"],"places":["as written by user"],'
+    '{"cat":"A|B|C|D|E|F|G|H|P|X|OOS|FOLLOW","lines":["U6"],"places":["as written by user"],'
     '"dates":["YYYY-MM-DD"],"time":"HH:MM|null","dur_min":null,"what_if":false}\n'
     "A=event impact on stations, B=anomaly/root cause, C=line/station closure response (reroute, overload, staff), "
     "D=one station's flow profile/peak/prediction, E=energy per passenger, F=network fragmentation/critical stations, "
-    "G=correlated stations, H=how passengers actually reroute, X=investment/InnoTrans/Messe, "
+    "G=correlated stations, H=how passengers actually reroute, P=which N stations get the highest load/pressure on a day (also weather/event scenarios), X=investment/InnoTrans route, "
     "OOS=needs data we lack (capacity, delays, costs, forecasts beyond 2026-09-22, off-topic). Year is 2026. "
     "If HISTORY=yes and the message only refers back to the previous answer ('those stations', 'how sure'), use FOLLOW."
 )
@@ -284,7 +442,7 @@ async def llm_route(question: str, base_plan: dict, has_history: bool = False) -
     except (json.JSONDecodeError, TypeError):
         return base_plan
     plan = dict(base_plan)
-    plan.update(tier=1, cat=j.get("cat", plan["cat"]) if j.get("cat") in {*"ABCDEFGHX", "OOS", "FOLLOW"} else plan["cat"],
+    plan.update(tier=1, cat=j.get("cat", plan["cat"]) if j.get("cat") in {*"ABCDEFGHPX", "OOS", "FOLLOW"} else plan["cat"],
                 conf=0.8, raw=[p for p in j.get("places", []) if isinstance(p, str)])
     plan["lines"] = plan["lines"] or [l for l in j.get("lines", []) if isinstance(l, str)]
     plan["dates"] = plan["dates"] or [d for d in j.get("dates", []) if isinstance(d, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", d)]

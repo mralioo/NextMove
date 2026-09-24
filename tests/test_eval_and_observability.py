@@ -33,7 +33,7 @@ def test_good_closure_answer_scores_full_and_bad_facts_are_caught():
     exp = metrics.expectations(item, TRUTH)
     facts = {"status": "ok", "cl": {"why": "safety inspection", "h": 1.5, "from": "2026-07-13 13:50", "to": "2026-07-13 15:20"},
              "press": [{"s": "Mehringdamm", "p": 29}, {"s": "Ullsteinstr.", "p": 21}]}
-    good = ("**Answer:** U6 is closed for a safety inspection from 13:50 to 15:20. A replacement bus is needed. Mehringdamm (29%) and "
+    good = ("**Verdict:** U6 is closed for a safety inspection from 13:50 to 15:20. A replacement bus is needed. Mehringdamm (29%) and "
             "Ullsteinstr. (21%) come under most pressure; deploy staff there. This is an assumption-based estimate.")
     m, checks = metrics.score_item(item, _run(good, facts, {"cat": "C"}), exp, {"n": 8, "tools": 4})
     assert m["completeness"] == 1.0 and m["fact_accuracy"] == 1.0 and m["hallucination_free"] == 1.0 and m["route_correct"] == 1.0
@@ -56,7 +56,7 @@ def test_decline_scoring_and_trap_routing():
     exp = metrics.expectations(item, None)
     assert exp["supported"] is False
     facts = {"status": "oos"}
-    ans = "**Answer:** That can't be answered from this dataset: no capacity data exists. I can show a station's peak profile instead."
+    ans = "**Verdict:** That can't be answered from this dataset: no capacity data exists. I can show a station's peak profile instead."
     m, _ = metrics.score_item(item, _run(ans, facts, {"cat": "OOS"}), exp, {"n": 5, "tools": 0})
     assert m["route_correct"] == 1.0 and m["honest_scope"] == 1.0 and m["decline_quality"] == 1.0 and m["answered"] == 0.0
 
@@ -130,7 +130,7 @@ def test_phantom_fuzzy_station_match_is_rejected():
 
 
 def test_unsupported_category_states_the_true_reason():
-    facts, _ = asyncio.run(executor.execute(_plan(cat="E"), "energy per passenger?", None, _FakeMcp()))
+    facts, _ = asyncio.run(executor.execute(_plan(cat="X"), "invest where?", None, _FakeMcp()))
     assert facts["status"] == "unsupported" and "not connected yet" in facts["reason"]
     assert "not connected yet" in __import__("writer").render_fallback(facts)
 

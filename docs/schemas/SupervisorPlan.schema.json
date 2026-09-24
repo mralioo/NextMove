@@ -1,0 +1,650 @@
+{
+ "$defs": {
+  "Entities": {
+   "additionalProperties": false,
+   "description": "Parameters the supervisor extracts from the question (station names are the data's exact strings).",
+   "properties": {
+    "lines": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Lines",
+     "type": "array"
+    },
+    "stations": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Stations",
+     "type": "array"
+    },
+    "dates": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Dates",
+     "type": "array"
+    },
+    "times": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Times",
+     "type": "array"
+    },
+    "duration_min": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Duration Min"
+    },
+    "horizon_min": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Horizon Min"
+    },
+    "venue": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Venue"
+    },
+    "venue_alias_used": {
+     "default": false,
+     "title": "Venue Alias Used",
+     "type": "boolean"
+    },
+    "event": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Event"
+    },
+    "top_n": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Top N"
+    },
+    "rain": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Rain"
+    },
+    "relative_day": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Relative Day"
+    },
+    "what_if": {
+     "default": false,
+     "title": "What If",
+     "type": "boolean"
+    },
+    "month": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Month"
+    },
+    "unresolved_places": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Unresolved Places",
+     "type": "array"
+    },
+    "out_of_scope_terms": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Out Of Scope Terms",
+     "type": "array"
+    },
+    "assumptions": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Assumptions",
+     "type": "array"
+    }
+   },
+   "title": "Entities",
+   "type": "object"
+  },
+  "FollowUp": {
+   "additionalProperties": false,
+   "description": "The question continues an earlier one. `mode`: explain = answer from the earlier facts; rerun = same specialist with inherited\nparameters and the operator's changes applied ('start from that point').",
+   "properties": {
+    "mode": {
+     "enum": [
+      "explain",
+      "rerun"
+     ],
+     "title": "Mode",
+     "type": "string"
+    },
+    "parent_category": {
+     "title": "Parent Category",
+     "type": "string"
+    },
+    "inherited": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Inherited",
+     "type": "array"
+    },
+    "overridden": {
+     "additionalProperties": true,
+     "default": {},
+     "title": "Overridden",
+     "type": "object"
+    }
+   },
+   "required": [
+    "mode",
+    "parent_category"
+   ],
+   "title": "FollowUp",
+   "type": "object"
+  },
+  "GuardrailResult": {
+   "additionalProperties": false,
+   "description": "One guardrail check. `action` is what the system did about a failure: allow | bounce (unrelated question, conversation cut) |\ncut (stop the loop) | repair (fix the output deterministically) | fallback (safe deterministic answer) | escalate (flag low confidence).",
+   "properties": {
+    "stage": {
+     "enum": [
+      "input",
+      "route",
+      "worker",
+      "evaluator",
+      "output",
+      "failsafe"
+     ],
+     "title": "Stage",
+     "type": "string"
+    },
+    "check": {
+     "title": "Check",
+     "type": "string"
+    },
+    "passed": {
+     "title": "Passed",
+     "type": "boolean"
+    },
+    "action": {
+     "default": "allow",
+     "enum": [
+      "allow",
+      "bounce",
+      "cut",
+      "repair",
+      "fallback",
+      "escalate"
+     ],
+     "title": "Action",
+     "type": "string"
+    },
+    "detail": {
+     "default": "",
+     "title": "Detail",
+     "type": "string"
+    }
+   },
+   "required": [
+    "stage",
+    "check",
+    "passed"
+   ],
+   "title": "GuardrailResult",
+   "type": "object"
+  },
+  "HistoryHit": {
+   "additionalProperties": false,
+   "description": "A previous, ACCEPTED answer (local turn store, mirrored to Cognee sessions) that already answers this question.",
+   "properties": {
+    "kind": {
+     "enum": [
+      "exact",
+      "similar"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "turn_id": {
+     "title": "Turn Id",
+     "type": "integer"
+    },
+    "session_id": {
+     "title": "Session Id",
+     "type": "string"
+    },
+    "similarity": {
+     "title": "Similarity",
+     "type": "number"
+    },
+    "question": {
+     "title": "Question",
+     "type": "string"
+    },
+    "answer": {
+     "title": "Answer",
+     "type": "string"
+    },
+    "category": {
+     "title": "Category",
+     "type": "string"
+    },
+    "confidence": {
+     "anyOf": [
+      {
+       "type": "number"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Confidence"
+    },
+    "age_s": {
+     "title": "Age S",
+     "type": "number"
+    },
+    "data_window_end": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Data Window End"
+    }
+   },
+   "required": [
+    "kind",
+    "turn_id",
+    "session_id",
+    "similarity",
+    "question",
+    "answer",
+    "category",
+    "age_s"
+   ],
+   "title": "HistoryHit",
+   "type": "object"
+  },
+  "Objective": {
+   "additionalProperties": false,
+   "description": "What a good answer must achieve \u2014 the yardstick the evaluator checks the worker's result against.",
+   "properties": {
+    "kind": {
+     "enum": [
+      "explain_closure",
+      "closure_impact",
+      "station_profile",
+      "event_effect",
+      "load_ranking",
+      "anomaly_cause",
+      "energy_efficiency",
+      "resilience_ranking",
+      "demand_coupling",
+      "reroute_evidence",
+      "follow_up",
+      "decline",
+      "bounce"
+     ],
+     "title": "Kind",
+     "type": "string"
+    },
+    "statement": {
+     "title": "Statement",
+     "type": "string"
+    },
+    "success_criteria": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Success Criteria",
+     "type": "array"
+    }
+   },
+   "required": [
+    "kind",
+    "statement"
+   ],
+   "title": "Objective",
+   "type": "object"
+  },
+  "PartPlan": {
+   "additionalProperties": false,
+   "description": "One question inside a multi-question message.",
+   "properties": {
+    "text": {
+     "title": "Text",
+     "type": "string"
+    },
+    "category": {
+     "enum": [
+      "A",
+      "B",
+      "C",
+      "D",
+      "E",
+      "F",
+      "G",
+      "H",
+      "P",
+      "X",
+      "OOS",
+      "FOLLOW",
+      "BOUNCE"
+     ],
+     "title": "Category",
+     "type": "string"
+    },
+    "confidence": {
+     "title": "Confidence",
+     "type": "number"
+    },
+    "entities": {
+     "$ref": "#/$defs/Entities"
+    },
+    "route": {
+     "$ref": "#/$defs/Route"
+    }
+   },
+   "required": [
+    "text",
+    "category",
+    "confidence",
+    "entities",
+    "route"
+   ],
+   "title": "PartPlan",
+   "type": "object"
+  },
+  "Route": {
+   "additionalProperties": false,
+   "description": "Which specialist, MCP servers, datasets, tools and ML engine the supervisor assigns to the question.",
+   "properties": {
+    "specialist": {
+     "title": "Specialist",
+     "type": "string"
+    },
+    "mcp_servers": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Mcp Servers",
+     "type": "array"
+    },
+    "datasets": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Datasets",
+     "type": "array"
+    },
+    "tools": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Tools",
+     "type": "array"
+    },
+    "ml_engine": {
+     "default": "none",
+     "enum": [
+      "tabpfn",
+      "empirical",
+      "none"
+     ],
+     "title": "Ml Engine",
+     "type": "string"
+    }
+   },
+   "required": [
+    "specialist"
+   ],
+   "title": "Route",
+   "type": "object"
+  }
+ },
+ "additionalProperties": false,
+ "properties": {
+  "schema_version": {
+   "default": "1.0",
+   "title": "Schema Version",
+   "type": "string"
+  },
+  "plan_id": {
+   "title": "Plan Id",
+   "type": "string"
+  },
+  "question": {
+   "title": "Question",
+   "type": "string"
+  },
+  "decision": {
+   "enum": [
+    "proceed",
+    "answer_from_history",
+    "follow_up",
+    "decline",
+    "need_input",
+    "bounce"
+   ],
+   "title": "Decision",
+   "type": "string"
+  },
+  "in_scope": {
+   "title": "In Scope",
+   "type": "boolean"
+  },
+  "category": {
+   "enum": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E",
+    "F",
+    "G",
+    "H",
+    "P",
+    "X",
+    "OOS",
+    "FOLLOW",
+    "BOUNCE"
+   ],
+   "title": "Category",
+   "type": "string"
+  },
+  "confidence": {
+   "title": "Confidence",
+   "type": "number"
+  },
+  "tier": {
+   "default": 0,
+   "title": "Tier",
+   "type": "integer"
+  },
+  "entities": {
+   "$ref": "#/$defs/Entities",
+   "default": {
+    "lines": [],
+    "stations": [],
+    "dates": [],
+    "times": [],
+    "duration_min": null,
+    "horizon_min": null,
+    "venue": null,
+    "venue_alias_used": false,
+    "event": null,
+    "top_n": null,
+    "rain": null,
+    "relative_day": null,
+    "what_if": false,
+    "month": null,
+    "unresolved_places": [],
+    "out_of_scope_terms": [],
+    "assumptions": []
+   }
+  },
+  "objective": {
+   "$ref": "#/$defs/Objective"
+  },
+  "route": {
+   "$ref": "#/$defs/Route"
+  },
+  "guardrails": {
+   "default": [],
+   "items": {
+    "$ref": "#/$defs/GuardrailResult"
+   },
+   "title": "Guardrails",
+   "type": "array"
+  },
+  "history": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/HistoryHit"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "follow_up": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/FollowUp"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null
+  },
+  "parts": {
+   "default": [],
+   "items": {
+    "$ref": "#/$defs/PartPlan"
+   },
+   "title": "Parts",
+   "type": "array"
+  },
+  "message": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "title": "Message"
+  },
+  "kb_boundaries": {
+   "default": [],
+   "items": {
+    "type": "string"
+   },
+   "title": "Kb Boundaries",
+   "type": "array"
+  },
+  "llm_router_error": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "title": "Llm Router Error"
+  }
+ },
+ "required": [
+  "question",
+  "decision",
+  "in_scope",
+  "category",
+  "confidence",
+  "objective",
+  "route"
+ ],
+ "title": "SupervisorPlan",
+ "type": "object"
+}

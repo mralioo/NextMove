@@ -9,7 +9,7 @@ checkable, grounded answer — or, where the data cannot support one, a checkabl
 
 ```bash
 make agent-query Q="<paste a question>"      # one-shot through the full agent
-make agent-web                               # ADK dev UI: watch the tool calls
+make up                                      # dashboard + ADK chat UI + MCP servers + Neo4j (make agent-web = ADK UI only)
 ```
 
 Grade each answer with the checklist in [§10](#10-grading-checklist). The final evaluation (Sept 25) uses **new
@@ -30,19 +30,32 @@ Dataset coverage: **2026-06-10 05:00 → 2026-09-22 00:45**, 15-minute grain, 16
 
 ## Support status today
 
-| Cat | Topic | Training Q | Status in this build |
+| Cat | Topic | Training Q | Specialist / tools (status) |
 | --- | --- | --- | --- |
-| A | Event impact on neighbouring stations | Q1, Bonus 2 | ❌ no tools (needs venue→station mapping) |
-| B | Anomaly detection + root cause | Q2, Q7 | ❌ no tools |
-| **C** | **Disruption response (closures, reroute, overload, staff)** | **Q3** | ✅ `resolve_closure → apply_closure → alternate_paths → scenario_flow` (TabPFN) |
+| A | Event impact on neighbouring stations | Q1, Bonus 2 | ✅ partial — `event_impact` (venue→station mapping learned from flows; alias *Mercedes-Benz Arena* → *Uber Arena*) |
+| B | Anomaly detection + root cause | Q2, Q7 | ✅ partial — `find_anomalies` (closure → event → weather → "unexplained"; causes are "consistent with") |
+| **C** | **Disruption response (closures, reroute, overload, staff)** | **Q3** | ✅ `resolve_closure → apply_closure → alternate_paths → scenario_flow` (TabPFN); what-if closures simulated as described |
 | **D** | **Station profiling** | **Q4** | ✅ `station_profile` (+ point predictions) |
-| E | Energy efficiency ranking | Q5 | ❌ dashboard only, no agent tool |
-| F | Network resilience ranking | Q6 | ❌ dashboard only (`network_resilience()`), no agent tool |
-| G | Latent station correlation | Q8 | ❌ no tools |
-| H | Reroute behaviour vs shortest path | Q9 | ⚠️ no tool; a precomputed finding exists (see H1) |
+| E | Energy efficiency ranking | Q5 | ✅ `energy_efficiency` (Wh per passenger, approximate per-line passengers) |
+| F | Network resilience ranking | Q6 | ✅ `network_resilience_ranking` (graph cut, passengers affected per day) |
+| G | Latent station correlation | Q8 | ✅ partial — `correlated_stations` (correlations are weak in this data; the answer must say so) |
+| H | Reroute behaviour vs shortest path | Q9 | ✅ partial — `reroute_behaviour` (recorded finding: no measurable rerouting) |
+| P | Which N stations get the highest load on a day (weather / event scenario) | challenge Q3 | ✅ partial — `rank_pressure` (TabPFN; load ranking, not a capacity) |
+| X | Investment / InnoTrans routing | Bonus 1, 2 | ❌ declines honestly (needs several analyses combined) |
 
-Questions for ❌ categories are still worth asking: today the **correct** behaviour is an honest "not supported yet"
-(the Scenario specialist is designed to decline), and the same questions become the acceptance tests when the tools land.
+Questions for the ❌ category are still worth asking: the **correct** behaviour is an honest "not supported yet". Unrelated questions (R12) are **bounced** by the supervisor's scope guardrail; related but unanswerable ones (C14, D11, E7, F8 …) are **declined** with what is possible.
+
+## ADK eval set (`eval_set_1`) — three questions with approximate answers
+
+Loaded into the ADK UI (Evals tab) by `make adk-evalset` (`evaluation/make_adk_evalset.py`; file `agent/eval_set_1.evalset.json`). Each case is a single-turn conversation with a **reference final response**; the references are approximate on purpose (numbers rounded, wording free) and were taken from the raw data / the knowledge base's ground truth.
+
+| Case id | Question | Approximate reference answer | Where the numbers come from |
+| --- | --- | --- | --- |
+| `c1_u6_closure` (= C1, training Q3) | Line U6 is suspended on a section between Hallesches Tor and Kaiserin-Augusta-Strasse stations. What is the reason behind this closure and how long will it last? How should the passengers be rerouted, which stations would become overloaded, and where should additional staff be deployed? | Closed for a **safety inspection** on 13 July 2026, **13:50–15:20 (1.5 h)**. **No rail detour** → replacement bus. Most pressured: **Kaiserin-Augusta-Str.** (≈ 78 % chance of exceeding its own busiest-5 % level vs 17 % normally), then **Mehringdamm** (≈ 29 % vs 10 %) → staff there. Figures are assumption-based estimates, not capacity. | `closures.csv` (KB `GT-CL-*`), `scenario_flow` |
+| `d1_rudow_peak` (= D1, training Q4) | At what time does the commute flow peak at Rudow station usually take place? Does it exceed the mean commute peak value across all stations? | Weekday commute peak at **18:00**, ≈ **219** passengers per 15 min; **below** the network mean weekday peak of ≈ **264** (≈ 17 % lower) → does **not** exceed it. | `flows.csv` (KB `GT-D-RUDOW`) |
+| `a1_arena_concert` (challenge Q2) | There is a sold-out concert at Mercedes-Benz Arena tonight at 21:00. What does the flow look like at Hermannplatz, and what should we do at 23:15 when it ends? | Hermannplatz shows **no measurable uplift**. The data calls the arena *Uber Arena* (assumed to be the same venue). Stations that feel it: **Warschauer Str.** (≈ +114 per 15 min, ~6× normal) and **Schlesisches Tor** (≈ +93, ~5×). At 23:15 put staff at those two until ≈ 00:15. "Tonight" has no date in the data (venue pattern used); the venue→station link is inferred; no capacity data. | `berlin_events*.csv` + `flows.csv` (KB `GT-A-UBER`), `event_impact` |
+
+**Running it.** In the ADK UI → *Evals* → `eval_set_1` → select the cases → set the metric. ADK's default `response_match_score` threshold (0.8, ROUGE-1 against the reference) is far too strict for prose that is free-worded; a threshold around **0.3–0.4** is meaningful. A run on the small model measured **0.40 (c1), 0.41 (d1), 0.47 (a1)**, all passing at 0.2. No tool trajectory is expected: our tools run behind MCP inside the pipeline, not as ADK function calls. Use the small model for these runs (`WRITER_LITELLM_MODEL=gpt-4o-mini EVALUATOR_LITELLM_MODEL=gpt-4o-mini`) — the default writer and evaluator roles point at the shared main model. `TMT_HISTORY=off` keeps a repeated run from being answered out of the turn history.
 
 ---
 

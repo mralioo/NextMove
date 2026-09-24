@@ -6,52 +6,13 @@
     "target": "passengers (per station per 15 min)",
     "n_features": 17,
     "n_train_rows": 10000,
-    "model_id": "01a0cf49-602a-7ba3-88ea-c73ea5d6fa82",
-    "saved_at": "2026-09-23T17:22:08+00:00",
+    "model_id": "01a0d316-2e6c-77d2-a645-12505e44b032",
+    "saved_at": "2026-09-24T11:04:03+00:00",
     "refit_at": null,
     "tabpfn_model": "v3.5_default",
     "tabpfn_client_version": "0.6.0",
     "fingerprint": "1a34b7202326e65c",
-    "metrics": {
-      "n_train_sample": 10000,
-      "n_test_rows": 4000,
-      "train_days_before": "2026-09-02",
-      "tabpfn_median": {
-        "mae": 74.62
-      },
-      "tabpfn_mean": {
-        "rmse": 135.61,
-        "r2": 0.3538
-      },
-      "baseline_station_slot_mean": {
-        "mae": 77.87,
-        "rmse": 135.05,
-        "r2": 0.3592
-      },
-      "baseline_station_slot_median": {
-        "mae": 75.42
-      },
-      "baseline_global_mean": {
-        "mae": 110.31
-      },
-      "interval_coverage": {
-        "80% (q10-q90)": 0.786,
-        "90% (q05-q95)": 0.897,
-        "95% (q025-q975)": 0.948
-      },
-      "baseline_interval_coverage": {
-        "80% (q10-q90)": 0.817,
-        "90% (q05-q95)": 0.916,
-        "95% (q025-q975)": 0.954
-      },
-      "mean_interval_width_80": 237.28,
-      "baseline_mean_interval_width_80": 239.68,
-      "mean_pinball_loss": {
-        "tabpfn": 22.137,
-        "baseline_empirical_quantiles": 22.25,
-        "skill_vs_baseline": 0.0051
-      }
-    },
+    "metrics": null,
     "dataset_folder": "data/training dataset",
     "train_days_before": "2026-09-02"
   },
@@ -62,9 +23,9 @@
     "target": "passengers (per station per 15 min)",
     "n_features": 17,
     "n_train_rows": 8000,
-    "model_id": "01a0cf4e-b192-7083-947a-647740a5b3e4",
-    "saved_at": "2026-09-23T17:25:05+00:00",
-    "refit_at": "2026-09-23T17:27:19+00:00",
+    "model_id": "01a0d316-4aa3-7722-a490-a0a1c9eb1402",
+    "saved_at": "2026-09-24T11:04:10+00:00",
+    "refit_at": null,
     "tabpfn_model": "v3.5_default",
     "tabpfn_client_version": "0.6.0",
     "fingerprint": "792431925c058ebc",
@@ -79,8 +40,8 @@
     "target": "overcrowded (flow >= station's own p90)",
     "n_features": 17,
     "n_train_rows": 8000,
-    "model_id": "01a0cf4c-9b21-7611-ab87-64a879e737ff",
-    "saved_at": "2026-09-23T17:25:04+00:00",
+    "model_id": "01a0d316-3b0c-7240-b3fa-f075e94ed488",
+    "saved_at": "2026-09-24T11:04:10+00:00",
     "refit_at": null,
     "tabpfn_model": "v3.5_default",
     "tabpfn_client_version": "0.6.0",

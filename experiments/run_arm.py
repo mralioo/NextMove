@@ -45,8 +45,8 @@ def apply_environment(arm: arms.Arm, exp_id: str) -> None:
     os.environ.update(cfg.to_env())
     os.environ["OBS_SOURCE"] = f"exp:{arm.arm_id}"
     os.environ["WARM_LLM"] = "0"
+    os.environ["TMT_HISTORY"] = "off"               # evaluations recompute: no answer-from-history, no cross-session restore
     os.environ["TMT_MEMORY_DB"] = str(REPO / "observability" / f"memory_{exp_id}_{arm.arm_id}.db")
-    os.environ["TMT_EXCLUDE"] = "||".join([questions.Q1, questions.Q2])       # keep the tfidf router honest: never trained on the test questions
     if p["writer"] == "small":
         os.environ["WRITER_LITELLM_MODEL"] = os.environ.get("WORKER_LITELLM_MODEL", "gpt-4o-mini")
         for k in ("WRITER_API_BASE", "WRITER_API_KEY", "WRITER_API_VERSION"):
@@ -82,14 +82,6 @@ async def main() -> None:
     conn = obs.connect()
     conn.row_factory = lambda cur, row: {d[0]: row[i] for i, d in enumerate(cur.description)}
     setup = {"git": _git(), "python": platform.python_version(), "protocol": [t for t, _, _ in questions.PROTOCOL], "params": arm.params}
-
-    if arm.params["router"] == "jev":
-        import router_jev
-        if not router_jev.configured():
-            record_arm(conn, args.exp_id, arm, "skipped", "JEV_API_KEY not set — the JEV router is opt-in (it sends the question to a "
-                       "third-party API whose model card / weights are not published).", setup, {})
-            print(f"[{arm.arm_id}] skipped (JEV_API_KEY not set)")
-            return
 
     import ground_truth
     import judge as judge_mod
@@ -159,9 +151,6 @@ async def main() -> None:
               f"quality={scoring.quality(m):.2f}" + (f" judge(rel/faith/clar)={m['judge_relevance']:.1f}/{m['judge_faithfulness']:.1f}/{m['judge_clarity']:.1f}" if m.get('judge_relevance') is not None else " judge=n/a"))
 
     summary = scoring.arm_summary(turns, runs_by_turn, startup)
-    if arm.params["memory"] == "episodic":
-        from memory import EpisodicMemory
-        summary["memory_store"] = EpisodicMemory().stats()
     record_arm(conn, args.exp_id, arm, "ok", "", setup, summary)
     print(f"  => quality {summary['quality']:.2f} · mean latency {summary['latency_mean_s']:.1f}s · LLM calls {summary['llm_calls']} · tools {summary['tool_calls']}")
     rt.shutdown()

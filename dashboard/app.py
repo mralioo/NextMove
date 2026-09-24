@@ -15,5 +15,7 @@ pages = [
     st.Page("views/8_Observability.py", title="Observability", icon="🔭", url_path="observability"),
     st.Page("views/9_Evaluation.py", title="Evaluation", icon="✅", url_path="evaluation"),
     st.Page("views/10_Experiments.py", title="Experiments", icon="🧪", url_path="experiments"),
+    st.Page("views/11_Agent_Workflow.py", title="Agent Workflow", icon="🧭", url_path="workflow"),
+    st.Page("views/12_Resources.py", title="Resources", icon="🧰", url_path="resources"),
 ]
 st.navigation(pages).run()

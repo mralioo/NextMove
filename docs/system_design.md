@@ -1,5 +1,7 @@
 # Talk To My Train — System Design & Agentic Architecture (As-Built)
 
+> **Historical — superseded.** This describes the architecture before the supervisor / worker ⇄ evaluator / writer redesign. Current design: [`agent_architecture_v3.md`](agent_architecture_v3.md); how to run: [`running_the_system.md`](running_the_system.md).
+
 This is the technical reference for what's actually implemented in this repository —
 not the aspirational blueprint. Two companion documents cover different ground:
 

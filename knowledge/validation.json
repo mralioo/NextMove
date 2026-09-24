@@ -1,0 +1,84 @@
+{
+ "pressure": {
+  "n_days": 8,
+  "spearman_load": 0.43633906164211084,
+  "spearman_p95": -0.050769395223976235,
+  "obs_peak_of_pred_top3": 1670.7083333333333,
+  "obs_peak_mean_all": 528.5561377245509,
+  "mean_overlap_top3": 1.5,
+  "chance_overlap_top3": 0.05389221556886228,
+  "days": [
+   {
+    "date": "2026-09-16",
+    "spearman_load": 0.4434035396291371,
+    "spearman_p95": -0.11944670524095109,
+    "obs_peak_top3": 2357.0,
+    "obs_peak_all": 557.3952095808384,
+    "overlap_top3": 3
+   },
+   {
+    "date": "2026-09-15",
+    "spearman_load": 0.5130548195147444,
+    "spearman_p95": -0.08879750948181764,
+    "obs_peak_top3": 1712.0,
+    "obs_peak_all": 557.3952095808384,
+    "overlap_top3": 1
+   },
+   {
+    "date": "2026-09-10",
+    "spearman_load": 0.5031430114268903,
+    "spearman_p95": -0.0681446104766127,
+    "obs_peak_top3": 1824.0,
+    "obs_peak_all": 560.2574850299401,
+    "overlap_top3": 2
+   },
+   {
+    "date": "2026-09-05",
+    "spearman_load": 0.22412497418455887,
+    "spearman_p95": 0.05399396904193353,
+    "obs_peak_top3": 934.6666666666666,
+    "obs_peak_all": 412.2215568862275,
+    "overlap_top3": 1
+   },
+   {
+    "date": "2026-08-20",
+    "spearman_load": 0.40042889513621066,
+    "spearman_p95": -0.004059647284260274,
+    "obs_peak_top3": 1807.0,
+    "obs_peak_all": 528.8263473053893,
+    "overlap_top3": 2
+   },
+   {
+    "date": "2026-07-14",
+    "spearman_load": 0.39479630514149777,
+    "spearman_p95": -0.08113172272550981,
+    "obs_peak_top3": 1579.6666666666667,
+    "obs_peak_all": 527.7125748502993,
+    "overlap_top3": 1
+   },
+   {
+    "date": "2026-08-05",
+    "spearman_load": 0.46673026728237194,
+    "spearman_p95": 0.004725784992501233,
+    "obs_peak_top3": 1687.6666666666667,
+    "obs_peak_all": 548.1137724550898,
+    "overlap_top3": 1
+   },
+   {
+    "date": "2026-07-29",
+    "spearman_load": 0.5450306808214755,
+    "spearman_p95": -0.10329472061709313,
+    "obs_peak_top3": 1463.6666666666667,
+    "obs_peak_all": 536.5269461077844,
+    "overlap_top3": 1
+   }
+  ]
+ },
+ "ml": {
+  "mae_tabpfn": 74.62,
+  "mae_baseline": 77.87,
+  "rmse_tabpfn": 135.61,
+  "rmse_baseline": 135.05,
+  "pinball_skill": 0.0051
+ }
+}

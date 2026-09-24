@@ -1,7 +1,7 @@
 """The experiment design: one baseline configuration and one-factor-at-a-time (OFAT) variations of it.
 
 Factors (see agent/config.py for what each level means):
-    router  rules | llm | tfidf | jev          memory  session | none | episodic
+    router  rules | llm                        memory  session | none
     mcp     stdio | inmemory | http            engine  tabpfn | empirical
     writer  small | main | template            (small = gpt-4o-mini, main = the shared main model, template = no LLM)
 
@@ -16,13 +16,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 BASELINE = {"router": "rules", "memory": "session", "mcp": "stdio", "engine": "tabpfn", "writer": "small"}
-FACTOR_LEVELS = {
-    "router": ["rules", "llm", "tfidf", "jev"],
-    "memory": ["session", "none", "episodic"],
-    "mcp": ["stdio", "inmemory", "http"],
-    "engine": ["tabpfn", "empirical"],
-    "writer": ["small", "main", "template"],
-}
 ORDER = list(BASELINE)
 
 
@@ -56,13 +49,7 @@ ARMS: list[Arm] = [
     _arm("A02", "baseline replicate 2 (noise floor)", "-", "A third identical run: with A00 and A01 it gives the run-to-run range used as the noise floor."),
     _arm("R1", "router = LLM", "router", "An LLM router is slower than rules and no more accurate on these two questions; it may mis-route the "
          "follow-up.", router="llm"),
-    _arm("R2", "router = TF-IDF classifier", "router", "A local learned classifier matches rules on category at ~ms cost; entities still come "
-         "from rules.", router="tfidf"),
-    _arm("R3", "router = JEV API", "router", "External classifier; opt-in (needs JEV_API_KEY, sends the question to a third party). Skipped when "
-         "not configured.", router="jev"),
     _arm("M1", "memory = none", "memory", "Without session memory the follow-up question cannot be answered (it has no referent).", memory="none"),
-    _arm("M2", "memory = episodic", "memory", "Persistent fact memory makes the repeated question in a new session faster (tools skipped) with "
-         "identical facts.", memory="episodic"),
     _arm("C1", "mcp = in-memory", "mcp", "Removing the subprocess/pipe layer saves start-up and per-call overhead; answers identical.", mcp="inmemory"),
     _arm("C2", "mcp = HTTP", "mcp", "HTTP adds per-call overhead vs stdio; answers identical.", mcp="http"),
     _arm("E1", "engine = empirical (no ML)", "engine", "Replacing TabPFN with the empirical baseline keeps the ranking similar but changes the "

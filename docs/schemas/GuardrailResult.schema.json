@@ -1,0 +1,51 @@
+{
+ "additionalProperties": false,
+ "description": "One guardrail check. `action` is what the system did about a failure: allow | bounce (unrelated question, conversation cut) |\ncut (stop the loop) | repair (fix the output deterministically) | fallback (safe deterministic answer) | escalate (flag low confidence).",
+ "properties": {
+  "stage": {
+   "enum": [
+    "input",
+    "route",
+    "worker",
+    "evaluator",
+    "output",
+    "failsafe"
+   ],
+   "title": "Stage",
+   "type": "string"
+  },
+  "check": {
+   "title": "Check",
+   "type": "string"
+  },
+  "passed": {
+   "title": "Passed",
+   "type": "boolean"
+  },
+  "action": {
+   "default": "allow",
+   "enum": [
+    "allow",
+    "bounce",
+    "cut",
+    "repair",
+    "fallback",
+    "escalate"
+   ],
+   "title": "Action",
+   "type": "string"
+  },
+  "detail": {
+   "default": "",
+   "title": "Detail",
+   "type": "string"
+  }
+ },
+ "required": [
+  "stage",
+  "check",
+  "passed"
+ ],
+ "title": "GuardrailResult",
+ "type": "object"
+}

@@ -1,7 +1,7 @@
 {
   "tabpfn_client_version": "0.6.0",
   "task": "regression",
-  "model_id": "01a0cf4e-b192-7083-947a-647740a5b3e4",
+  "model_id": "01a0d316-4aa3-7722-a490-a0a1c9eb1402",
   "params": {
     "api_mode": "auto",
     "average_before_softmax": null,

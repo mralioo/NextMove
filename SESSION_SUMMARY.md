@@ -1,5 +1,7 @@
 # Session Summary — Talk To My Train (InnoTrans 2026 Hackathon)
 
+> **Historical — superseded.** This describes the architecture before the supervisor / worker ⇄ evaluator / writer redesign. Current design: [`agent_architecture_v3.md`](docs/agent_architecture_v3.md); how to run: [`running_the_system.md`](docs/running_the_system.md).
+
 Written 2026-09-23 as a handoff/continuation record. Read this first if picking the
 project back up in a new session or after moving the folder — it points to every
 artifact built, why, and what state it's in.

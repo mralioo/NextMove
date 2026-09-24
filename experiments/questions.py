@@ -2,7 +2,7 @@
 
 Q1  the workbook's disruption question (TRAINING #3): answerable, with ground truth recomputable from the raw csv.
 Q2  a FOLLOW-UP that only makes sense after Q1 (same session). It exists to make the effect of memory visible.
-Q1r Q1 asked again in a NEW session. It exists to expose cross-session memory (episodic) and run-to-run consistency.
+Q1r Q1 asked again in a NEW session. It exists to expose cross-session memory and run-to-run consistency.
 
 Turn order in every arm: Q1 -> Q2 (same session) -> Q1r (fresh session).
 """

@@ -42,6 +42,7 @@ from env_loader import load_all_dotenvs  # noqa: E402
 from features import FEATURE_COLUMNS, encode_categoricals  # noqa: E402
 from table_cache import cached_feature_table  # noqa: E402
 from disruption_tools import register as register_disruption_tools  # noqa: E402
+from analytics_tools import register as register_analytics_tools  # noqa: E402
 from inference_models import load_or_fit_point_models  # noqa: E402
 from utils.data_loader import (  # noqa: E402
     DEFAULT_DATA_DIR,
@@ -66,7 +67,10 @@ mcp = FastMCP(
     ),
 )
 
-_FOLDER = str(next(iter(discover_dataset_dirs(DEFAULT_DATA_DIR).values())))
+_DIRS = list(discover_dataset_dirs(DEFAULT_DATA_DIR).values())
+# One dataset folder -> that folder. Several (e.g. the Sept 22-30 evaluation set dropped next to the training set) -> the parent
+# folder, whose loaders MERGE every matching file (dedupe on timestamp) instead of silently using only the first.
+_FOLDER = str(_DIRS[0]) if len(_DIRS) == 1 else str(DEFAULT_DATA_DIR)
 
 # Lazily-built, in-process caches. Rebuilding the ~1.4M-row feature table or
 # re-fitting a TabPFN model on every tool call would be slow and (for TabPFN)
@@ -326,6 +330,8 @@ def predict_expected_flow(station_name: str, timestamp: str) -> dict:
 
 # Category C (disruption response) tools — see mcp_server/disruption_tools.py
 _warm_disruption = register_disruption_tools(mcp, _FOLDER, _get_feature_table)
+# Categories A, P, B, E, F, G, H — see mcp_server/analytics_tools.py
+register_analytics_tools(mcp, _FOLDER, _get_feature_table, _warm_disruption.baseline)
 
 
 def _warm_up() -> None:

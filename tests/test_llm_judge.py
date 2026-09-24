@@ -104,12 +104,12 @@ def test_regex_is_only_the_fallback_when_the_judge_skips_a_criterion_or_is_unava
 
 
 def test_declines_are_judged_by_criteria_not_keywords():
-    item = dataset.Item("T05", "TRAINING", "energy?", expected_cat="E")
+    item = dataset.Item("T10", "TRAINING", "invest where?", expected_cat="X")
     exp = metrics.expectations(item, TRUTH)
     assert exp["supported"] is False and set(exp["criteria"]) == {"declines", "offers_alternative"}
     v = judge.normalise({"criteria": {"declines": {"met": True, "evidence": "cannot be answered yet"}, "offers_alternative": {"met": False, "evidence": "no alternative"}},
                          "relevance": 4, "faithfulness": 5, "clarity": 5, "usefulness": 2}, exp["criteria"])
-    m, _ = metrics.score_item(item, _run("It cannot be answered yet.", {"status": "unsupported"}, {"cat": "E"}), exp, {"n": 5, "tools": 0}, judge=v)
+    m, _ = metrics.score_item(item, _run("It cannot be answered yet.", {"status": "unsupported"}, {"cat": "X"}), exp, {"n": 5, "tools": 0}, judge=v)
     assert m["decline_quality"] == 0.5 and m["honest_scope"] == 1.0 and m["completeness"] is None
 
 
@@ -120,9 +120,9 @@ def test_group_scores_include_the_judge_metrics():
 
 
 def test_a_judge_verdict_without_scores_does_not_crash_scoring():
-    item = dataset.Item("T05", "TRAINING", "energy?", expected_cat="E")
+    item = dataset.Item("T10", "TRAINING", "invest where?", expected_cat="X")
     exp = metrics.expectations(item, TRUTH)
     empty = judge.normalise({"criteria": {}}, exp["criteria"])          # no criteria, no scores at all
-    m, checks = metrics.score_item(item, _run("It cannot be answered yet.", {"status": "unsupported"}, {"cat": "E"}), exp, {"n": 5, "tools": 0}, judge=empty)
+    m, checks = metrics.score_item(item, _run("It cannot be answered yet.", {"status": "unsupported"}, {"cat": "X"}), exp, {"n": 5, "tools": 0}, judge=empty)
     assert m["judge_used"] == 1.0 and m["judge_relevance"] is None
     assert m["decline_quality"] is not None                              # criteria the judge skipped fall back to the regex rubric

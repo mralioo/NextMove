@@ -49,8 +49,22 @@ def discover_dataset_dirs(base_dir: str = DEFAULT_DATA_DIR) -> dict[str, Path]:
 
 
 def _find_one(folder: Path, pattern: str) -> Path | None:
-    matches = sorted(folder.glob(pattern))
+    matches = sorted(folder.glob(pattern)) or sorted(folder.rglob(pattern))     # a parent of dataset folders works too
     return matches[0] if matches else None
+
+
+def _find_all(folder: Path, pattern: str) -> list[Path]:
+    """Every file matching `pattern` in `folder` — and, when `folder` is a parent of several dataset folders, in them too.
+    The Sept 22-30 evaluation data may arrive as an extra file next to the old one or as a second folder; both must be
+    MERGED, never 'first file wins' (that silently dropped the history)."""
+    return sorted(folder.rglob(pattern))
+
+
+def _read_merged(folder: Path, pattern: str, **kw) -> pd.DataFrame:
+    files = _find_all(folder, pattern)
+    if not files:
+        raise FileNotFoundError(f"no file matching {pattern} under {folder}")
+    return pd.concat([pd.read_csv(f, **kw) for f in files], ignore_index=True) if len(files) > 1 else pd.read_csv(files[0], **kw)
 
 
 def _parse_mixed_datetime(series: pd.Series) -> pd.Series:
@@ -81,26 +95,23 @@ def load_lines(folder: str) -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def load_flows(folder: str) -> pd.DataFrame:
-    path = _find_one(Path(folder), "flows*.csv")
-    df = pd.read_csv(path)
+    df = _read_merged(Path(folder), "flows*.csv")
     df["timestamp"] = _parse_mixed_datetime(df["timestamp"])
-    df = df.sort_values("timestamp").reset_index(drop=True)
+    df = df.sort_values("timestamp").drop_duplicates("timestamp", keep="last").reset_index(drop=True)
     return df
 
 
 @st.cache_data(show_spinner=False)
 def load_weather(folder: str) -> pd.DataFrame:
-    path = _find_one(Path(folder), "weather_data*.csv")
-    df = pd.read_csv(path)
+    df = _read_merged(Path(folder), "weather_data*.csv")
     df = df.rename(columns={df.columns[0]: "timestamp"})
     df["timestamp"] = _parse_mixed_datetime(df["timestamp"])
-    return df.sort_values("timestamp").reset_index(drop=True)
+    return df.sort_values("timestamp").drop_duplicates("timestamp", keep="last").reset_index(drop=True)
 
 
 @st.cache_data(show_spinner=False)
 def load_events(folder: str) -> pd.DataFrame:
-    path = _find_one(Path(folder), "berlin_events*.csv")
-    df = pd.read_csv(path)
+    df = _read_merged(Path(folder), "berlin_events*.csv").drop_duplicates(["event_name", "began_local"], keep="last")
     df["began_local"] = pd.to_datetime(df["began_local"], utc=False, format="mixed")
     df["estimated_end_local"] = pd.to_datetime(
         df["estimated_end_local"], utc=False, format="mixed", errors="coerce"
@@ -127,8 +138,7 @@ _STATION_CLOSURE_RE = re.compile(r"Station (.+?) closed due to (.+)\.")
 
 @st.cache_data(show_spinner=False)
 def load_closures(folder: str) -> pd.DataFrame:
-    path = _find_one(Path(folder), "closures*.csv")
-    df = pd.read_csv(path)
+    df = _read_merged(Path(folder), "closures*.csv").drop_duplicates(["when", "description"], keep="last").reset_index(drop=True)
     df["when"] = _parse_mixed_datetime(df["when"])
     df["duration_td"] = df["duration"].apply(_parse_duration)
     df["end"] = df["when"] + df["duration_td"]
@@ -162,11 +172,10 @@ def load_closures(folder: str) -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def load_energy(folder: str) -> pd.DataFrame:
-    path = _find_one(Path(folder), "energy_consumption*.csv")
-    df = pd.read_csv(path)
+    df = _read_merged(Path(folder), "energy_consumption*.csv")
     df = df.rename(columns={df.columns[0]: "timestamp"})
     df["timestamp"] = _parse_mixed_datetime(df["timestamp"])
-    return df.sort_values("timestamp").reset_index(drop=True)
+    return df.sort_values("timestamp").drop_duplicates("timestamp", keep="last").reset_index(drop=True)
 
 
 # ---------------------------------------------------------------------------

@@ -21,6 +21,8 @@ CHAINS = {
     "SUPERVISOR": ("SUPERVISOR", "WORKER", "ADK"),
     "ROUTER": ("ROUTER", "WORKER", "ADK"),
     "WORKER": ("WORKER", "ADK"),
+    # the evaluator is the "powerful" LLM, the same model as the supervisor's (EVALUATOR_LITELLM_MODEL overrides it)
+    "EVALUATOR": ("EVALUATOR", "SUPERVISOR", "WORKER", "ADK"),
 }
 
 

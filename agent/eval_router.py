@@ -38,7 +38,6 @@ tot = sum(map(sum, ok.values()))
 print(f"{tot}/{len(rows)} correct ({tot / len(rows):.0%}) · {dt:.2f} ms per question")
 for c in sorted(ok):
     print(f"  {c}: {sum(ok[c])}/{len(ok[c])}")
-core = [(q, t) for q, t, _ in rows if t == "Core"]
 print("\nMISSES:")
 for m in misses:
     print("  %-4s %-10s exp=%s got=%-6s conf=%.2f  %s" % m)

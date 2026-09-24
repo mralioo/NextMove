@@ -199,7 +199,7 @@ def register(mcp, folder: str, get_feature_table: Callable[[], pd.DataFrame]) ->
         closure_id: int | None = None, line: str | None = None,
         from_station: str | None = None, to_station: str | None = None,
         station: str | None = None, start: str | None = None,
-        duration_minutes: int | None = None, top_n: int = 10,
+        duration_minutes: int | None = None, top_n: int = 10, engine: str = "",
     ) -> dict:
         """Category C step 4 — the TabPFN-backed estimate. For each 15-min slot of the
         closure window: TabPFN regression predicts each involved station's normal
@@ -212,7 +212,8 @@ def register(mcp, folder: str, get_feature_table: Callable[[], pd.DataFrame]) ->
         Window must lie inside the dataset coverage window. Output is a model-based
         demand-pressure estimate, NOT a measured capacity claim: the dataset has no
         capacity data, and its historical closures show no measurable redistribution.
-        Same arguments as apply_closure. Uses the checkpointed TabPFN model; predictions are cached,
+        Same arguments as apply_closure, plus `engine` ('' = the server default, 'tabpfn' or 'empirical' = the naive station x hour quantile baseline, no ML —
+        the evaluator can ask for it as a cross-check). Uses the checkpointed TabPFN model; predictions are cached,
         so closures already seen (all 26 in the dataset are pre-warmed) answer instantly."""
         spec = build_spec(closure_id, line, from_station, to_station, station, start, duration_minutes)
         if isinstance(spec, str):
@@ -222,6 +223,10 @@ def register(mcp, folder: str, get_feature_table: Callable[[], pd.DataFrame]) ->
             b = baseline()
         except (ValueError, RuntimeError) as e:
             return {"error": str(e)}
+        if engine in ("tabpfn", "empirical") and engine != b.engine:
+            import copy
+            b = copy.copy(b)                      # shallow: shares the big table and the fitted model; only the engine switch differs
+            b.engine = engine
         result = run_scenario(net(), b, eff, top_n=max(1, min(int(top_n), 25)))
         if "error" not in result:
             result["deployment_hint"] = (
@@ -231,4 +236,5 @@ def register(mcp, folder: str, get_feature_table: Callable[[], pd.DataFrame]) ->
                 "cite the low/high columns.")
         return _jsonable(result)
 
+    warm.baseline = baseline          # shared with the analytics tools (rank_pressure uses the same TabPFN demand model)
     return warm

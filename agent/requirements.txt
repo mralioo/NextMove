@@ -1,4 +1,15 @@
-google-adk
+google-adk[eval]   # [eval] = the ADK UI "Evals" tab and `adk eval` (rouge, pandas)
 mcp
 python-dotenv
 litellm
+pydantic>=2
+httpx
+# evaluation: LangSmith-style evaluators (offline by default)
+langsmith
+openevals
+openai
+# knowledge graph extraction (the Neo4j LLM Graph Builder's engine) and the optional Neo4j sink
+langchain-openai
+langchain-experimental
+neo4j
+networkx

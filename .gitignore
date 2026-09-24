@@ -27,3 +27,6 @@ evaluation/output/
 .vscode/
 # experiment run outputs (regenerable from observability/agent_obs.db)
 experiments/output/
+observability/backup/
+
+.run/

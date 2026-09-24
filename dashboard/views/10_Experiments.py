@@ -39,7 +39,7 @@ with st.expander("📖 The design in one minute", expanded=False):
 **Q2** = a follow-up that only makes sense after Q1 in the same session (*"Which of those stations should get staff first, and how sure are you?"*);
 **Q1r** = Q1 again in a **new** session (exposes cross-session memory and run-to-run consistency).
 
-**Factors and levels.** router: rules · llm · tfidf · jev — memory: session · none · episodic — MCP transport: stdio · in-memory · HTTP —
+**Factors and levels.** router: rules · llm — memory: session · none — MCP transport: stdio · in-memory · HTTP —
 ML engine: TabPFN · empirical (no ML) — writer: small LLM · main LLM · template (no LLM).
 
 **One factor at a time (OFAT).** Baseline **A00** (rules · session · stdio · TabPFN · small writer); each other arm changes exactly one factor.
@@ -181,7 +181,7 @@ with t_router:
                    "Route latency Q1 (ms)": s["route_ms"].get("Q1"), "Route latency Q2 (ms)": s["route_ms"].get("Q2"), "Quality": s["quality"], "Judge": s.get("judge")})
     st.dataframe(pd.DataFrame(rr).round(3), use_container_width=True, hide_index=True)
     explain("Did each router send Q1 to the disruption playbook (C) and the follow-up Q2 to FOLLOW, and how long did the routing itself take?",
-            "1.0 = routed correctly. Route latency is the router alone (the LLM router calls a model, the others do not). JEV shows 'skipped' unless JEV_API_KEY is set.")
+            "1.0 = routed correctly. Route latency is the router alone (the LLM router calls a model, the others do not).")
 with t_mem:
     mm = []
     for a in ("A00", "M1", "M2"):
@@ -191,8 +191,8 @@ with t_mem:
                        "Q1 latency": s["latency_s"].get("Q1"), "Q1r latency": s["latency_s"].get("Q1r"), "Speed-up of Q1r": s.get("speedup_q1r"),
                        "Memory hit on Q1r": s.get("memory_hit_q1r"), "Consistency Q1↔Q1r": s.get("consistency_q1_q1r")})
     st.dataframe(pd.DataFrame(mm).round(3), use_container_width=True, hide_index=True)
-    explain("With no memory the follow-up has nothing to refer to; with session memory it reuses the previous answer's facts; with episodic memory a repeated "
-            "situation in a NEW session is served from a persistent store (tools skipped).",
+    explain("With no memory the follow-up has nothing to refer to; with session memory it reuses the previous answer's facts; "
+            "(the persistent episodic store of the first study was removed; the turn history and the knowledge graph replace it).",
             "Look at 'Follow-up completeness' (does the answer name the earlier stations, give an order, and say how sure it is) and at the speed-up of Q1r. "
             "Speed-ups smaller than the noise floor are not evidence.")
 with t_mcp:

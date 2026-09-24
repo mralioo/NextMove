@@ -5,11 +5,10 @@ process with its own setup. Defaults reproduce the production workflow.
 
     router   rules    deterministic classifier (+ small-LLM fallback when unsure)   [production]
              llm      small LLM always classifies (no rules)
-             tfidf    local TF-IDF + logistic-regression classifier for the category (rules still extract entities)
-             jev      external JEV classification API (opt-in: needs JEV_API_KEY; sends the question to a third party)
-    memory   session  the previous answer's facts are kept for follow-up questions in the same session   [production]
+    memory   session  the previous answer's facts are kept for follow-up questions in the same session
+             cognee   session + curated knowledge base (ground truth / boundaries / insights) + sanity check + turn history that survives restarts,
+                      mirrored to Cognee in the background (agent/knowledge.py)   [production when COGNEE_ENABLED is set]
              none     no memory: every question is answered in isolation
-             episodic session memory + a persistent store of past facts reused across sessions (skips the tools)
     mcp      stdio    MCP server as a subprocess over stdio                          [production]
              inmemory MCP server in the same process (no subprocess / pipes)
              http     MCP server as a separate process over streamable HTTP
@@ -25,8 +24,8 @@ import os
 from dataclasses import asdict, dataclass
 
 CHOICES = {
-    "router": ("rules", "llm", "tfidf", "jev"),
-    "memory": ("session", "none", "episodic"),
+    "router": ("rules", "llm"),
+    "memory": ("session", "none", "cognee"),
     "mcp": ("stdio", "inmemory", "http"),
     "engine": ("tabpfn", "empirical"),
     "writer": ("llm", "template"),
@@ -54,8 +53,18 @@ class RunConfig:
 
 def load() -> RunConfig:
     raw = os.environ.get("TMT_CONFIG")
-    cfg = RunConfig(**{k: v for k, v in json.loads(raw).items() if k in CHOICES}) if raw else RunConfig()
-    return cfg.validate()
+    if raw:
+        return RunConfig(**{k: v for k, v in json.loads(raw).items() if k in CHOICES}).validate()
+    try:                                            # the production default depends on the .env (COGNEE_ENABLED)
+        import sys
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from env_loader import load_all_dotenvs
+        load_all_dotenvs()
+    except Exception:
+        pass
+    cog = str(os.environ.get("COGNEE_ENABLED", "")).lower() in ("1", "true", "yes", "on")
+    return RunConfig(memory="cognee" if cog else "session").validate()
 
 
 CONFIG = load()

@@ -2,7 +2,7 @@
 
     make experiments                                   # every arm (~10 min; the main model is used by ONE arm, 3 calls)
     make experiments ARGS="--list"                     # show the design without running anything
-    make experiments ARGS="--arms A00,A01,M1,M2"       # a subset
+    make experiments ARGS="--arms A00,A01,M1"       # a subset
     make experiments ARGS="--arms A00,W2 --no-judge"
 
 Results go to the `exp_runs` / `exp_turns` tables (dashboard page "Experiments") and to experiments/output/<exp_id>.json.

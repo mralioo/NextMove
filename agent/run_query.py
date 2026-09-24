@@ -28,7 +28,6 @@ from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
 
-APP_NAME = "talk_to_my_train"
 USER_ID = "operator"
 
 
@@ -67,8 +66,7 @@ async def run(question: str, trace: bool = False) -> None:
 
 
 def build_agent_for_cli():
-    """Honour AGENT_MODE (fast pipeline by default; AGENT_MODE=llm = the original LLM supervisor loop)."""
-    from agent import app   # App(root_agent + observability plugin); honours AGENT_MODE
+    from agent import app   # App(root_agent + observability plugin)
 
     return app
 

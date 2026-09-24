@@ -10,6 +10,7 @@ LLM JUDGE (small model by default; --judge-model main uses the shared model, dou
 
 Suites   limit     ONE complex message with six sub-asks (default) — see dataset.LIMIT_QUESTION
          training  the 11 TRAINING questions of `evaluation/team_answers_template v1.xlsx`
+         challenge the 3 example questions of the problem statement (verbatim) + 3 date-grounded variants, scored on ideal-answer criteria
          final    the FINAL_TEST rows once they are filled in (Sept 25)
          stress   Edge + Trap + cross-cutting robustness questions from docs/test_questions.md
          bank     every non-follow-up question of docs/test_questions.md
@@ -51,14 +52,14 @@ def enforce_budget(n_questions: int, repeat: int, judge_main: bool, allow_many: 
 
 def parse_args():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--suite", default="limit", choices=["limit", "training", "final", "stress", "bank", "all"])
+    ap.add_argument("--suite", default="limit", choices=["limit", "training", "final", "stress", "bank", "all", "challenge"])
     ap.add_argument("--repeat", type=int, default=1, help="runs per question; >1 also scores consistency")
-    ap.add_argument("--mode", default="fast", choices=["fast", "llm"], help="agent mode (AGENT_MODE)")
     ap.add_argument("--no-judge", action="store_true", help="skip the LLM judge and score with the regex rubric only (legacy / offline)")
     ap.add_argument("--judge-model", default="small", choices=["small", "main"], help="which model judges the answers (default: the small worker model)")
     ap.add_argument("--export-xlsx", action="store_true", help="write the answers into a COPY of the workbook")
     ap.add_argument("--team", default="", help="TEAM_NAME for the exported workbook")
     ap.add_argument("--limit", type=int, default=0, help="only the first N questions (debugging)")
+    ap.add_argument("--ids", default="", help="comma-separated question ids to run (e.g. CH1w,T04)")
     ap.add_argument("--no-warm", action="store_true", help="don't wait for the MCP server warm-up first")
     ap.add_argument("--label", default="", help="free-text note stored with the run")
     ap.add_argument("--allow-many", action="store_true", help=f"allow more than {MAX_CALLS} questions x repeats (uses the shared LLM endpoint)")
@@ -72,6 +73,8 @@ def build_items(suite: str):
     items = []
     if suite == "limit":
         items += dataset.load_limit_items()
+    if suite == "challenge":
+        items += dataset.load_challenge_items()
     if suite in ("training", "all"):
         items += [i for i in dataset.load_workbook_items() if i.stage == "TRAINING"]
     if suite in ("final", "all"):
@@ -101,9 +104,9 @@ def git_commit() -> str:
 
 async def main() -> None:
     args = parse_args()
-    os.environ["AGENT_MODE"] = args.mode
     os.environ["OBS_SOURCE"] = "eval"
-    os.environ["WARM_LLM"] = "0"                   # no warm-up ping to the shared endpoint during evaluation
+    os.environ["WARM_LLM"] = "0"
+    os.environ["TMT_HISTORY"] = "off"               # evaluations recompute: no answer-from-history, no cross-session restore                   # no warm-up ping to the shared endpoint during evaluation
     if args.cheap:
         os.environ["WRITER_LITELLM_MODEL"] = os.environ.get("WORKER_LITELLM_MODEL", "gpt-4o-mini")
         os.environ.pop("WRITER_API_BASE", None)
@@ -119,6 +122,9 @@ async def main() -> None:
     from google.genai import types
 
     items = build_items(args.suite)
+    if args.ids:
+        want = {i.strip() for i in args.ids.split(",")}
+        items = [i for i in items if i.id in want]
     if args.limit:
         items = items[:args.limit]
     if not items:
@@ -134,7 +140,7 @@ async def main() -> None:
     from agent import app
     from mcp_runtime import get_runtime
 
-    if args.mode == "fast" and not args.no_warm:
+    if not args.no_warm:
         rt = get_runtime()
         await asyncio.get_running_loop().run_in_executor(None, rt._ready.wait)
         await asyncio.sleep(9)                     # let the server's background warm-up finish (models, caches)
@@ -143,7 +149,7 @@ async def main() -> None:
     eval_id = time.strftime("ev-%Y%m%d-%H%M%S")
     conn = obs.connect()
     conn.row_factory = lambda cur, row: {d[0]: row[i] for i, d in enumerate(cur.description)}
-    print(f"eval {eval_id} · suite={args.suite} · {len(items)} questions × {args.repeat} · mode={args.mode} · budget={metrics.BUDGET_S:.0f}s\n")
+    print(f"eval {eval_id} · suite={args.suite} · {len(items)} questions × {args.repeat} · budget={metrics.BUDGET_S:.0f}s\n")
 
     rows, per_item, judges = [], {}, {}
     for it in items:
@@ -204,7 +210,7 @@ async def main() -> None:
                           "judge_model": judged[0]["model"] if judged else None, "judge_coverage": len(judged) / max(len(judges), 1),
                           "judge_tokens": sum(j.get("tokens", 0) for j in judged)}
     conn.execute("INSERT OR REPLACE INTO eval_runs VALUES (?,?,?,?,?,?,?,?)", (
-        eval_id, time.time(), args.suite, args.mode, len(rows), metrics.BUDGET_S, git_commit(),
+        eval_id, time.time(), args.suite, "fast", len(rows), metrics.BUDGET_S, git_commit(),
         json.dumps({**summary, "label": args.label}, default=str)))
     conn.commit()
 

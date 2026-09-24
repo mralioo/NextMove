@@ -1,0 +1,250 @@
+{
+ "$defs": {
+  "Entities": {
+   "additionalProperties": false,
+   "description": "Parameters the supervisor extracts from the question (station names are the data's exact strings).",
+   "properties": {
+    "lines": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Lines",
+     "type": "array"
+    },
+    "stations": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Stations",
+     "type": "array"
+    },
+    "dates": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Dates",
+     "type": "array"
+    },
+    "times": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Times",
+     "type": "array"
+    },
+    "duration_min": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Duration Min"
+    },
+    "horizon_min": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Horizon Min"
+    },
+    "venue": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Venue"
+    },
+    "venue_alias_used": {
+     "default": false,
+     "title": "Venue Alias Used",
+     "type": "boolean"
+    },
+    "event": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Event"
+    },
+    "top_n": {
+     "anyOf": [
+      {
+       "type": "integer"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Top N"
+    },
+    "rain": {
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Rain"
+    },
+    "relative_day": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Relative Day"
+    },
+    "what_if": {
+     "default": false,
+     "title": "What If",
+     "type": "boolean"
+    },
+    "month": {
+     "anyOf": [
+      {
+       "type": "string"
+      },
+      {
+       "type": "null"
+      }
+     ],
+     "default": null,
+     "title": "Month"
+    },
+    "unresolved_places": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Unresolved Places",
+     "type": "array"
+    },
+    "out_of_scope_terms": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Out Of Scope Terms",
+     "type": "array"
+    },
+    "assumptions": {
+     "default": [],
+     "items": {
+      "type": "string"
+     },
+     "title": "Assumptions",
+     "type": "array"
+    }
+   },
+   "title": "Entities",
+   "type": "object"
+  }
+ },
+ "additionalProperties": false,
+ "description": "A problem \u2192 answer \u2192 actions/options record, the unit the graph grows by.",
+ "properties": {
+  "question": {
+   "title": "Question",
+   "type": "string"
+  },
+  "category": {
+   "title": "Category",
+   "type": "string"
+  },
+  "entities": {
+   "$ref": "#/$defs/Entities"
+  },
+  "answer": {
+   "title": "Answer",
+   "type": "string"
+  },
+  "confidence": {
+   "anyOf": [
+    {
+     "type": "number"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "title": "Confidence"
+  },
+  "verdict": {
+   "anyOf": [
+    {
+     "type": "string"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "default": null,
+   "title": "Verdict"
+  },
+  "actions": {
+   "default": [],
+   "items": {
+    "type": "string"
+   },
+   "title": "Actions",
+   "type": "array"
+  },
+  "options": {
+   "default": [],
+   "items": {
+    "type": "string"
+   },
+   "title": "Options",
+   "type": "array"
+  },
+  "source": {
+   "default": "runtime",
+   "title": "Source",
+   "type": "string"
+  },
+  "ts": {
+   "title": "Ts",
+   "type": "number"
+  }
+ },
+ "required": [
+  "question",
+  "category",
+  "entities",
+  "answer"
+ ],
+ "title": "GraphCase",
+ "type": "object"
+}

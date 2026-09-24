@@ -44,9 +44,6 @@ def build(exp_id: str | None) -> tuple[str, str]:
     qs = [s["quality"] for s in reps]
     qb, qnoise = st.mean(qs), max(qs) - min(qs)
 
-    def turn_route_ms(arm, turn):
-        return S[arm]["route_ms"].get(turn)
-
     out = [f"### Results of `{exp_id}`\n",
            f"Baseline = mean of the {len(reps)} identical replicates: **{base:.2f} s** mean latency per turn; "
            f"noise range across replicates **{noise:.2f} s** ({', '.join(f'{x:.2f}' for x in lat)} s); baseline quality {qb:.2f} "
@@ -80,8 +77,6 @@ def build(exp_id: str | None) -> tuple[str, str]:
     sec("Router (RQ1)", ["A00", "R1", "R2"], [
         ("Route time Q1 (ms)", lambda s: f(s["route_ms"].get("Q1"), "{:.0f}")), ("Route time Q2 (ms)", lambda s: f(s["route_ms"].get("Q2"), "{:.0f}")),
         ("LLM calls", lambda s: str(s["llm_calls"])), ("Quality", lambda s: f(s["quality"])), ("Follow-up completeness", lambda s: f(s.get("follow_up_completeness")))])
-    if "R3" in rows and rows["R3"]["status"] != "ok":
-        out.append(f"\n_R3 (JEV): {rows['R3']['status']} — {rows['R3']['note']}_")
     sec("Memory (RQ2)", ["A00", "M1", "M2"], [
         ("Follow-up completeness", lambda s: f(s.get("follow_up_completeness"))), ("Quality", lambda s: f(s["quality"])),
         ("Tools time Q1 (s)", lambda s: f(s["tools_s"].get("Q1"))), ("Tools time Q1r (s)", lambda s: f(s["tools_s"].get("Q1r"))),

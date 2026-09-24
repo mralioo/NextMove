@@ -1,5 +1,7 @@
 # Talk To My Train — Agents Overview & Session Summary
 
+> **Historical — superseded.** This describes the architecture before the supervisor / worker ⇄ evaluator / writer redesign. Current design: [`agent_architecture_v3.md`](agent_architecture_v3.md); how to run: [`running_the_system.md`](running_the_system.md).
+
 > **Update:** the default agent is now the fast **router → executor → writer** pipeline (~4 s per answer) — see
 > `docs/latency_optimization.md`. The Supervisor / specialists / Verifier described below are the original
 > LLM loop, still available with `AGENT_MODE=llm` (~37 s).

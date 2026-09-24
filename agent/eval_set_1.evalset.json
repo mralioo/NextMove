@@ -1,0 +1,91 @@
+{
+  "eval_set_id": "eval_set_1",
+  "name": "eval_set_1",
+  "eval_cases": [
+    {
+      "eval_id": "c1_u6_closure",
+      "conversation": [
+        {
+          "invocation_id": "c1_u6_closure_inv",
+          "user_content": {
+            "parts": [
+              {
+                "text": "Line U6 is suspended on a section between Hallesches Tor and Kaiserin-Augusta-Strasse stations. What is the reason behind this closure and how long will it last? How should the passengers be rerouted, which stations would become overloaded, and where should additional staff be deployed?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "The U6 section between Hallesches Tor and Kaiserin-Augusta-Str. is closed for a safety inspection on 13 July 2026 from 13:50 to 15:20, i.e. 1.5 hours. There is no rail detour, so a replacement bus is needed. Kaiserin-Augusta-Str. is the most pressured station (about a 78% chance of exceeding its own busiest-5% level versus 17% normally), followed by Mehringdamm (about 29% vs 10%); deploy additional staff there. The pressure figures are assumption-based estimates (the share of passengers who divert is assumed), not capacity measurements."
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "agent",
+        "user_id": "user"
+      }
+    },
+    {
+      "eval_id": "d1_rudow_peak",
+      "conversation": [
+        {
+          "invocation_id": "d1_rudow_peak_inv",
+          "user_content": {
+            "parts": [
+              {
+                "text": "At what time does the commute flow peak at Rudow station usually take place? Does it exceed the mean commute peak value across all stations?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Rudow's weekday commute peak is at 18:00 with about 219 passengers per 15 minutes. That is below the network mean weekday peak of about 264 passengers (roughly 17% lower), so it does not exceed the mean."
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "agent",
+        "user_id": "user"
+      }
+    },
+    {
+      "eval_id": "a1_arena_concert",
+      "conversation": [
+        {
+          "invocation_id": "a1_arena_concert_inv",
+          "user_content": {
+            "parts": [
+              {
+                "text": "There is a sold-out concert at Mercedes-Benz Arena tonight at 21:00. What does the flow look like at Hermannplatz, and what should we do at 23:15 when it ends?"
+              }
+            ],
+            "role": "user"
+          },
+          "final_response": {
+            "parts": [
+              {
+                "text": "Hermannplatz shows no measurable uplift from events at this venue. In the data the arena is called Uber Arena and is assumed to be the same venue. The stations that feel concerts are Warschauer Str. (about +114 passengers per 15 minutes, roughly 6 times normal) and Schlesisches Tor (about +93, roughly 5 times normal). At 23:15, when it ends, put additional staff at those two stations until about 00:15. 'Tonight' has no calendar date in the data, so the numbers are the pattern of the venue's past events; the venue-to-station link is inferred from flows, and there is no capacity data."
+              }
+            ],
+            "role": "model"
+          }
+        }
+      ],
+      "session_input": {
+        "app_name": "agent",
+        "user_id": "user"
+      }
+    }
+  ],
+  "creation_timestamp": 1790246704.1041675
+}
