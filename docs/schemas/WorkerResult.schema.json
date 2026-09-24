@@ -1,0 +1,125 @@
+{
+ "$defs": {
+  "ToolCall": {
+   "additionalProperties": false,
+   "properties": {
+    "tool": {
+     "title": "Tool",
+     "type": "string"
+    },
+    "server": {
+     "default": "ubahn-flow-data",
+     "title": "Server",
+     "type": "string"
+    },
+    "seconds": {
+     "default": 0.0,
+     "title": "Seconds",
+     "type": "number"
+    }
+   },
+   "required": [
+    "tool"
+   ],
+   "title": "ToolCall",
+   "type": "object"
+  }
+ },
+ "additionalProperties": false,
+ "description": "The worker's output: the compact facts, how confident it is and why, and what it touched.",
+ "properties": {
+  "schema_version": {
+   "default": "1.0",
+   "title": "Schema Version",
+   "type": "string"
+  },
+  "task_id": {
+   "title": "Task Id",
+   "type": "string"
+  },
+  "iteration": {
+   "title": "Iteration",
+   "type": "integer"
+  },
+  "status": {
+   "enum": [
+    "ok",
+    "need",
+    "unsupported",
+    "oos",
+    "follow",
+    "multi",
+    "error"
+   ],
+   "title": "Status",
+   "type": "string"
+  },
+  "facts": {
+   "additionalProperties": true,
+   "title": "Facts",
+   "type": "object"
+  },
+  "confidence": {
+   "maximum": 1.0,
+   "minimum": 0.0,
+   "title": "Confidence",
+   "type": "number"
+  },
+  "confidence_reasons": {
+   "default": [],
+   "items": {
+    "type": "string"
+   },
+   "title": "Confidence Reasons",
+   "type": "array"
+  },
+  "assumptions": {
+   "default": [],
+   "items": {
+    "type": "string"
+   },
+   "title": "Assumptions",
+   "type": "array"
+  },
+  "datasets_used": {
+   "default": [],
+   "items": {
+    "type": "string"
+   },
+   "title": "Datasets Used",
+   "type": "array"
+  },
+  "tools_called": {
+   "default": [],
+   "items": {
+    "$ref": "#/$defs/ToolCall"
+   },
+   "title": "Tools Called",
+   "type": "array"
+  },
+  "ml_engine_used": {
+   "default": "none",
+   "enum": [
+    "tabpfn",
+    "empirical",
+    "none"
+   ],
+   "title": "Ml Engine Used",
+   "type": "string"
+  },
+  "seconds": {
+   "default": 0.0,
+   "title": "Seconds",
+   "type": "number"
+  }
+ },
+ "required": [
+  "task_id",
+  "iteration",
+  "status",
+  "facts",
+  "confidence"
+ ],
+ "title": "WorkerResult",
+ "type": "object"
+}
