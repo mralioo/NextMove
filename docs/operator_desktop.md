@@ -1,7 +1,9 @@
 # Operator desktop (React) — a minimal control-room screen with Toby, the assistant
 
+> **Migrated.** The UI now lives in `frontend/` with the new design (tabs: Operator Desk, Chat Copilot, Network & Heatmap, Flow Analytics, Cascade Simulator, Energy Efficiency) — see [`frontend_migration.md`](frontend_migration.md) and [`modules/frontend.md`](modules/frontend.md). This page still describes the **behaviour** of the desk, Toby, the operations column and the feedback controls, which were kept. File names below (`MapView.jsx`, `Avatar.jsx`, `ChatPanel.jsx`, `OpsLog.jsx`) are those of the archived first version in `frontend_old/`; in `frontend/` they are `components/desk/MapView.jsx`, `components/Toby.jsx`, `components/chat/ChatCore.jsx`, `components/chat/OpsLog.jsx`.
+
 **Status:** built and used end to end (map, replay, chat with operations log, feedback, pending badge); checked with a headless Chrome script (screenshots and clicks), not with a human operator.
-**Open it:** `make up` → **http://127.0.0.1:8770/app/** (served by the operator API). Development with hot reload: `./.venv/bin/python scripts/tasks.py ui-dev` → http://localhost:5173 (proxies `/api`). Build once: `make install` or `tasks.py ui-build` (`make up` builds it automatically when `frontend/dist` is missing and `npm` exists).
+**Open it:** `make up` → **http://127.0.0.1:8770/app/** (served by the operator API). Development with hot reload: `make ui` → http://localhost:3000/app/ (proxies `/api`). Build: `make ui-build` (`make up` rebuilds it automatically when the sources are newer than `frontend/dist`).
 
 ## 1. What it looks like
 

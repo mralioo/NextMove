@@ -2,10 +2,18 @@
 
 | Document | What it is | Status |
 | --- | --- | --- |
+| [`../README.md`](../README.md) | **Start here** — system design, user flow, data flow, events, data schema, tool calling and MCP, API summary, repository map, limits | current |
+| [`modules/`](modules/README.md) | One page per module: `agent`, `mcp_server`, `ml`, `backend`, `frontend`, `dashboard`, `evaluation`, `scripts_and_ops`, `data` | current |
+| [`events_and_data_flow.md`](events_and_data_flow.md) | Operator user flow, system context and data flow, sequence of a chat turn, feedback loop, event catalogue (ADK `customMetadata.kind`, SSE steps), spans, what is stored when | current |
+| [`data_schema.md`](data_schema.md) | Every data shape: raw files, golden data, knowledge base, SQLite stores, artifact bundle, agent messages, knowledge graph, UI state | current |
+| [`mcp_and_tools.md`](mcp_and_tools.md) | Tool calling: the three MCP servers, category → playbook → tools, how a call travels, calling from outside | current |
+| [`api_reference.md`](api_reference.md) | Operator API and the ADK endpoints it uses: groups, examples, the SSE streaming format, errors | current |
+| [`generated/`](generated/mcp_tools.md) | **Generated** (`make docs`): MCP tool catalogue, operator-API endpoint table, `openapi.json` | current |
+| [`frontend_migration.md`](frontend_migration.md) | Migration to the new UI: what came from where, kept functions, new streaming, API mapping, removed placeholder data, limits | current |
 | [`../data/data_schema_high_quality.md`](../data/data_schema_high_quality.md) | Schema of the golden pre-processed data (`data/normalized`, `data/processed`, derived `data/quality`) and the MCP tools that read it | current |
 | [`ml_preprocessing_pipeline.md`](ml_preprocessing_pipeline.md) | Normalization pipeline (normal flow, weather, rest) integrated in `ml/`, the quality database with boundaries, the quality MCP server and how the Inspector uses it | current |
 | [`conversation_threads_and_graph.md`](conversation_threads_and_graph.md) | One conversation = one situation: topic-switch choice, chat history, resumed conversations; categorised knowledge graph (situations, domains, action types), audit / repair | current |
-| [`operator_desktop.md`](operator_desktop.md) | React operator desktop: city map with replay, Toby the floating assistant, operations column, feedback controls; the endpoints it added | current |
+| [`operator_desktop.md`](operator_desktop.md) | Behaviour of the operator desk, Toby, operations column and feedback controls (design of the first desktop; the UI was migrated, see `frontend_migration.md`) | current for behaviour; file names in §1–2 refer to `frontend_old/` |
 | [`operator_feedback_api.md`](operator_feedback_api.md) | Operator feedback loop (score of a response, action taken → knowledge graph, precedents) and the endpoints for the UI | current |
 | [`brief_answers_and_operator_kb.md`](brief_answers_and_operator_kb.md) | Brief answers by default, full report on request (why / evidence / sources / tools); artifact bundles saved to the operator knowledge base, graph and memory | current |
 | [`presentation_guide.md`](presentation_guide.md) | Talk for the fair: story, slides, demo script, Q&A, plus the full report (specs, stack, design, numbers, limits) | current |
