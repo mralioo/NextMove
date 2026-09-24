@@ -3,6 +3,7 @@
 | Document | What it is | Status |
 | --- | --- | --- |
 | [`../README.md`](../README.md) | **Start here** — system design, user flow, data flow, events, data schema, tool calling and MCP, API summary, repository map, limits | current |
+| [`presentation/nextmove_agentic_system.html`](presentation/nextmove_agentic_system.html) | **Animated presentation** (open in a browser, self-contained, works offline): agent roles and hierarchy, one question step by step, memory and knowledge graph, why it works | current |
 | [`modules/`](modules/README.md) | One page per module: `agent`, `mcp_server`, `ml`, `backend`, `frontend`, `dashboard`, `evaluation`, `scripts_and_ops`, `data` | current |
 | [`events_and_data_flow.md`](events_and_data_flow.md) | Operator user flow, system context and data flow, sequence of a chat turn, feedback loop, event catalogue (ADK `customMetadata.kind`, SSE steps), spans, what is stored when | current |
 | [`data_schema.md`](data_schema.md) | Every data shape: raw files, golden data, knowledge base, SQLite stores, artifact bundle, agent messages, knowledge graph, UI state | current |

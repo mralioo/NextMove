@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NextMove · how the agent team works</title>
+<style>
+:root{
+  --bg:#020B0E; --panel:rgba(6,24,31,.92); --line:rgba(0,229,212,.16); --text:#F1F7F6; --muted:#8FB0BA; --dim:#4D6B75;
+  --teal:#00E5D4; --gold:#F5C518; --orange:#FF6A2B; --blue:#4EA1FF; --green:#3DDC97; --violet:#B48CFF; --red:#FF5C5C;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:radial-gradient(circle at 50% -10%,#0a2a35 0%,#031218 45%,#01070A 100%) fixed;background-color:var(--bg);color:var(--text);
+  font-family:Inter,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;overflow:hidden;display:flex;flex-direction:column}
+header{display:flex;align-items:center;gap:18px;padding:10px 22px;border-bottom:1px solid var(--line);background:rgba(2,11,14,.7);flex-wrap:wrap}
+header img{height:52px;width:auto;object-fit:contain;background:#fff;border-radius:10px;box-shadow:0 0 18px rgba(0,229,212,.28)}
+header .sub{color:var(--muted);font-size:13px;max-width:340px;line-height:1.3}
+nav{display:flex;gap:6px;margin:0 auto;flex-wrap:wrap}
+nav button,.ctl button{background:transparent;border:1px solid transparent;color:var(--muted);padding:7px 16px;border-radius:999px;font:600 14px inherit;cursor:pointer;transition:.2s}
+nav button:hover,.ctl button:hover{color:var(--text);background:rgba(255,255,255,.06)}
+nav button.on{background:rgba(0,229,212,.12);border-color:rgba(0,229,212,.4);color:var(--teal);box-shadow:0 0 14px rgba(0,229,212,.2)}
+nav button b{opacity:.55;margin-right:6px}
+.ctl{display:flex;gap:6px;align-items:center}
+.ctl button{border-color:var(--line);padding:7px 13px}
+.ctl button.on{color:var(--gold);border-color:rgba(245,197,24,.5)}
+main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:16px;padding:14px 22px 8px}
+#stage{position:relative;border:1px solid var(--line);border-radius:18px;background:rgba(3,14,19,.55);overflow:hidden;min-height:0}
+#stage svg{width:100%;height:100%;display:block}
+#cards{position:absolute;inset:0;padding:22px 26px;display:none;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,minmax(0,1fr)) auto;gap:14px;overflow:auto}
+aside{display:flex;flex-direction:column;min-height:0;border:1px solid var(--line);border-radius:18px;background:var(--panel);padding:20px 22px;overflow:auto}
+aside .kicker{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--teal);font-weight:700}
+aside h2{font-size:26px;line-height:1.15;margin:6px 0 10px;letter-spacing:-.01em}
+aside p{font-size:16.5px;line-height:1.5;color:#D3E4E8}
+aside .grp{margin-top:14px}
+aside .grp h4{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--gold);margin-bottom:5px}
+aside .grp.never h4{color:var(--red)}
+aside .grp.gives h4{color:var(--green)}
+aside ul{list-style:none;font-size:15px;line-height:1.42;color:#C4D9DE}
+aside li{padding:2px 0 2px 16px;position:relative}
+aside li:before{content:"";position:absolute;left:0;top:.62em;width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.55}
+aside .dots{margin-top:auto;padding-top:14px;display:flex;gap:6px;flex-wrap:wrap}
+aside .dots i{width:26px;height:6px;border-radius:3px;background:rgba(255,255,255,.14);cursor:pointer;transition:.3s}
+aside .dots i.done{background:rgba(0,229,212,.5)} aside .dots i.cur{background:var(--teal);box-shadow:0 0 10px var(--teal)}
+footer{padding:4px 22px 10px;color:var(--dim);font-size:12.5px;display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+footer kbd{border:1px solid var(--dim);border-radius:5px;padding:0 6px;color:var(--muted);font-size:12px}
+#bar{height:3px;background:var(--teal);width:0;position:fixed;left:0;bottom:0;transition:width linear;box-shadow:0 0 10px var(--teal)}
+/* svg parts */
+.hidden{opacity:0!important;pointer-events:none}
+.el{transition:opacity .6s ease}
+.node rect.body{fill:rgba(8,30,38,.96);stroke-width:2;transition:.35s}
+.node .ttl{font:700 21px Inter,sans-serif;fill:#fff}
+.node .sub{font:500 14.5px Inter,sans-serif;fill:var(--muted)}
+.node .badge{font:800 12px Inter,sans-serif;letter-spacing:.1em}
+.node.hl rect.body{filter:drop-shadow(0 0 14px var(--c));stroke-width:3.5}
+.node.hl{animation:pop .9s ease-out}
+@keyframes pop{0%{transform:scale(.96)}50%{transform:scale(1.035)}100%{transform:scale(1)}}
+.node{transform-box:fill-box;transform-origin:center}
+.lane{fill:none;stroke:var(--line);stroke-dasharray:3 6}
+.lanelbl{font:700 12px Inter,sans-serif;letter-spacing:.14em;fill:var(--dim);text-transform:uppercase}
+.edge{fill:none;stroke-width:2.4;stroke-linecap:round;opacity:.75;transition:.4s}
+.edge.dash{stroke-dasharray:6 7}
+.edge.hl{stroke-width:4;opacity:1;stroke-dasharray:10 8;animation:dash 1s linear infinite;filter:drop-shadow(0 0 5px currentColor)}
+@keyframes dash{to{stroke-dashoffset:-36}}
+.elbl{font:600 14px Inter,sans-serif;fill:var(--muted);paint-order:stroke;stroke:#03121a;stroke-width:5px;stroke-linejoin:round}
+.chip rect{fill:#0d1830;stroke:var(--violet);stroke-width:1.6;transition:.35s}
+.chip text{font:700 15px Inter,sans-serif;fill:#E4D6FF}
+.chip .s{font:500 12.5px Inter,sans-serif;fill:var(--muted)}
+.chip.hl rect{fill:#2a2050;stroke-width:3;filter:drop-shadow(0 0 12px var(--violet))}
+.token{filter:drop-shadow(0 0 9px currentColor)}
+.gn circle{stroke-width:2.4;fill:#061821;transition:.4s}
+.gn text{font:600 13px Inter,sans-serif;fill:#EAF6F8;text-anchor:middle;paint-order:stroke;stroke:#03121a;stroke-width:4px}
+.gn.hl circle{filter:drop-shadow(0 0 12px currentColor);stroke-width:4}
+.gn.fresh{animation:born 1s ease-out}
+@keyframes born{0%{transform:scale(.2);opacity:0}70%{transform:scale(1.25)}100%{transform:scale(1);opacity:1}}
+.gn{transform-box:fill-box;transform-origin:center}
+.ge{stroke:#5C7C87;stroke-width:1.8;fill:none;transition:.5s}
+.ge.hl{stroke:var(--gold);stroke-width:3.5;filter:drop-shadow(0 0 6px var(--gold))}
+.ge.draw{animation:draw 1s ease-out forwards}
+@keyframes draw{from{stroke-dashoffset:var(--len)}to{stroke-dashoffset:0}}
+.callout rect{fill:rgba(245,197,24,.12);stroke:var(--gold);stroke-width:2}
+.callout text{font:700 16px Inter,sans-serif;fill:#FFE9A0}
+.callout .s{font:500 13.5px Inter,sans-serif;fill:#E8D9A5}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px 18px;opacity:0;transform:translateY(14px);transition:.6s;display:flex;flex-direction:column;gap:6px}
+.card.in{opacity:1;transform:none}
+.card .k{font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:700}
+.card h3{font-size:19px;line-height:1.2}
+.card p{font-size:14.5px;line-height:1.42;color:#C4D9DE}
+.card .eff{margin-top:auto;font-size:13.5px;color:var(--green);border-top:1px dashed var(--line);padding-top:8px}
+.card .eff b{color:#fff}
+.stat{grid-column:1/-1;display:flex;gap:28px;justify-content:space-around;flex-wrap:wrap;border:1px solid var(--line);border-radius:16px;padding:12px;background:rgba(0,229,212,.05)}
+.stat div{text-align:center}.stat b{font-size:28px;color:var(--teal);display:block;font-family:"Space Grotesk",Inter,sans-serif}.stat span{font-size:12.5px;color:var(--muted)}
+@media (max-width:1100px){main{grid-template-columns:1fr;grid-template-rows:55vh auto;overflow:auto} body{overflow:auto} #cards{grid-template-columns:1fr 1fr}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <img alt="NextMove" src="data:image/webp;base64,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">
+  <div class="sub">How the agent team works together — roles, hierarchy, memory and the knowledge graph</div>
+  <nav id="nav"></nav>
+  <div class="ctl"><button id="prev" title="previous (←)">◀</button><button id="next" title="next (→ / space)">▶</button><button id="auto" title="autoplay (A)">Autoplay</button><button id="full" title="full screen (F)">⤢</button></div>
+</header>
+<main>
+  <div id="stage"><svg id="svg" viewBox="0 0 1240 680" preserveAspectRatio="xMidYMid meet"></svg><div id="cards"></div></div>
+  <aside id="cap"></aside>
+</main>
+<footer><span><kbd>←</kbd> <kbd>→</kbd> / <kbd>space</kbd> step</span><span><kbd>1</kbd>–<kbd>4</kbd> scene</span><span><kbd>A</kbd> autoplay</span><span><kbd>F</kbd> full screen</span><span style="margin-left:auto">NextMove · InnoTrans 2026 · advisory only — the operator decides</span></footer>
+<div id="bar"></div>
+
+<script>
+"use strict";
+const NS = "http://www.w3.org/2000/svg";
+const C = {op:"#F1F7F6", disp:"#4EA1FF", ana:"#00E5D4", ins:"#F5C518", wri:"#FF6A2B", mcp:"#3DDC97", mem:"#B48CFF", red:"#FF5C5C"};
+const svg = document.getElementById("svg"), cardsEl = document.getElementById("cards"), cap = document.getElementById("cap");
+
+/* ---------- tiny SVG helpers ---------- */
+function E(tag, attrs = {}, parent = svg, text) {
+  const n = document.createElementNS(NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (text != null) n.textContent = text;
+  parent.appendChild(n); return n;
+}
+const REG = {};                       // id -> element of the current scene
+function reg(id, el) { el.classList.add("el"); REG[id] = el; return el; }
+function node(id, x, y, w, h, color, title, sub, badge) {
+  const g = E("g", {class: "node", transform: `translate(${x - w / 2},${y - h / 2})`});
+  g.style.setProperty("--c", color);
+  const r = E("rect", {class: "body", width: w, height: h, rx: 16, stroke: color}, g);
+  E("text", {class: "ttl", x: 16, y: sub ? h / 2 - 2 : h / 2 + 7}, g, title);
+  if (sub) E("text", {class: "sub", x: 16, y: h / 2 + 22}, g, sub);
+  if (badge) { const b = E("text", {class: "badge", x: w - 14, y: 22, "text-anchor": "end", fill: color}, g, badge); }
+  g.dataset.cx = x; g.dataset.cy = y;
+  return reg(id, g);
+}
+function edge(id, d, color, opts = {}) {
+  const p = E("path", {class: "edge" + (opts.dash ? " dash" : ""), d, stroke: color});
+  if (opts.arrow !== false) p.setAttribute("marker-end", "url(#a-" + color.slice(1) + ")");
+  p.style.color = color; return reg(id, p);
+}
+function lbl(id, x, y, t, anchor = "middle") { return reg(id, E("text", {class: "elbl", x, y, "text-anchor": anchor}, svg, t)); }
+function chip(id, x, y, w, h, title, sub) {
+  const g = E("g", {class: "chip", transform: `translate(${x},${y})`});
+  E("rect", {width: w, height: h, rx: 13}, g);
+  E("text", {x: w / 2, y: sub ? h / 2 - 1 : h / 2 + 5, "text-anchor": "middle"}, g, title);
+  if (sub) E("text", {class: "s", x: w / 2, y: h / 2 + 17, "text-anchor": "middle"}, g, sub);
+  return reg(id, g);
+}
+function lane(y, text) { E("line", {class: "lane", x1: 0, x2: 1240, y1: y, y2: y}); E("text", {class: "lanelbl", x: 14, y: y - 8}, svg, text); }
+function defs() {
+  const d = E("defs");
+  for (const c of Object.values(C)) {
+    const m = E("marker", {id: "a-" + c.slice(1), viewBox: "0 0 10 10", refX: 8, refY: 5, markerWidth: 7, markerHeight: 7, orient: "auto-start-reverse"}, d);
+    E("path", {d: "M0,0 L10,5 L0,10 z", fill: c}, m);
+  }
+  const m2 = E("marker", {id: "a-5C7C87", viewBox: "0 0 10 10", refX: 8, refY: 5, markerWidth: 6, markerHeight: 6, orient: "auto-start-reverse"}, d);
+  E("path", {d: "M0,0 L10,5 L0,10 z", fill: "#5C7C87"}, m2);
+}
+
+/* ---------- token flight along a path ---------- */
+let GEN = 0;
+function fly(pathId, color, dur = 1100, label) {
+  const my = GEN, p = REG[pathId]; if (!p) return Promise.resolve();
+  const len = p.getTotalLength();
+  const g = E("g", {class: "token"}); g.style.color = color;
+  E("circle", {r: 9, fill: color}, g);
+  if (label) E("text", {class: "elbl", y: -16, "text-anchor": "middle", style: "font-size:13px;fill:#fff"}, g, label);
+  return new Promise(res => {
+    const t0 = performance.now();
+    (function tick(now) {
+      if (my !== GEN) { g.remove(); return res(); }
+      const k = Math.min(1, (now - t0) / dur), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+      const pt = p.getPointAtLength(len * e); g.setAttribute("transform", `translate(${pt.x},${pt.y})`);
+      if (k < 1) requestAnimationFrame(tick); else { g.remove(); res(); }
+    })(t0);
+  });
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function seq(list) { const my = GEN; for (const f of list) { if (my !== GEN) return; await f(); } }
+
+/* =====================================================================
+   SCENE 1 — team and hierarchy
+   ===================================================================== */
+function buildTeam() {
+  lane(120, "Human"); lane(255, "Level 1 · decide what to do"); lane(395, "Level 2 · do the work and check it"); lane(535, "Level 3 · communicate");
+  edge("e_qd", "M630,116 L630,152", C.op); lbl("l_qd", 690, 140, "question", "start");
+  edge("e_da", "M560,226 C540,262 500,272 480,308", C.disp); lbl("l_da", 500, 268, "objective + route", "end");
+  edge("e_di", "M700,226 C720,262 760,272 780,308", C.disp, {dash: true}); lbl("l_di", 760, 268, "objective = yardstick", "start");
+  edge("e_ai", "M572,338 L688,338", C.ana); lbl("l_ai", 630, 326, "facts", "middle");
+  edge("e_ia", "M688,366 L572,366", C.ins, {dash: true}); lbl("l_ia", 630, 388, "revise", "middle");
+  edge("e_iw", "M800,392 C800,450 770,470 730,486", C.ins); lbl("l_iw", 815, 450, "verdict + verified facts", "start");
+  edge("e_wo", "M480,520 C310,520 310,84 480,84", C.wri, {dash: true}); lbl("l_wo", 330, 300, "brief · confidence · sources", "end");
+  node("n_op", 630, 84, 300, 64, C.op, "Operator", "asks · decides · gives feedback", "HUMAN");
+  node("n_disp", 630, 190, 300, 72, C.disp, "Dispatcher", "understands · routes · refuses", "LEVEL 1");
+  node("n_ana", 470, 352, 200, 80, C.ana, "Analyst", "pulls data · forecasts", "LEVEL 2");
+  node("n_ins", 790, 352, 200, 80, C.ins, "Inspector", "recomputes · judges", "LEVEL 2");
+  node("n_wri", 630, 520, 300, 72, C.wri, "Writer", "one-screen brief · nothing invented", "LEVEL 3");
+  const t = E("g", {}); reg("g_tools", t);
+  E("rect", {x: 30, y: 410, width: 230, height: 98, rx: 16, fill: "rgba(61,220,151,.07)", stroke: C.mcp, "stroke-width": 2}, t);
+  E("text", {x: 145, y: 436, "text-anchor": "middle", style: "font:700 19px Inter,'Segoe UI',Roboto,Arial,sans-serif;fill:#fff"}, t, "MCP tools · 57");
+  ["data + TabPFN · 17", "knowledge · 18", "quality + golden · 22"].forEach((x, i) => E("text", {x: 145, y: 461 + i * 19, "text-anchor": "middle", style: "font:500 14px Inter,'Segoe UI',Roboto,Arial,sans-serif;fill:#BFEBD6"}, t, x));
+  edge("e_at", "M370,362 C300,362 200,380 170,408", C.mcp);
+  const m = E("g", {}); reg("g_mem", m);
+  E("rect", {x: 985, y: 150, width: 240, height: 390, rx: 16, fill: "rgba(180,140,255,.07)", stroke: C.mem, "stroke-width": 2}, m);
+  E("text", {x: 1105, y: 184, "text-anchor": "middle", style: "font:700 19px Inter,'Segoe UI',Roboto,Arial,sans-serif;fill:#fff"}, m, "Memory & knowledge");
+  [["Session memory", "last plan + facts"], ["Turn history", "accepted answers"], ["Knowledge base", "ground truth · boundaries"], ["Knowledge graph", "problems → actions"], ["Operator feedback", "scores · actions"]]
+    .forEach(([a, b], i) => { E("text", {x: 1105, y: 226 + i * 62, "text-anchor": "middle", style: "font:700 15.5px Inter,'Segoe UI',Roboto,Arial,sans-serif;fill:#E4D6FF"}, m, a); E("text", {x: 1105, y: 246 + i * 62, "text-anchor": "middle", style: "font:500 13px Inter,'Segoe UI',Roboto,Arial,sans-serif;fill:#8FB0BA"}, m, b); });
+  edge("e_dm", "M780,180 C880,180 930,200 983,215", C.mem, {dash: true}); edge("e_im", "M890,352 L983,352", C.mem, {dash: true}); edge("e_wm", "M780,520 C880,520 940,500 983,490", C.mem, {dash: true});
+}
+const TEAM = [
+  {title: "One chain of responsibility", kicker: "the agent team", text: "Five roles, each with a narrow job and a clear limit. Nobody both produces and approves a number, and nobody who writes the answer can add facts.", show: ["n_op"], hl: ["n_op"],
+   groups: [["Design rule", ["Decide → do → check → communicate", "Every hand-over is a typed, validated message", "Hard limits: 2 rounds, 40 s, closed list of adjustments"]]]},
+  {title: "Operator — the human decides", kicker: "top of the hierarchy", text: "NextMove is advisory. The operator asks in plain words, reads a one-screen brief and stays responsible for the decision.", show: ["n_op", "n_disp", "e_qd", "l_qd"], hl: ["n_op", "e_qd"],
+   groups: [["Does", ["Asks (typing or voice)", "Rates the answer 1–5", "Reports what was actually done and how it went"]], ["Gets back", ["Brief: verdict · evidence · do now · caveat", "Full report only on request (why / evidence / tools)"]]]},
+  {title: "Dispatcher — decides WHAT to do", kicker: "level 1 · supervisor", text: "Understands the question and picks the route. It is deterministic (rules first, a small model only when unsure) and takes about a millisecond.", show: ["n_disp", "e_da", "l_da"], hl: ["n_disp", "e_qd"], mem: true,
+   groups: [["Responsible for", ["Guardrails: off-topic or manipulative → bounce", "Related but unsupported (capacity, delays, costs) → decline", "Category, entities, objective + success criteria", "Route: tools, datasets, ML engine", "Follow-up or identical accepted answer → reuse"]], ["Never", ["Compute a number", "Guess a missing station or date — it asks"]]]},
+  {title: "Analyst — does the work", kicker: "level 2 · worker", text: "A function, not a chat model: it runs the playbook of MCP tool calls for the category and returns compact facts with a confidence score and the reasons for it.", show: ["n_ana", "g_tools", "e_at"], hl: ["n_ana", "e_at", "e_da"],
+   groups: [["Responsible for", ["Tool calls in parallel where independent", "Forecast with TabPFN when the category needs it", "Facts JSON: short keys, rounded numbers", "Confidence (0–1) + assumptions stated"]], ["Never", ["Judge its own result", "Change the plan — only the Inspector's validated adjustments"]]]},
+  {title: "Inspector — decides if it is good enough", kicker: "level 2 · evaluator", text: "Recomputes the key numbers from the raw data before anything is shown. Ground truth outranks the language model: a failed check cannot be accepted.", show: ["n_ins", "e_di", "l_di", "e_ai", "l_ai", "e_ia", "l_ia"], hl: ["n_ins", "e_ai", "e_ia", "e_di"],
+   groups: [["Checks", ["Objective met? Required facts present?", "Ground truth recomputed from the raw CSVs", "Knowledge-base boundaries and station names", "Quality database (plausible per station · hour · day type)", "Similar past cases from the knowledge graph"]], ["Verdict", ["accept · revise (validated adjustments) · reject", "Max 2 rounds and 40 s — then the best result is kept and flagged"]]]},
+  {title: "Writer — communicates, invents nothing", kicker: "level 3", text: "The only generative step: one short model call on the verified facts. A deterministic guard rejects any number that is not in the facts.", show: ["n_wri", "e_iw", "l_iw", "e_wo", "l_wo"], hl: ["n_wri", "e_iw", "e_wo"],
+   groups: [["Responsible for", ["One-screen brief in plain language", "Sources: datasets, tools, model, knowledge entries actually used", "Adds the operator precedent line when one exists", "Stores the artifact for “why / evidence / which tools”"]], ["Never", ["See raw tool output", "Add a number — otherwise the brief is replaced by a template", "Show numbers if the Inspector rejected them (safe fallback text)"]]]},
+  {title: "Tools and memory sit under the team", kicker: "shared resources", text: "Facts come only through MCP tools. What the team remembers is kept in five stores — each read by exactly the role that needs it.", show: ["g_tools", "g_mem", "e_dm", "e_im", "e_wm"], hl: ["g_tools", "g_mem", "e_dm", "e_im", "e_wm"], mem: true,
+   groups: [["Read by", ["Dispatcher → session memory, turn history", "Inspector → knowledge base, knowledge graph, quality DB", "Writer → operator precedents"]]]},
+];
+
+/* =====================================================================
+   SCENE 2 — one question, step by step
+   ===================================================================== */
+function buildFlow() {
+  // memory chips
+  chip("c_ses", 200, 26, 150, 50, "Session memory", "last plan + facts");
+  chip("c_his", 366, 26, 150, 50, "Turn history", "accepted answers");
+  chip("c_kb", 585, 26, 170, 50, "Knowledge base", "ground truth · bounds");
+  chip("c_kg", 771, 26, 170, 50, "Knowledge graph", "cases · precedents");
+  chip("c_fb", 957, 26, 170, 50, "Operator feedback", "scores · actions");
+  edge("m_ds", "M275,76 L320,258", C.mem, {dash: true, arrow: false}); edge("m_dh", "M440,76 L360,258", C.mem, {dash: true, arrow: false});
+  edge("m_ik", "M670,76 C740,150 745,330 705,388", C.mem, {dash: true, arrow: false}); edge("m_ig", "M856,76 C860,200 780,350 705,400", C.mem, {dash: true, arrow: false});
+  edge("m_wg", "M1030,76 C1030,150 950,200 930,258", C.mem, {dash: true, arrow: false});
+  // paths
+  edge("p_od", "M175,300 L265,300", C.op); edge("p_da", "M415,285 C480,285 480,190 545,190", C.disp); edge("p_di", "M415,305 C480,305 480,400 545,400", C.disp, {dash: true});
+  edge("p_ai", "M600,232 L600,358", C.ana); edge("p_ia", "M640,358 L640,232", C.ins, {dash: true});
+  edge("p_iw", "M695,405 C770,405 770,310 825,310", C.ins); edge("p_wu", "M975,300 L1045,300", C.wri);
+  edge("p_at", "M560,222 C490,300 480,470 500,552", C.mcp); edge("p_it", "M650,442 L695,552", C.mcp);
+  edge("p_fb", "M1120,342 C1120,250 1080,150 1050,80", C.mem, {dash: true});
+  // nodes
+  node("n_op", 100, 300, 150, 84, C.op, "Operator", "asks", ""); node("n_disp", 340, 300, 150, 84, C.disp, "Dispatcher", "level 1");
+  node("n_ana", 620, 180, 150, 84, C.ana, "Analyst", "level 2"); node("n_ins", 620, 400, 150, 84, C.ins, "Inspector", "level 2");
+  node("n_wri", 900, 300, 150, 84, C.wri, "Writer", "level 3"); node("n_ui", 1120, 300, 150, 84, C.op, "Operator", "reads · rates");
+  const mc = [["s_data", 500, 585, "data + TabPFN", "17 tools · stdio"], ["s_qual", 705, 585, "quality + golden", "22 tools · in-memory"], ["s_kn", 910, 585, "knowledge", "18 tools · for other agents"]];
+  mc.forEach(([id, x, y, a, b]) => { const n = node(id, x, y, 190, 66, C.mcp, a, b); });
+  lane(560, "MCP servers");
+  // guardrail exits
+  const exits = E("g", {}); reg("g_exit", exits);
+  [["bounce", "off-topic", 200], ["decline", "no data", 310], ["history", "≤ 24 h · 0 s", 420]].forEach(([a, b, x]) => {
+    E("rect", {x: x - 50, y: 400, width: 100, height: 46, rx: 10, fill: "rgba(255,92,92,.08)", stroke: a === "history" ? C.mem : C.red, "stroke-width": 1.6}, exits);
+    E("text", {x, y: 420, "text-anchor": "middle", style: "font:700 14px Inter,'Segoe UI',Roboto,Arial,sans-serif;fill:#fff"}, exits, a);
+    E("text", {x, y: 437, "text-anchor": "middle", style: "font:500 10.5px Inter,'Segoe UI',Roboto,Arial,sans-serif;fill:#9DB6BE"}, exits, b.length > 20 ? b.slice(0, 19) + "…" : b);
+  });
+  edge("p_ex", "M335,342 L315,398", C.red, {dash: true});
+  lbl("l_q", 340, 262, "", "middle");
+  const co = E("g", {class: "callout"}); reg("g_call", co);
+  E("rect", {x: 770, y: 430, width: 350, height: 60, rx: 12}, co); E("text", {x: 786, y: 456}, co, "revise → round 2 (max 2 rounds, 40 s)"); E("text", {class: "s", x: 786, y: 476}, co, "“station outside the plausible band — recompute”");
+  const q = E("g", {class: "callout"}); reg("g_q", q);
+  E("rect", {x: 20, y: 468, width: 320, height: 62, rx: 12}, q); E("text", {x: 34, y: 493, style: "font-size:14px"}, q, "“Line U7 suspended Hermannplatz –");
+  E("text", {x: 34, y: 513, style: "font-size:14px"}, q, "Karl-Marx-Str. tonight: reroute, staff?”");
+}
+const FLOW = [
+  {title: "1 · The operator asks", kicker: "user → UI → API", text: "A plain-language question. The UI streams the run over Server-Sent Events, so the operator watches the team work instead of a spinner.", show: ["n_op", "g_q"], hl: ["n_op"],
+   run: async () => { await sleep(300); },
+   groups: [["Example", ["“Line U7 is suspended between Hermannplatz and Karl-Marx-Straße tonight — how do we reroute, who gets overloaded, where should staff go?”"]]]},
+  {title: "2 · Dispatcher: guardrails, route, memory", kicker: "≈ 1 ms · deterministic", text: "Before any work: is it in scope? Is it a follow-up? Was the same question already answered and accepted? Then the plan: category C, entities, objective, tools.", show: ["n_op", "g_q", "n_disp", "p_od", "g_exit", "p_ex", "c_ses", "c_his", "m_ds", "m_dh"], hl: ["n_disp", "p_od", "c_ses", "c_his", "m_ds", "m_dh", "g_exit", "p_ex"],
+   run: () => seq([() => fly("p_od", C.op, 800, "question")]),
+   groups: [["Possible exits (no LLM, no tools)", ["bounce · decline · answer from history (0 s)"]], ["Otherwise the plan", ["category C · lines U7 · stations · time · duration", "objective + success criteria", "route: resolve_closure → apply_closure … · TabPFN"]]]},
+  {title: "3 · Analyst: the playbook of tool calls", kicker: "MCP · parallel where independent", text: "The Analyst runs a fixed sequence per category. For a closure: find it, apply it to the graph, find detours, then forecast the load with TabPFN.", show: ["n_ana", "p_da", "p_di", "s_data", "p_at"], hl: ["n_ana", "p_da", "p_at", "s_data"],
+   run: () => seq([() => fly("p_da", C.disp, 900, "objective"), () => fly("p_at", C.mcp, 900, "resolve_closure"), () => fly("p_at", C.mcp, 700, "apply ∥ alternate_paths"), () => fly("p_at", C.mcp, 700, "scenario_flow")]),
+   groups: [["Returns", ["compact facts (rounded numbers, short keys)", "confidence 0–1 with the reasons", "assumptions stated (e.g. 25 / 50 / 75 % diversion)"]]]},
+  {title: "4 · Inspector: recompute before showing", kicker: "ground truth outranks the LLM", text: "The Inspector re-derives the key figures from the raw data and asks the quality server whether every passenger number is plausible for that station, hour and day type.", show: ["n_ins", "p_ai", "s_qual", "p_it", "c_kb", "c_kg", "m_ik", "m_ig"], hl: ["n_ins", "p_ai", "p_it", "s_qual", "c_kb", "c_kg", "m_ik", "m_ig"],
+   run: () => seq([() => fly("p_ai", C.ana, 800, "facts + confidence"), () => fly("p_it", C.mcp, 700, "quality_check_facts")]),
+   groups: [["Reads", ["objective + success criteria from the Dispatcher", "ground truth + boundaries (knowledge base)", "similar past cases (knowledge graph)", "quality database over MCP"]]]},
+  {title: "5 · Verdict: accept, revise or reject", kicker: "hard-bounded loop", text: "If a check fails the Inspector sends back a validated adjustment from a closed list (a date, a station, the engine…). The Analyst re-runs; at most two rounds.", show: ["g_call"], hl: ["n_ins", "n_ana", "p_ia", "g_call"],
+   run: () => seq([() => fly("p_ia", C.ins, 900, "revise"), () => fly("p_ai", C.ana, 900, "facts, round 2")]),
+   groups: [["Guarantees", ["A failed truth check cannot be “accepted”", "An LLM “reject” cannot overrule passed checks", "Reject ⇒ safe fallback text, never the doubtful numbers"]]]},
+  {title: "6 · Writer: one short call, one guard", kicker: "brief by default", text: "Verified facts in, a one-screen brief out: verdict, evidence, do now, caveat, sources. Every number must appear in the facts — otherwise a template renders them.", show: ["n_wri", "p_iw", "c_fb", "m_wg"], hl: ["n_wri", "p_iw", "c_fb", "c_kg", "m_wg"],
+   run: () => seq([() => fly("p_iw", C.ins, 1000, "verdict + verified facts")]),
+   groups: [["Adds", ["operator precedent line: what operators did in a similar case and how it went", "confidence line and sources", "artifact bundle for the full report on demand"]]]},
+  {title: "7 · The operator sees the brief", kicker: "≈ 3.7 s median in the reference run", text: "The brief arrives with the live operations log: tool calls, inference time, tokens, and the time split per role.", show: ["n_ui", "p_wu"], hl: ["n_ui", "p_wu", "n_wri"],
+   run: () => seq([() => fly("p_wu", C.wri, 700, "brief")]),
+   groups: [["Then", ["Rate 1–5", "Why? / Evidence / Which tools? → full report from the artifact", "“I did something” → what was done, followed?, outcome"]]]},
+  {title: "8 · Feedback closes the loop", kicker: "learning from the operator", text: "Ratings and action reports are stored, linked to stations and lines, and become precedents for the next similar situation.", show: ["p_fb"], hl: ["n_ui", "p_fb", "c_fb", "c_kg", "c_his"],
+   run: () => seq([() => fly("p_fb", C.mem, 1200, "score + action")]),
+   groups: [["Feeds", ["operator knowledge base (turns · feedback)", "knowledge graph (Feedback · OperatorAction nodes)", "precedent line in later answers"]]]},
+];
+
+/* =====================================================================
+   SCENE 3 — memory and knowledge graph
+   ===================================================================== */
+const GN = {}; // graph node registry
+function gnode(id, x, y, r, color, label, kind) {
+  const g = E("g", {class: "gn", transform: `translate(${x},${y})`}); g.style.color = color;
+  E("circle", {r, stroke: color}, g);
+  const lines = label.split("|");
+  lines.forEach((t, i) => E("text", {y: r + 16 + i * 15}, g, t));
+  if (kind) E("text", {y: 5, style: "font:800 11px Inter,'Segoe UI',Roboto,Arial,sans-serif;fill:" + color}, g, kind);
+  g.dataset.x = x; g.dataset.y = y; return reg(id, g);
+}
+function gedge(id, a, b, label) {
+  const A = REG[a], B = REG[b]; const x1 = +A.dataset.x, y1 = +A.dataset.y, x2 = +B.dataset.x, y2 = +B.dataset.y;
+  const p = E("path", {class: "ge", d: `M${x1},${y1} L${x2},${y2}`}); p.style.setProperty("--len", Math.hypot(x2 - x1, y2 - y1));
+  p.setAttribute("stroke-dasharray", Math.hypot(x2 - x1, y2 - y1)); p.dataset.lbl = label || ""; return reg(id, p);
+}
+function buildMemory() {
+  // agents (left)
+  node("a_disp", 105, 130, 170, 62, C.disp, "Dispatcher"); node("a_ins", 105, 300, 170, 62, C.ins, "Inspector"); node("a_wri", 105, 470, 170, 62, C.wri, "Writer"); 
+  // graph frame
+  const fr = E("rect", {x: 640, y: 40, width: 585, height: 620, rx: 18, fill: "rgba(180,140,255,.04)", stroke: C.mem, "stroke-width": 1.6}); reg("g_frame", fr);
+  const ft = E("text", {x: 660, y: 70, style: "font:700 18px Inter,'Segoe UI',Roboto,Arial,sans-serif;fill:#E4D6FF"}, svg, "Knowledge graph"); reg("g_ftitle", ft);
+  const fs = E("text", {x: 660, y: 90, style: "font:500 13px Inter,'Segoe UI',Roboto,Arial,sans-serif;fill:#8FB0BA"}, svg, "problems → answers → actions · grows with every accepted answer"); reg("g_fsub", fs);
+  // edges drawn first (behind), nodes later — but edges need node positions: define positions table
+  const P = {cat: [930, 150], pA: [740, 235], aA: [740, 345], actA: [840, 440], stA: [670, 450],
+    pB: [1000, 260], aB: [1000, 370], actB: [1120, 450], ln: [1130, 170], art: [1125, 300],
+    fb: [960, 500], oa: [1060, 585], pC: [800, 540]};
+  for (const [k, v] of Object.entries(P)) { const d = document.createElementNS(NS, "g"); d.dataset.x = v[0]; d.dataset.y = v[1]; REG["pos_" + k] = d; }
+  const eg = (id, a, b, l) => { const A = REG["pos_" + a], B = REG["pos_" + b]; const x1 = +A.dataset.x, y1 = +A.dataset.y, x2 = +B.dataset.x, y2 = +B.dataset.y, len = Math.hypot(x2 - x1, y2 - y1);
+    const p = E("path", {class: "ge", d: `M${x1},${y1} L${x2},${y2}`, "stroke-dasharray": len}); p.style.setProperty("--len", len); reg(id, p); return p; };
+  eg("ge_1", "pA", "cat"); eg("ge_2", "pA", "aA"); eg("ge_3", "aA", "actA"); eg("ge_4", "pA", "stA");
+  eg("ge_5", "pB", "cat"); eg("ge_6", "pB", "aB"); eg("ge_7", "aB", "actB"); eg("ge_8", "pB", "ln"); eg("ge_9", "pB", "art"); eg("ge_10", "pB", "stA");
+  eg("ge_11", "pB", "fb"); eg("ge_12", "fb", "oa"); eg("ge_13", "oa", "actB"); eg("ge_14", "pC", "pB"); eg("ge_15", "pC", "cat");
+  const nn = (id, k, r, col, label, kind) => gnode(id, P[k][0], P[k][1], r, col, label, kind);
+  nn("g_cat", "cat", 24, C.mem, "Category C|Disruption", "CAT"); nn("g_pA", "pA", 20, C.disp, "U8 closure|26 Sep", "PROB"); nn("g_aA", "aA", 17, C.wri, "answer +|confidence", "ANS"); nn("g_actA", "actA", 17, C.green || C.mcp, "replacement|bus", "ACT"); nn("g_stA", "stA", 15, "#8FB0BA", "Hermannplatz", "STN");
+  nn("g_pB", "pB", 20, C.disp, "U7 closure|25 Sep", "PROB"); nn("g_aB", "aB", 17, C.wri, "answer +|confidence", "ANS"); nn("g_actB", "actB", 17, C.mcp, "deploy staff|Neukölln", "ACT"); nn("g_ln", "ln", 15, "#8FB0BA", "Line U7", "LINE"); nn("g_art", "art", 17, C.ana, "artifact|tools · checks", "ART");
+  nn("g_fb", "fb", 17, C.gold || C.ins, "score 5", "FB"); nn("g_oa", "oa", 19, C.mcp, "2 staff to Neukölln|outcome: worked", "DID"); nn("g_pC", "pC", 20, C.disp, "U7 closure|2 Oct (next)", "PROB");
+  // callouts
+  const c1 = E("g", {class: "callout"}); reg("g_prec", c1);
+  E("rect", {x: 645, y: 614, width: 330, height: 42, rx: 12}, c1); E("text", {x: 660, y: 632, style: "font-size:14px"}, c1, "Precedent: operators sent 2 staff to Neukölln —");
+  E("text", {class: "s", x: 660, y: 649}, c1, "it worked (score 5). Shown in the brief.");
+  // links agents -> stores
+  edge("l_ds", "M190,120 C220,110 230,100 250,95", C.mem, {dash: true}); edge("l_dh", "M190,145 C220,170 230,185 250,195", C.mem, {dash: true});
+  edge("l_ik", "M190,300 L250,300", C.mem, {dash: true}); edge("l_ig", "M190,325 C300,420 520,470 640,420", C.mem, {dash: true});
+  edge("l_wf", "M190,470 C210,450 230,430 250,425", C.mem, {dash: true}); edge("l_wg", "M190,488 C400,590 560,590 660,545", C.mem, {dash: true});
+  edge("l_wr", "M550,190 C700,130 850,170 1000,260", C.mem, {dash: true, arrow: false});
+  // stores (middle)
+  const S = [["st_ses", 400, 80, "Session memory", "last plan + facts of the conversation"], ["st_his", 400, 190, "Turn history", "accepted answers + artifacts (SQLite)"], ["st_kb", 400, 300, "Knowledge base", "14 boundaries · 37 ground truths · 4 insights"], ["st_fb", 400, 410, "Operator feedback", "scores · actions · outcomes"]];
+  S.forEach(([id, x, y, a, b]) => { const g = chip(id, x - 150, y - 40, 300, 80, a, b); });
+  const co = chip("st_cog", 250, 545, 300, 46, "Cognee memory agent", "optional mirror · opt-in"); co.querySelector("rect").setAttribute("stroke-dasharray", "5 5");
+}
+const MEM = [
+  {title: "Two kinds of memory, one goal", kicker: "memory & knowledge", text: "Stores that remember what happened (memory) and stores that know what is true (knowledge). Together they let the team reuse, verify and improve.", show: ["a_disp", "a_ins", "a_wri", "st_ses", "st_his", "st_kb", "st_fb", "st_cog"], hl: ["st_ses", "st_his", "st_kb", "st_fb"],
+   groups: [["Remember", ["session memory · turn history · operator feedback"]], ["Know", ["knowledge base (built from the raw CSVs) · knowledge graph"]]]},
+  {title: "Before answering: remember the conversation", kicker: "Dispatcher ← session memory + turn history", text: "“What about 22:30?” or “why?” are continuations, not new questions. And a question that was already answered and accepted is served in 0 s.", show: ["l_ds", "l_dh"], hl: ["a_disp", "st_ses", "st_his", "l_ds", "l_dh"],
+   groups: [["Contribution", ["Follow-ups explain or re-run from the earlier plan", "Identical accepted answer within 24 h: nothing recomputed", "An answer rated 1–2 is never reused"]]]},
+  {title: "While checking: ground truth and boundaries", kicker: "Inspector ← knowledge base", text: "The knowledge base is computed from the raw files, never from the agent's own tools — so it can vouch for them. It also lists what the data cannot support.", show: ["l_ik"], hl: ["a_ins", "st_kb", "l_ik"],
+   groups: [["Contribution", ["Numbers that contradict ground truth are caught", "Boundaries (no capacity, delay or cost data) → honest declines", "Dates outside the data window → labelled scenarios only"]]]},
+  {title: "Similar cases: the knowledge graph", kicker: "Inspector ← graph", text: "Every accepted answer becomes a case: problem → answer → actions and options, linked to categories, stations and lines. The Inspector sees similar past cases when it judges a result.", show: ["l_ig", "g_frame", "g_ftitle", "g_fsub", "g_cat", "g_pA", "g_aA", "g_actA", "g_stA", "ge_1", "ge_2", "ge_3", "ge_4"], hl: ["a_ins", "l_ig", "g_pA", "g_aA", "g_actA", "ge_2", "ge_3"],
+   groups: [["Contribution", ["Cold start: seeded with the 26 recorded closures and their reroutes", "Categorised by situation and domain — no mixing of topics", "Grows with every accepted answer"]]]},
+  {title: "Writing: what did operators do last time?", kicker: "Writer ← feedback + graph", text: "When a similar situation (same line or stations) has an action report, the brief carries one line: what operators did and how it went.", show: ["l_wf", "l_wg"], hl: ["a_wri", "st_fb", "l_wf", "l_wg"],
+   groups: [["Contribution", ["Advice is grounded in real operator practice", "A precedent needs the same line or station — never a look-alike from elsewhere"]]]},
+  {title: "After the answer: write back", kicker: "memory grows", text: "The turn and its artifact bundle (plan, every tool call, checks, confidence reasons) go to the turn history. The accepted case is added to the graph. Cognee mirroring is opt-in.", show: ["ge_5", "ge_6", "ge_7", "ge_8", "ge_9", "ge_10", "g_pB", "g_aB", "g_actB", "g_ln", "g_art"], hl: ["st_his", "g_pB", "g_aB", "g_actB", "g_ln", "g_art", "ge_5", "ge_6", "ge_7", "ge_8", "ge_9", "ge_10"], fresh: ["g_pB", "g_aB", "g_actB", "g_ln", "g_art"],
+   run: () => seq([() => fly("l_wr", C.mem, 1400, "artifact")]),
+   groups: [["Stored", ["turn + facts + plan + verdict", "artifact: tools · checks · confidence · report", "graph: Problem · Answer · Action · Line · Station · Artifact"]]]},
+  {title: "The operator's feedback joins the graph", kicker: "loop closed", text: "A rating and a short “what I did” report attach to the situation. The stations and lines named in the text are linked automatically.", show: ["g_fb", "g_oa", "ge_11", "ge_12", "ge_13"], hl: ["st_fb", "g_fb", "g_oa", "ge_11", "ge_12", "ge_13"], fresh: ["g_fb", "g_oa"],
+   groups: [["Stored", ["score 1–5 · comment", "action text · followed? · outcome (worked / partly / did not work)"]]]},
+  {title: "The next similar question is better", kicker: "the compounding effect", text: "A new U7 closure finds the earlier situation, and the brief shows what worked. Bad answers stay out; good ones and real actions accumulate.", show: ["g_pC", "ge_14", "ge_15", "g_prec"], hl: ["g_pC", "ge_14", "g_pB", "ge_11", "ge_12", "g_oa", "g_prec", "a_wri"], fresh: ["g_pC"],
+   groups: [["Result", ["Faster (reuse) · safer (checked) · more practical (precedents)", "Each answer is traceable to its artifact"]]]},
+];
+
+/* =====================================================================
+   SCENE 4 — why it works better
+   ===================================================================== */
+const CARDS = [
+  ["Dispatcher", C.disp, "Scope + routing", "Off-topic, manipulation and unsupported questions never reach the tools; the right playbook runs for the rest.", "no wasted calls · honest declines"],
+  ["Analyst", C.ana, "Facts from tools", "Numbers come from deterministic MCP tools and TabPFN forecasts, with confidence and stated assumptions.", "traceable numbers"],
+  ["Inspector", C.ins, "Verify before showing", "Ground truth, knowledge-base boundaries and the quality database are checked before the Writer sees anything.", "hallucinated numbers blocked"],
+  ["Writer", C.wri, "One screen, no inventions", "A short brief; the number guard replaces the text by a template if a figure is not in the facts.", "readable in seconds"],
+  ["Session memory", C.mem, "Continue, don't restart", "Follow-ups (“why?”, “what about 22:30?”) start from the earlier plan and facts.", "shorter dialogue"],
+  ["Turn history", C.mem, "Reuse what was accepted", "An identical accepted answer within 24 h is served instantly; poorly rated answers are never reused.", "0 s repeat answers"],
+  ["Knowledge base", C.mem, "Ground truth + limits", "Recomputed from the raw CSVs; states what the data cannot support.", "safe boundaries"],
+  ["Knowledge graph", C.mem, "Cases, situations, precedents", "Problems linked to answers, actions and options; seeded with recorded closures; grows with every accepted answer.", "similar cases in the check"],
+  ["Operator feedback", C.mem, "Practice, not just theory", "Ratings and action reports become precedents: what operators did and how it went.", "advice from real practice"],
+];
+function buildCards() {
+  cardsEl.innerHTML = "";
+  CARDS.forEach(([k, col, h, p, eff], i) => {
+    const d = document.createElement("div"); d.className = "card"; d.style.borderColor = col + "66"; d.style.transitionDelay = (i * 90) + "ms";
+    d.innerHTML = `<div class="k" style="color:${col}">${k}</div><h3>${h}</h3><p>${p}</p><div class="eff">Effect: <b>${eff}</b></div>`;
+    cardsEl.appendChild(d);
+  });
+  const s = document.createElement("div"); s.className = "stat"; s.innerHTML =
+    `<div><b>57</b><span>MCP tools in 3 servers</span></div><div><b>≈ 3.7 s</b><span>median answer, reference run on the organiser's workbook</span></div><div><b>46 / 46</b><span>guardrail decisions (no LLM)</span></div><div><b>137</b><span>offline tests</span></div><div><b>0 s</b><span>repeat of an accepted answer</span></div>`;
+  cardsEl.appendChild(s);
+}
+const WHY = [{title: "Why the team works better together", kicker: "the result", text: "Separation of duties makes answers checkable; memory and the knowledge graph make each answer better than the last. The operator stays in charge.", cards: true,
+  groups: [["In one sentence", ["Decide → do → check → communicate, with memory feeding every step and feedback feeding the memory."]]]}];
+
+/* =====================================================================
+   engine
+   ===================================================================== */
+const SCENES = [
+  {id: "team", name: "Team & hierarchy", build: buildTeam, steps: TEAM},
+  {id: "flow", name: "One question, step by step", build: buildFlow, steps: FLOW},
+  {id: "mem", name: "Memory & knowledge graph", build: buildMemory, steps: MEM},
+  {id: "why", name: "Why it works", build: null, steps: WHY},
+];
+const TRANSIENT = new Set(["g_call"]);
+let sc = 0, st = 0, auto = false, timer = null;
+
+function esc(s) { return s.replace(/[&<>]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;"}[c])); }
+function renderCaption() {
+  const S = SCENES[sc].steps[st];
+  const cls = ["", "gives", "never"];
+  const groups = (S.groups || []).map(([h, items]) => `<div class="grp ${/^never/i.test(h) ? "never" : /^(returns|gets back|stored|result|contribution|adds|verdict|guarantees)/i.test(h) ? "gives" : ""}"><h4>${esc(h)}</h4><ul>${items.map(i => `<li>${esc(i)}</li>`).join("")}</ul></div>`).join("");
+  cap.innerHTML = `<div class="kicker">${esc(S.kicker || "")}</div><h2>${esc(S.title)}</h2><p>${esc(S.text)}</p>${groups}<div class="dots">${SCENES[sc].steps.map((_, i) => `<i class="${i < st ? "done" : i === st ? "cur" : ""}" data-i="${i}"></i>`).join("")}</div>`;
+  cap.querySelectorAll(".dots i").forEach(d => d.onclick = () => go(sc, +d.dataset.i));
+  cap.scrollTop = 0;
+}
+function build(i) {
+  GEN++; svg.innerHTML = ""; for (const k in REG) delete REG[k];
+  const S = SCENES[i];
+  const isCards = !S.build;
+  svg.style.display = isCards ? "none" : "block"; cardsEl.style.display = isCards ? "grid" : "none";
+  if (isCards) { buildCards(); return; }
+  defs(); S.build();
+}
+function apply() {
+  const steps = SCENES[sc].steps, S = steps[st];
+  const shown = new Set(); steps.slice(0, st + 1).forEach(s => (s.show || []).forEach(id => shown.add(id)));
+  for (const id in REG) {
+    const el = REG[id]; if (id.startsWith("pos_")) continue;
+    el.classList.toggle("hidden", !(shown.has(id) && (!TRANSIENT.has(id) || (S.show || []).includes(id))));
+    el.classList.toggle("hl", (S.hl || []).includes(id));
+    el.classList.remove("fresh");
+    if (el.classList.contains("ge")) el.style.strokeDashoffset = shown.has(id) ? 0 : el.style.getPropertyValue("--len");
+  }
+  // memory chips lit in the team scene when asked
+  if (S.mem) ["g_mem"].forEach(id => REG[id] && REG[id].classList.add("hl"));
+  (S.fresh || []).forEach(id => { const el = REG[id]; if (el) { void el.getBoundingClientRect(); el.classList.add("fresh"); } });
+  // freshly drawn graph edges
+  (S.show || []).forEach(id => { const el = REG[id]; if (el && el.classList && el.classList.contains("ge") && steps.slice(0, st).every(p => !(p.show || []).includes(id))) { el.style.strokeDashoffset = el.style.getPropertyValue("--len"); requestAnimationFrame(() => { el.style.transition = "stroke-dashoffset 1s ease-out"; el.style.strokeDashoffset = 0; }); } });
+  if (SCENES[sc].steps === WHY) requestAnimationFrame(() => cardsEl.querySelectorAll(".card").forEach(c => c.classList.add("in")));
+  if (S.run) S.run();
+}
+let built = -1;
+function go(s, i) {
+  if (built !== s) { build(s); built = s; }
+  sc = s; st = i; GEN++;
+  document.querySelectorAll("#nav button").forEach((b, k) => b.classList.toggle("on", k === sc));
+  renderCaption(); apply(); schedule();
+}
+function next() { const S = SCENES[sc]; if (st < S.steps.length - 1) go(sc, st + 1); else go((sc + 1) % SCENES.length, 0); }
+function prev() { if (st > 0) go(sc, st - 1); else { const p = (sc + SCENES.length - 1) % SCENES.length; go(p, SCENES[p].steps.length - 1); } }
+function schedule() {
+  clearTimeout(timer); const bar = document.getElementById("bar"); bar.style.transition = "none"; bar.style.width = "0";
+  if (!auto) return;
+  const ms = 7500; requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.transition = `width ${ms}ms linear`; bar.style.width = "100%"; }));
+  timer = setTimeout(next, ms);
+}
+document.getElementById("nav").innerHTML = SCENES.map((s, i) => `<button data-i="${i}"><b>${i + 1}</b>${s.name}</button>`).join("");
+document.querySelectorAll("#nav button").forEach(b => b.onclick = () => go(+b.dataset.i, 0));
+document.getElementById("next").onclick = next; document.getElementById("prev").onclick = prev;
+document.getElementById("auto").onclick = e => { auto = !auto; e.target.classList.toggle("on", auto); schedule(); };
+document.getElementById("full").onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+addEventListener("keydown", e => {
+  if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { e.preventDefault(); next(); }
+  else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); prev(); }
+  else if (/^[1-4]$/.test(e.key)) go(+e.key - 1, 0);
+  else if (e.key.toLowerCase() === "a") document.getElementById("auto").click();
+  else if (e.key.toLowerCase() === "f") document.getElementById("full").click();
+});
+go(0, 0);
+</script>
+</body>
+</html>
