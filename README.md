@@ -1,6 +1,15 @@
-# NextMove
+<p align="center">
+  <img src="frontend/assets/logo.webp" alt="NextMove" width="300">
+</p>
 
-**An AI team for the control room** — InnoTrans 2026 hackathon, Berlin U-Bahn. An operator asks in plain words ("Line U7 is suspended between Hermannplatz and Karl-Marx-Straße tonight — how do we reroute, who gets overloaded, where should staff go?"); a small team of agents pulls the numbers through MCP tools, **recomputes the key figures before anything is shown**, and answers with a one-screen brief. The operator rates the answer and reports what they actually did; that becomes a precedent for the next similar situation. *Advisory only — the operator decides.*
+<h1 align="center">NextMove</h1>
+
+<p align="center">
+  <b>An AI team for the control room</b><br>
+  <sub>InnoTrans 2026 Hackathon · Berlin U-Bahn · Dispatcher → Analyst ⇄ Inspector → Writer</sub>
+</p>
+
+An operator asks in plain words ("Line U7 is suspended between Hermannplatz and Karl-Marx-Straße tonight — how do we reroute, who gets overloaded, where should staff go?"); a small team of agents pulls the numbers through MCP tools, **recomputes the key figures before anything is shown**, and answers with a one-screen brief. The operator rates the answer and reports what they actually did; that becomes a precedent for the next similar situation. *Advisory only — the operator decides.*
 
 > ### ▶ See the system design in motion
 > **[Open the animated walkthrough](https://htmlpreview.github.io/?https://github.com/mralioo/NextMove/blob/main/docs/presentation/nextmove_agentic_system.html)** — the agent team, its roles and hierarchy, one question step by step, memory and the knowledge graph, and why it works.
@@ -265,3 +274,31 @@ docs/         documentation (index: docs/README.md) — docs/modules/ per module
 ## 12. Documentation index
 
 Start with [`docs/README.md`](docs/README.md). Most useful: [`docs/modules/`](docs/modules/README.md) (one page per module) · [`docs/api_reference.md`](docs/api_reference.md) · [`docs/mcp_and_tools.md`](docs/mcp_and_tools.md) · [`docs/events_and_data_flow.md`](docs/events_and_data_flow.md) · [`docs/data_schema.md`](docs/data_schema.md) · [`docs/frontend_migration.md`](docs/frontend_migration.md) · [`docs/running_the_system.md`](docs/running_the_system.md) · [`docs/presentation_guide.md`](docs/presentation_guide.md).
+
+---
+
+## 13. Team, problem owner and hackathon
+
+<table align="center">
+  <tr>
+    <td align="center" valign="middle" width="33%"><b>Contributors</b></td>
+    <td align="center" valign="middle" width="33%"><b>Problem owner</b></td>
+    <td align="center" valign="middle" width="33%"><b>Hackathon</b></td>
+  </tr>
+  <tr>
+    <td align="center" valign="middle">
+      <a href="https://github.com/mralioo">@mralioo</a><br>
+      Till Determann
+    </td>
+    <td align="center" valign="middle">
+      <img src="frontend/assets/ALSTOM_CORPORATE_LOGO_2_COLOURS_TRANSPARENT.png" alt="Alstom" height="50"><br>
+      <sub>Alstom — challenge and problem statement</sub>
+    </td>
+    <td align="center" valign="middle">
+      <img src="frontend/assets/hackaton.png" alt="InnoTrans Hackathon — AI on Track" height="70"><br>
+      <sub>InnoTrans 2026 Hackathon · AI on Track</sub>
+    </td>
+  </tr>
+</table>
+
+<p align="center"><sub>Advisory only — the operator decides.</sub></p>
