@@ -1,0 +1,35 @@
+# =====================
+# DATA / ANALYTICS
+# =====================
+numpy>=1.26.0
+pandas>=2.0.0
+scikit-learn>=1.4.0
+networkx>=3.0
+matplotlib>=3.8.0
+openpyxl>=3.1.0
+
+# =====================
+# AI / LLM FRAMEWORK
+# =====================
+openai>=1.0.0
+langchain>=0.2.0
+langchain-openai>=0.1.0
+langchain-core>=0.2.0
+langgraph>=0.2.0
+
+# =====================
+# MCP
+# =====================
+fastmcp>=0.4.0
+mcp>=1.0.0
+
+# =====================
+# UTILITIES
+# =====================
+python-dotenv>=1.0.0
+
+# =====================
+# TESTING
+# =====================
+pytest>=8.0.0
+pytest-asyncio>=0.23.0

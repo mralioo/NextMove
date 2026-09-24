@@ -1,0 +1,39 @@
+============================================================
+InnoTrans 2026 -- Dataset Summary Report
+============================================================
+
+PASSENGER FLOWS
+  Date range  : 2026-06-10 05:00 -> 2026-09-22 00:45
+  Timestamps  : 8,320 (15-min grain)
+  Stations    : 168
+  Daily flow  : mean=1,400,572  max=1,749,001  min=1,630
+  Peak day    : 2026-07-17  (1,749,001 passengers)
+  Top station : U Spichernstr. (Berlin) (2,796,939 total)
+  Quiet stn   : U Rohrdamm (Berlin) (701,154 total)
+
+NETWORK
+  Stations    : 168
+  Lines       : U1, U2, U3, U5, U6, U7, U8, U9
+
+EVENTS
+  Total events: 417
+  Peak day    : 2026-09-19 00:00:00 (10,759 attendance)
+  Attendance  : mean=937  max=2,394
+  Segments    : {'Arts & Theatre': np.int64(297), 'Music': np.int64(105), 'Miscellaneous': np.int64(14), 'Undefined': np.int64(1)}
+
+CLOSURES / DISRUPTIONS
+  Total       : 26
+  Line suspensions: 15
+  Station closures: 11
+
+WEATHER
+  Temp range  : 9.8degC -> 37.3degC
+  Rain timestamps: 1,007 / 8,320  (12.1%)
+  Max precip  : 17.9 mm
+
+ENERGY
+  Lines       : U1, U2, U3, U5, U6, U7, U8, U9
+  Highest consumer : U7 (15,099 MWh)
+  Lowest consumer  : U1 (4,244 MWh)
+
+============================================================
