@@ -73,3 +73,14 @@ button { cursor: pointer; }
 .steps li.tool { border-left: 3px solid #3ddc97; } .steps li.llm { border-left: 3px solid #c084fc; } .steps li.evaluator { border-left: 3px solid #f5c542; } .steps li.route { border-left: 3px solid #4ea1ff; }
 .src { color: var(--muted); font-size: 11px; margin-top: 8px; }
 @media (max-width: 1100px) { .grid { grid-template-columns: 1fr; overflow: auto; } .left, .right { flex-direction: row; overflow: auto; } .chat-body { grid-template-columns: 1fr; } .ops { display: none; } }
+
+/* conversation history, context pill, topic-switch choice */
+.chat-body.hist { grid-template-columns: 250px 1fr 330px; }
+.history { border-right: 1px solid var(--line); background: #0c1428; overflow: auto; padding: 10px; } .history h4 { margin: 0 0 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .7px; color: #b9c4dc; display: flex; justify-content: space-between; align-items: center; } .history h4 button { background: var(--panel2); border: 1px solid var(--line); border-radius: 7px; padding: 1px 8px; font-size: 12px; text-transform: none; letter-spacing: 0; }
+.conv-item { padding: 8px 9px; border: 1px solid var(--line); border-radius: 9px; margin-bottom: 6px; cursor: pointer; background: var(--panel); } .conv-item:hover { border-color: var(--accent); } .conv-item.on { border-color: var(--accent); background: #15274a; }
+.conv-item .ttl { font-size: 12.5px; line-height: 1.3; } .conv-item .meta { display: flex; gap: 8px; align-items: center; margin-top: 4px; color: var(--muted); font-size: 11px; } .chip.cat { background: #23407a; font-weight: 600; }
+.hdr-actions button.on { border-color: var(--accent); }
+.ctxpill { display: flex; align-items: center; gap: 8px; padding: 5px 14px; border-top: 1px solid var(--line); background: #0d1730; font-size: 12px; } .ctxpill span { color: var(--muted); text-transform: uppercase; letter-spacing: .6px; font-size: 10.5px; } .ctxpill b { flex: 1; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .ctxpill button { background: none; border: 1px solid #2a5ab8; color: #cfe3ff; border-radius: 10px; padding: 1px 10px; font-size: 12px; } .ctxpill button:hover { background: #16315f; }
+.choice { max-width: 92%; background: #2a2412; border: 1px solid #6b5a1e; border-radius: 12px; padding: 10px 12px; display: grid; gap: 6px; } .choice .why { color: #d9cfa8; font-size: 12.5px; } .choice .btns { display: flex; gap: 8px; margin-top: 2px; } .choice small { color: #a89b6a; }
+.note { color: var(--muted); font-size: 12px; text-align: center; } .ctxnote { color: var(--muted); font-size: 11.5px; margin-top: 4px; }
+@media (max-width: 1100px) { .chat-body.hist { grid-template-columns: 220px 1fr; } }

@@ -23,6 +23,7 @@ export default function App() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [sessionId, setSessionId] = useState(null);
+  const [thread, setThread] = useState({ title: "", linkTurn: null });
   const [thinking, setThinking] = useState(false);
   const [prefill, setPrefill] = useState(null);
   const [pending, setPending] = useState(0);
@@ -79,7 +80,7 @@ export default function App() {
       {open && (
         <ChatPanel operator={OPERATOR} sessionId={sessionId} setSessionId={setSessionId} messages={messages} setMessages={setMessages} prefill={prefill} clearPrefill={() => setPrefill(null)}
                    onMinimize={() => setOpen(false)} onDockPick={(c) => { setPos({ corner: c }); setOpen(false); }}
-                   thinking={thinking} setThinking={setThinking} onAnswered={() => refreshPending()} suggestions={suggestions} />
+                   thinking={thinking} setThinking={setThinking} onAnswered={() => refreshPending()} suggestions={suggestions} thread={thread} setThread={setThread} />
       )}
     </div>
   );

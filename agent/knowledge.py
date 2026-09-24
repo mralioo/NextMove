@@ -173,7 +173,7 @@ class KnowledgeBase:
         with self._conn() as c:
             c.execute("CREATE TABLE IF NOT EXISTS turns (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT, user_id TEXT, ts REAL, question TEXT, cat TEXT, "
                       "answer TEXT, facts_json TEXT, sanity_json TEXT)")
-            for col, typ in (("verdict", "TEXT"), ("confidence", "REAL"), ("plan_key", "TEXT"), ("data_end", "TEXT"), ("accepted", "INTEGER"), ("plan_json", "TEXT"), ("artifact_json", "TEXT"), ("operator_score", "REAL"), ("n_feedback", "INTEGER")):
+            for col, typ in (("verdict", "TEXT"), ("confidence", "REAL"), ("plan_key", "TEXT"), ("data_end", "TEXT"), ("accepted", "INTEGER"), ("plan_json", "TEXT"), ("artifact_json", "TEXT"), ("operator_score", "REAL"), ("n_feedback", "INTEGER"), ("linked_from", "INTEGER")):
                 try:                                       # turn store created before v3: add the columns the supervisor's history lookup needs
                     c.execute(f"ALTER TABLE turns ADD COLUMN {col} {typ}")
                 except sqlite3.OperationalError:
@@ -224,13 +224,13 @@ class KnowledgeBase:
     # -- history
     def remember_turn(self, session_id: str, user_id: str, question: str, cat: str, answer: str, facts: dict | None, sanity: dict | None = None, *,
                       verdict: str | None = None, confidence: float | None = None, plan_key: str | None = None, data_end: str | None = None,
-                      accepted: bool | None = None, plan: dict | None = None, artifact: dict | None = None) -> int:
+                      accepted: bool | None = None, plan: dict | None = None, artifact: dict | None = None, linked_from: int | None = None) -> int:
         with self._conn() as c:
-            tid = c.execute("INSERT INTO turns (session_id, user_id, ts, question, cat, answer, facts_json, sanity_json, verdict, confidence, plan_key, data_end, accepted, plan_json, artifact_json) "
-                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            tid = c.execute("INSERT INTO turns (session_id, user_id, ts, question, cat, answer, facts_json, sanity_json, verdict, confidence, plan_key, data_end, accepted, plan_json, artifact_json, linked_from) "
+                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                             (session_id, user_id, time.time(), question, cat, answer, json.dumps(facts or {}, default=str), json.dumps(sanity or {}, default=str), verdict, confidence,
                              plan_key, data_end, None if accepted is None else int(accepted), json.dumps(plan, default=str) if plan else None,
-                             json.dumps({**artifact, "turn_id": None}, default=str) if artifact else None)).lastrowid
+                             json.dumps({**artifact, "turn_id": None}, default=str) if artifact else None, linked_from)).lastrowid
             if artifact:                                     # the bundle knows its own id
                 c.execute("UPDATE turns SET artifact_json=json_set(artifact_json, '$.turn_id', ?) WHERE id=?", (tid, tid))
             return tid
@@ -312,6 +312,80 @@ class KnowledgeBase:
                 continue
             out.append(t)
         return out[:limit]
+
+    # -- conversations (threads): a session is one conversation about ONE situation; the list is what the chat history shows
+    def conversations(self, operator_id: str = "", limit: int = 30) -> list[dict]:
+        """One row per session (newest first): the first question is the title, plus category, size, times, and the turn it was continued from (if any)."""
+        with self._conn() as c:
+            rows = c.execute("SELECT session_id, user_id, MIN(id), MAX(id), COUNT(*), MIN(ts), MAX(ts) FROM turns WHERE (?='' OR user_id=?) GROUP BY session_id ORDER BY MAX(id) DESC LIMIT ?",
+                             (operator_id, operator_id, limit)).fetchall()
+            out = []
+            for sid, uid, first, last, n, t0, t1 in rows:
+                f = c.execute("SELECT question, cat, linked_from FROM turns WHERE id=?", (first,)).fetchone()
+                cat = c.execute("SELECT cat FROM turns WHERE session_id=? AND cat IS NOT NULL AND cat NOT IN ('FOLLOW','OOS','BOUNCE') ORDER BY id LIMIT 1", (sid,)).fetchone()
+                score = c.execute("SELECT AVG(operator_score) FROM turns WHERE session_id=? AND operator_score IS NOT NULL", (sid,)).fetchone()[0]
+                out.append({"session_id": sid, "operator_id": uid, "title": f[0], "category": cat[0] if cat else f[1], "n_turns": n, "started": t0, "last": t1, "first_turn_id": first,
+                            "last_turn_id": last, "linked_from": f[2], "mean_score": round(score, 2) if score is not None else None})
+        return out
+
+    def conversation_turns(self, session_id: str) -> list[dict]:
+        with self._conn() as c:
+            ids = [r[0] for r in c.execute("SELECT id FROM turns WHERE session_id=? ORDER BY id", (session_id,))]
+            acted = {r[0] for r in c.execute("SELECT DISTINCT turn_id FROM operator_feedback WHERE action_text IS NOT NULL AND deleted=0")}
+        out = []
+        for i in ids:
+            t = self.turn_info(i)
+            if t:
+                t["action_reported"] = i in acted
+                out.append(t)
+        return out
+
+    def conversation_chains(self, operator_id: str = "", limit: int = 30) -> list[dict]:
+        """Conversations as the operator experiences them: a conversation that was resumed from the history (a new session linked to an old turn) is ONE entry, titled by its first question."""
+        rows = self.conversations(operator_id, limit * 3)
+        by_sid = {r["session_id"]: r for r in rows}
+        with self._conn() as c:
+            parent = {}
+            for r in rows:
+                if r["linked_from"]:
+                    p = c.execute("SELECT session_id FROM turns WHERE id=?", (r["linked_from"],)).fetchone()
+                    if p and p[0] != r["session_id"]:
+                        parent[r["session_id"]] = p[0]
+        def root(s):
+            seen = set()
+            while s in parent and s not in seen:
+                seen.add(s)
+                s = parent[s]
+            return s
+        chains: dict[str, list[dict]] = {}
+        for r in rows:
+            chains.setdefault(root(r["session_id"]), []).append(r)
+        out = []
+        for rid, members in chains.items():
+            members.sort(key=lambda m: m["first_turn_id"])
+            head = members[0]
+            newest = max(members, key=lambda m: m["last_turn_id"])
+            out.append({**head, "conversation_id": rid, "session_ids": [m["session_id"] for m in members], "n_turns": sum(m["n_turns"] for m in members), "last": newest["last"], "last_turn_id": newest["last_turn_id"],
+                        "last_session_id": newest["session_id"], "resumed": len(members) > 1})
+        return sorted(out, key=lambda x: -x["last_turn_id"])[:limit]
+
+    def session_anchor(self, session_id: str) -> dict | None:
+        """What the conversation is currently ABOUT: the latest answered situation of the session (not a 'why?' reply): question, category, entities, ids."""
+        with self._conn() as c:
+            r = c.execute("SELECT id FROM turns WHERE session_id=? AND plan_json IS NOT NULL AND cat NOT IN ('FOLLOW','OOS','BOUNCE') ORDER BY id DESC LIMIT 1", (session_id,)).fetchone()
+        return self.turn_anchor(r[0]) if r else None
+
+    def turn_anchor(self, turn_id: int) -> dict | None:
+        with self._conn() as c:
+            r = c.execute("SELECT id, question, cat, plan_json, artifact_json, session_id FROM turns WHERE id=? AND plan_json IS NOT NULL", (turn_id,)).fetchone()
+            first = c.execute("SELECT question, linked_from FROM turns WHERE session_id=? ORDER BY id LIMIT 1", (r[5],)).fetchone() if r else None
+        if not r:
+            return None
+        plan = json.loads(r[3])
+        art = json.loads(r[4]) if r[4] else {}
+        ent = plan.get("entities") or {}
+        return {"turn_id": r[0], "question": r[1], "category": r[2], "entities": {k: ent.get(k) for k in ("lines", "stations", "dates", "times", "venue", "event") if ent.get(k)},
+                "problem_key": art.get("problem_key"), "first_question": first[0] if first else r[1], "linked_from": first[1] if first else None}
 
     def feedback_stats(self, operator_id: str = "") -> dict:
         w, a = (" AND user_id=?", (operator_id,)) if operator_id else ("", ())

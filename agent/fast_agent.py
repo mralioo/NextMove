@@ -113,8 +113,18 @@ class SupervisorAgent(BaseAgent):
         st = ctx.session.state
         K = _kb()
         last, last_facts = (st.get("last_plan"), st.get("last_facts")) if CONFIG.memory != "none" else (None, None)
-        if K is not None and not last_facts and supervisor.HISTORY_ON():      # history survives restarts / new sessions
-            lt = K.last_turn(ctx.session.user_id)
+        restored: dict = {}
+        link = st.get("link_turn_id")
+        if K is not None and not last_facts and link:                        # a conversation the operator CHOSE to continue (chat history): its situation is loaded explicitly
+            lt = K.get_turn(int(link))
+            if lt and lt.get("plan") and lt.get("facts"):
+                last, last_facts = lt["plan"], lt["facts"]
+                art0 = K.get_artifact(int(link)) or {}
+                restored = {"last_facts": last_facts, "last_plan": last, "last_artifact": art0 or None,
+                            "situation": {"situation_key": art0.get("situation_key") or art0.get("problem_key"), "problem_key": art0.get("problem_key"), "question": lt["question"], "category": lt["cat"]}}
+                st.update(restored)
+        elif K is not None and not last_facts and supervisor.HISTORY_ON() and os.environ.get("TMT_RESTORE_LAST", "off") == "on":      # legacy: inherit the operator's last turn (off by
+            lt = K.last_turn(ctx.session.user_id)                                                                                       # default: a NEW conversation must start clean)
             if lt and lt.get("plan") and lt.get("facts"):
                 last, last_facts = lt["plan"], lt["facts"]
                 st["last_facts"], st["last_plan"] = last_facts, last
@@ -144,7 +154,7 @@ class SupervisorAgent(BaseAgent):
         for r in llm_log:
             yield _llm_event(self.name, r, t0)
         ev = _text_event(self.name, f"[plan · {timing['route_ms']} ms] {plan.decision} · {plan.category} · {plan.route.specialist} · engine {plan.route.ml_engine} · "
-                                    f"tools {plan.route.tools} · objective: {plan.objective.statement}", {"plan": legacy, "sp": sp_dump, "timing": timing, "t_start": t0})
+                                    f"tools {plan.route.tools} · objective: {plan.objective.statement}", {"plan": legacy, "sp": sp_dump, "timing": timing, "t_start": t0, **restored})
         ev.custom_metadata = {"kind": "supervisor", "seconds": round(time.time() - t0, 3), "route_ms": timing["route_ms"], "llm_route_s": round(sum(r["seconds"] for r in llm_log), 3),
                               "decision": plan.decision, "category": plan.category, "tier": plan.tier, "route": plan.route.model_dump(mode="json")}
         yield ev
@@ -293,6 +303,12 @@ class WriterAgent(BaseAgent):
             info, source = {"model": None, "guard": f"history ({h.kind}, similarity {h.similarity})"}, "history"
             K0 = _kb()
             old = K0.get_turn(h.turn_id) if K0 is not None else None
+            if K0 is not None:                              # the reused answer is still a message of THIS conversation: it appears in the chat history and anchors the situation
+                try:
+                    K0.remember_turn(ctx.session.id, ctx.session.user_id, q, plan.category, answer, (old or {}).get("facts"), {"source": "history", "from_turn": h.turn_id}, accepted=False,
+                                     plan=(old or {}).get("plan") or plan.model_dump(mode="json"), linked_from=None)
+                except Exception:
+                    pass
             if old and old.get("facts"):                    # the conversation continues from the reused answer: follow-ups need its facts and plan
                 st["last_facts"], st["last_plan"] = old["facts"], old.get("plan")
                 st["last_artifact"] = K0.get_artifact(h.turn_id)   # ... and "why / evidence / which tools" about it: the stored artifact bundle (None for an answer stored before artifacts existed)
@@ -340,6 +356,13 @@ class WriterAgent(BaseAgent):
                 art = artifacts.build(question=q, session_id=ctx.session.id, plan=st.get("sp") or {}, result=st.get("result"), verdict=st.get("verdict"), facts=facts, timing=timing, refs=refs,
                                       brief=brief_text, sources_line=line, sanity=None, source=source, answer_mode=mode, data_window=_window())
                 import feedback as fb
+                # thread bookkeeping: a rerun of the situation ("what about 22:30") is a VARIANT of it (same Situation in the graph), anything else starts a new Situation
+                from kgraph import _h as _kh, _norm as _kn
+                sit_prev = st.get("situation") or {}
+                is_variant = bool(plan.follow_up and plan.follow_up.mode == "rerun" and sit_prev.get("situation_key"))
+                art["kind"] = "variant" if is_variant else "situation"
+                art["situation_key"] = sit_prev["situation_key"] if is_variant else _kh(_kn(q), 12)
+                art["parent_problem_key"] = sit_prev.get("problem_key") if is_variant else None
                 art["requires_action"] = bool(writer.wants_action(q) or plan.category in ("C", "A", "P"))         # the UI then asks "what did you do about it?"
                 art["recommended_actions"] = fb.recommended_actions(brief_text, facts)
                 if supervisor.HISTORY_ON():                                    # operator precedents: what operators did in similar situations and how it went (feedback loop)
@@ -360,11 +383,14 @@ class WriterAgent(BaseAgent):
         if source == "history":
             delta["last_artifact"] = st.get("last_artifact")                   # "why / evidence" after a reused answer refers to ITS bundle
         if K is not None and source in ("worker", "follow_up", "decline", "safe_fallback"):
-            timing["sanity"] = _sanity_and_remember(K, ctx, q, body, facts, legacy, plan, st.get("verdict"), st.get("result"), source, art if source == "worker" else None)
+            timing["sanity"] = _sanity_and_remember(K, ctx, q, body, facts, legacy, plan, st.get("verdict"), st.get("result"), source, art if source == "worker" else None, st.get("link_turn_id"))
             if source == "worker" and facts.get("status") in ("ok", "multi"):        # what the operator was SHOWN is what "why? / evidence / what about 22:30" refers to
                 delta["last_plan"] = st["sp"]                                        # (only accepted answers are reused from history or added to the graph — that is separate)
             if art is not None and source == "worker" and timing["sanity"].get("turn_id"):
                 art["turn_id"] = timing["sanity"]["turn_id"]
+        if art is not None and source == "worker" and art.get("situation_key"):
+            delta["situation"] = {"situation_key": art["situation_key"], "problem_key": art.get("problem_key") or art.get("situation_key"),
+                                  "question": (st.get("situation") or {}).get("question") if art.get("kind") == "variant" else q, "category": plan.category}
         if art is not None:
             delta["last_artifact"] = art                                   # what "why / evidence / which tools" refers to in this session
         for r in w_log:
@@ -397,7 +423,7 @@ def _index_report(ctx, question: str, art: dict) -> None:
         threading.Thread(target=cognee().remember_qa, args=(ctx.session.id, question, art["report"][:6000], artifacts.memory_summary(art)), daemon=True, name="cognee-report").start()
 
 
-def _sanity_and_remember(K, ctx, question: str, answer: str, facts: dict, legacy: dict, plan: SupervisorPlan, verdict: dict | None, result: dict | None, source: str, art: dict | None = None) -> dict:
+def _sanity_and_remember(K, ctx, question: str, answer: str, facts: dict, legacy: dict, plan: SupervisorPlan, verdict: dict | None, result: dict | None, source: str, art: dict | None = None, linked_from: int | None = None) -> dict:
     """Cross-check the delivered answer against the knowledge base (ms, deterministic), store the turn locally (with the verdict, so the supervisor's history lookup only
     reuses ACCEPTED answers), add accepted cases to the knowledge graph, and mirror the turn to Cognee in a background thread — none of it delays or changes the answer."""
     with span("kb.sanity") as sp:
@@ -419,7 +445,7 @@ def _sanity_and_remember(K, ctx, question: str, answer: str, facts: dict, legacy
     try:
         from supervisor import plan_key
         tid = K.remember_turn(ctx.session.id, ctx.session.user_id, question, plan.category, answer, facts, res, verdict=(verdict or {}).get("verdict"), confidence=conf,
-                        plan_key=plan_key(plan.category, plan.entities), data_end=(K.by_id["B-COV"]["value"]["end"][:16] if "B-COV" in K.by_id else None), accepted=accepted, plan=plan.model_dump(mode="json"), artifact=art)
+                        plan_key=plan_key(plan.category, plan.entities), data_end=(K.by_id["B-COV"]["value"]["end"][:16] if "B-COV" in K.by_id else None), accepted=accepted, plan=plan.model_dump(mode="json"), artifact=art, linked_from=int(linked_from) if linked_from else None)
         if art is not None:
             art["turn_id"] = tid
     except Exception:
@@ -429,7 +455,9 @@ def _sanity_and_remember(K, ctx, question: str, answer: str, facts: dict, legacy
             from kgraph import actions_from_facts, kg
             acts, opts = actions_from_facts(facts) if facts.get("status") == "ok" else ([], [])
             with span("kg.record_case", **{"tmt.category": plan.category, "tmt.actions": acts, "tmt.options": opts, "tmt.neo4j_mirror": kg().neo4j_configured()}):
-                kg().record_case(GraphCase(question=question, category=plan.category, entities=plan.entities, answer=answer, confidence=conf, verdict="accept", actions=acts, options=opts))
+                kg().record_case(GraphCase(question=question, category=plan.category, entities=plan.entities, answer=answer, confidence=conf, verdict="accept", actions=acts, options=opts),
+                                 kind=(art or {}).get("kind", "situation"), parent_key=(art or {}).get("parent_problem_key"), situation_key=(art or {}).get("situation_key"),
+                                 conversation=ctx.session.id, operator=ctx.session.user_id)
                 if art is not None:
                     kg().record_artifact(art["problem_key"], art)              # operator knowledge base in the graph: Problem -> Artifact -> tools / datasets / model / KB entries
         except Exception:

@@ -155,9 +155,9 @@ def test_desktop_endpoints_topology_snapshot_series_and_chat(monkeypatch):
     snap = c.get("/api/v1/ops/snapshot", params={"at": tl["default_at"]}).json()
     assert snap["network"]["total"] > 0 and snap["lines"] and snap["closures"] and snap["closures"][0]["blocked_edges"] is not None
     assert len(c.get("/api/v1/ops/series", params={"date": tl["default_at"][:10]}).json()) > 50
-    monkeypatch.setattr(chat_bridge, "ask", lambda op, sid, msg: {"answer": "ok", "session_id": sid, "operator_id": op})
+    monkeypatch.setattr(chat_bridge, "ask", lambda op, sid, msg, link_turn_id=None: {"answer": "ok", "session_id": sid, "operator_id": op})
     assert c.post("/api/v1/chat", json={"message": "hi", "operator_id": "o", "session_id": "s"}).json()["session_id"] == "s"
-    def down(*a):
+    def down(*a, **k):
         raise chat_bridge.AgentUnavailable("not reachable")
     monkeypatch.setattr(chat_bridge, "ask", down)
     assert c.post("/api/v1/chat", json={"message": "hi"}).status_code == 503
@@ -178,3 +178,107 @@ def test_tidy_puts_a_blank_line_before_each_section():
 def writer_tidy(t):
     import writer
     return writer.tidy(t)
+
+
+# ------------------------------------------------------------------------------------------------ conversation threads
+def test_relation_detects_when_a_message_is_not_about_the_situation():
+    import threads
+    A = {"category": "C", "entities": {"lines": ["U7"], "stations": ["U Hermannplatz (Berlin)"], "dates": ["2026-09-25"]}}
+    assert threads.relation("why?", A)["relation"] == "related"
+    assert threads.relation("show me the evidence", A)["relation"] == "related"
+    assert threads.relation("for 3 hours instead", A)["relation"] == "related"
+    assert threads.relation("Which stations get pressure at Hermannplatz?", A)["relation"] == "related"
+    assert threads.relation("At what time does the commute flow peak at Rudow station usually take place?", A)["relation"] == "unrelated"
+    assert threads.relation("Identify three anomalies on July 19th.", A)["relation"] == "unrelated"
+    assert threads.relation("And Rudow?", A)["relation"] == "unsure"
+    assert threads.relation("What is the capital of France?", A)["relation"] == "related"          # off-topic: bounced on its own, the situation is untouched
+    assert threads.relation("anything", None)["relation"] == "related"
+
+
+def _turn(kb, sid, q, cat="C", link=None, art=None, uid="op1"):
+    plan = {"category": cat, "entities": {"lines": ["U7"], "stations": ["U Hermannplatz (Berlin)"]}}
+    return kb.remember_turn(sid, uid, q, cat, "answer", {"status": "ok"}, accepted=True, plan=plan, artifact=art or {"question": q, "brief": "b", "problem_key": "pk-" + sid}, linked_from=link)
+
+
+def test_conversation_history_groups_resumed_conversations_into_one_entry(tmp_path):
+    kb = knowledge.KnowledgeBase(db=tmp_path / "m.db")
+    t1 = _turn(kb, "s1", "U7 closure question")
+    _turn(kb, "s1", "why?", cat="FOLLOW")
+    _turn(kb, "s2", "Rudow peak?", cat="D")
+    t4 = _turn(kb, "s3", "What if it ends at 22:30?", link=t1)                                 # s3 resumes s1
+    ch = kb.conversation_chains("op1")
+    assert len(ch) == 2
+    c1 = next(c for c in ch if c["title"] == "U7 closure question")
+    assert c1["session_ids"] == ["s1", "s3"] and c1["n_turns"] == 3 and c1["resumed"] and c1["last_session_id"] == "s3" and c1["category"] == "C"
+    assert kb.session_anchor("s1")["question"] == "U7 closure question"                         # 'why?' is not a new situation
+    assert kb.turn_anchor(t4)["linked_from"] == t1 and kb.turn_anchor(t1)["entities"]["lines"] == ["U7"]
+
+
+def test_chat_asks_before_mixing_topics_and_new_starts_a_fresh_session(tmp_path, monkeypatch):
+    from fastapi.testclient import TestClient
+    kb = knowledge.KnowledgeBase(db=tmp_path / "m.db")
+    monkeypatch.setattr(knowledge, "kb", lambda: kb)
+    from backend import operator_api as api
+    import chat_bridge
+    calls = []
+    monkeypatch.setattr(chat_bridge, "ask", lambda op, sid, msg, link_turn_id=None: calls.append((sid, msg, link_turn_id)) or {"answer": "ok", "session_id": sid})
+    t1 = _turn(kb, "s1", "Line U7 is suspended between Hermannplatz and Karl-Marx-Strasse. Where to deploy staff?")
+    c = TestClient(api.app)
+    rudow = "At what time does the commute flow peak at Rudow station usually take place?"
+    r = c.post("/api/v1/chat", json={"message": rudow, "session_id": "s1"}).json()
+    assert r["needs_choice"] and r["relation"] == "unrelated" and r["recommended"] == "new" and {x["id"] for x in r["choices"]} == {"new", "continue"} and calls == []
+    r = c.post("/api/v1/chat", json={"message": rudow, "session_id": "s1", "context_mode": "new"}).json()
+    assert r["session_id"] != "s1" and r["context"]["mode"] == "new" and calls[-1][0] == r["session_id"]
+    r = c.post("/api/v1/chat", json={"message": rudow, "session_id": "s1", "context_mode": "continue"}).json()
+    assert r["session_id"] == "s1" and r["context"]["mode"] == "continue"
+    assert c.post("/api/v1/chat", json={"message": "why?", "session_id": "s1"}).json()["session_id"] == "s1"      # related: no question, no interruption
+    r = c.post("/api/v1/chat", json={"message": "for 3 hours instead", "link_turn_id": t1}).json()                  # resume a conversation from the history
+    assert calls[-1][2] == t1 and r["context"]["mode"] == "resumed"
+    r = c.post("/api/v1/chat", json={"message": rudow, "link_turn_id": t1}).json()                                  # ... and the first message is checked against it too
+    assert r["needs_choice"]
+    conv = c.get("/api/v1/conversations", params={"operator_id": "op1"}).json()
+    assert conv[0]["title"].startswith("Line U7") and c.get("/api/v1/conversations/s1").json()["resume_turn_id"] == t1
+
+
+# ------------------------------------------------------------------------------------------------ graph categorisation and no wrong branches
+def _case(q, cat="C", lines=("U7",), stations=("U Hermannplatz (Berlin)",), actions=()):
+    return S.GraphCase(question=q, category=cat, entities=S.Entities(lines=list(lines), stations=list(stations)), answer="brief " + q, verdict="accept", actions=list(actions))
+
+
+def test_variants_share_the_situation_and_categories_have_domains_and_actions_have_types(tmp_path):
+    g = kgraph.KnowledgeGraph(tmp_path / "kg.db")
+    p1 = g.record_case(_case("U7 closure Hermannplatz", actions=["Deploy additional staff at Neukölln", "Replacement bus between A and B"]), conversation="s1", operator="op1")
+    p2 = g.record_case(_case("what about 22:30?"), kind="variant", parent_key=p1, situation_key=p1, conversation="s1", operator="op1")
+    p3 = g.record_case(_case("Rudow peak", cat="D", lines=(), stations=("U Rudow (Berlin)",)), conversation="s2", operator="op1")
+    s = g.stats()
+    assert s["by_label"]["Situation"] == 2 and s["by_label"]["Conversation"] == 2                     # the variant did NOT open a third situation
+    assert s["by_rel"]["VARIANT_OF"] == 1 and s["by_rel"]["PART_OF"] == 3
+    tax = g.taxonomy()
+    assert {c["code"]: (c["label"], c["domain"]) for c in tax["categories"]} == {"C": ("Closure response", "Disruptions"), "D": ("Station profile", "Stations")}
+    assert kgraph.action_types("Sent two staff to Neukölln and ordered the replacement bus") == ["staff_deployment", "replacement_bus"]
+    assert kgraph.action_types("did something") == ["other"]
+    assert s["by_label"]["ActionType"] >= 2 and p2 != p1 and p3
+
+
+def test_feedback_is_categorised_typed_and_never_opens_a_wrong_branch(env):
+    kb, g, tid = env
+    feedback.submit(tid, score=4, action_text="Sent staff to Neukölln and informed passengers", followed="modified", kb=kb, graph=g, mirror=False)
+    s = g.stats()
+    assert s["by_rel"]["IN_CATEGORY"] >= 2 and s["by_rel"]["OF_TYPE"] >= 2 and s["by_rel"].get("ABOUT_SITUATION", 0) == 1
+    assert g.taxonomy()["operator_action_types"] == {"staff_deployment": 1, "passenger_information": 1}
+    # feedback for an answer whose situation was never recorded (e.g. a decline): kept, but marked and kept out of similarity / precedents
+    tid2 = kb.remember_turn("s9", "op1", "Which is the best single investment?", "X", "declined", {"status": "unsupported"}, accepted=False)
+    feedback.submit(tid2, score=1, kb=kb, graph=g, mirror=False)
+    orphans = [p for p in g._problems() if p[2].get("kind") == "feedback_only"]
+    assert len(orphans) == 1 and g.similar("Which is the best single investment?", "X") == []
+
+
+def test_audit_finds_and_repair_fixes_uncategorised_branches(tmp_path):
+    g = kgraph.KnowledgeGraph(tmp_path / "kg.db")
+    g.node("Problem", "old1", text="Line U7 closed between A and B. What now please?", category="C", source="runtime", params={"lines": ["U7"]})       # legacy: no kind, no situation, no category edge
+    g.node("Problem", "fu1", text="what about 22:30?", category="C", source="runtime", kind="situation", params={})                                    # a follow-up that became its own branch
+    a = g.audit()
+    assert "old1" in a["no_situation"] and "old1" in a["no_kind"] and "fu1" in a["followup_shaped"] and a["issues"] > 0
+    r = g.repair()
+    assert r["fixed"]["situations"] == 2 and r["fixed"]["followups"] == 1 and r["after"]["no_situation"] == 0 and r["after"]["no_kind"] == 0
+    assert g.similar("what about 22:30?", "C") == []                                                     # the follow-up-shaped problem no longer matches anything

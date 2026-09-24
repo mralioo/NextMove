@@ -86,21 +86,76 @@ class ChatBody(BaseModel):
     message: str = Field(..., min_length=1, max_length=1500)
     operator_id: str = Field("operator", description="becomes the ADK user_id")
     session_id: str | None = Field(None, description="omit to start a new conversation; send the returned session_id to continue it (follow-ups, 'why?')")
+    context_mode: Literal["auto", "continue", "new"] = Field("auto", description="auto = ask the operator when the message does not look connected to the conversation's situation; "
+                                                             "continue = connect it anyway; new = start a new conversation (fresh context)")
+    link_turn_id: int | None = Field(None, description="only with no session_id: start the new session CONNECTED to this earlier answer (resume a conversation from the history)")
+
+
+_SESSION_TURN: dict[str, int] = {}          # session_id -> the turn whose situation the conversation is about (covers answers reused from history)
+
+
+def _short(t: str, n: int = 90) -> str:
+    import threads
+    return threads.short_title(t or "", n)
 
 
 @app.post("/api/v1/chat", tags=["chat"])
 def chat(body: ChatBody) -> dict:
     """Ask the agent. Returns the answer (Markdown) plus everything the desktop shows next to it: `turn_id` / `artifact_turn_id` / `requires_action` / `precedent` (for feedback),
-    `steps` (operations log: dispatcher route, tool calls with arguments and seconds, analyst / inspector rounds, LLM calls, writer), `tools`, `llm`, `tokens` {in,out,total,estimated},
-    `timing` {supervisor_s, worker_evaluator_s, mcp_s, writer_s, total_s}, `counts`."""
+    `steps` (operations log), `tools`, `llm`, `tokens` {in,out,total,estimated}, `timing` {supervisor_s, worker_evaluator_s, mcp_s, writer_s, total_s}, `counts`.
+
+    **One conversation = one situation.** With an existing `session_id` and `context_mode = auto`, a message that is not clearly about the conversation's situation (another kind of question,
+    other line / station / event, or a vague short message) is NOT sent to the agent. The response is `{"needs_choice": true, "relation", "reason", "anchor", "choices", "recommended", "message"}`;
+    the UI shows two buttons and calls again with `context_mode = "continue"` (connect it to the previous topic) or `"new"` (start a new conversation: fresh session, no inherited context).
+    The response's `context` says what happened: `{mode: new|continue|auto, relation, reason, title}`."""
     import time as _t
 
     import chat_bridge
-    sid = body.session_id or f"ui-{int(_t.time() * 1000)}"
+    import threads
+    kb = knowledge.kb()
+    sid, link, mode = body.session_id, body.link_turn_id, body.context_mode
+    anchor = (kb.session_anchor(sid) or (kb.turn_anchor(_SESSION_TURN[sid]) if sid in _SESSION_TURN else None)) if sid else (kb.turn_anchor(link) if link else None)
+    rel = threads.relation(body.message, anchor) if anchor else {"relation": "related", "reason": "first question of the conversation", "signals": {}}
+    if anchor and mode == "auto" and rel["relation"] != "related":
+        qents = rel["signals"].get("new_entities")
+        return {"needs_choice": True, "relation": rel["relation"], "reason": rel["reason"], "message": body.message, "session_id": sid,
+                "anchor": {"question": _short(anchor["first_question"]), "current": _short(anchor["question"]), "category": anchor["category"], "turn_id": anchor["turn_id"]},
+                "choices": [{"id": "new", "label": "New conversation", "hint": "fresh context — recommended for a different topic"}, {"id": "continue", "label": "Continue this topic", "hint": "connect it to the previous question"}],
+                "recommended": "new" if rel["relation"] == "unrelated" or qents else "continue"}
+    if mode == "new":
+        sid, link = None, None
+    started_new = sid is None
+    sid = sid or f"ui-{int(_t.time() * 1000)}"
     try:
-        return chat_bridge.ask(body.operator_id, sid, body.message)
+        out = chat_bridge.ask(body.operator_id, sid, body.message, link_turn_id=link if started_new else None)
     except chat_bridge.AgentUnavailable as e:
         raise HTTPException(503, str(e))
+    if out.get("artifact_turn_id"):                          # an answer reused from history stores no turn of its own: remember which situation the conversation is about
+        _SESSION_TURN[sid] = out["artifact_turn_id"]
+    out["context"] = {"mode": "new" if started_new and not link else ("resumed" if started_new else mode), "relation": rel["relation"], "reason": rel["reason"],
+                      "title": _short(anchor["first_question"] if anchor else body.message), "linked_turn_id": link if started_new else None}
+    return out
+
+
+@app.get("/api/v1/conversations", tags=["chat"])
+def conversations(operator_id: str = "", limit: int = Query(30, ge=1, le=100)) -> list[dict]:
+    """The chat history: one entry per conversation (a conversation resumed from the history is still one entry), newest first — `title` = the first question, `category`, `n_turns`,
+    `started`, `last` (epoch seconds), `mean_score`, `resumed`, `session_ids`, `last_session_id`, `last_turn_id`."""
+    return knowledge.kb().conversation_chains(operator_id, limit)
+
+
+@app.get("/api/v1/conversations/{session_id}", tags=["chat"])
+def conversation(session_id: str) -> dict:
+    """All questions and answers of a conversation (and of the sessions it was resumed in), oldest first, with what the UI needs to show rating / action controls again
+    (`turn_id`, `has_artifact`, `requires_action`, `operator_score`, `action_reported`), and `resume_turn_id`: send it as `link_turn_id` (no session_id) to continue the conversation."""
+    kb = knowledge.kb()
+    chain = next((c for c in kb.conversation_chains("", 200) if session_id in c["session_ids"]), None)
+    if chain is None:
+        raise HTTPException(404, f"unknown conversation {session_id}")
+    turns = [t for sid in chain["session_ids"] for t in kb.conversation_turns(sid)]
+    anchor = kb.session_anchor(chain["last_session_id"]) or next((kb.turn_anchor(t["turn_id"]) for t in reversed(turns) if kb.turn_anchor(t["turn_id"])), None)
+    return {**{k: chain[k] for k in ("conversation_id", "title", "category", "n_turns", "started", "last", "session_ids", "last_session_id", "resumed")}, "turns": turns,
+            "anchor": anchor, "resume_turn_id": (anchor or {}).get("turn_id")}
 
 
 @app.get("/api/v1/ops/topology", tags=["desktop"])
@@ -261,6 +316,28 @@ def operator_actions(category: str = "", station: str = "", min_score: float | N
 def search_artifacts(q: str, category: str = "", k: int = Query(5, ge=1, le=20)) -> list[dict]:
     """Past accepted answers that resemble `q` (operator knowledge base): brief, confidence, tools, whether a full report exists."""
     return knowledge.kb().find_artifacts(q, category, k)
+
+
+@app.get("/api/v1/graph/taxonomy", tags=["knowledge"])
+def graph_taxonomy() -> dict:
+    """The graph by category and domain (Events, Disruptions, Stations, Network, Energy, Diagnostics, Operations planning, Strategy): situations per category, and how often operators used each
+    ActionType (staff_deployment, replacement_bus, passenger_information, rerouting, crowd_control, monitoring, service_change, coordination, other)."""
+    import kgraph
+    return kgraph.kg().taxonomy()
+
+
+@app.get("/api/v1/graph/audit", tags=["knowledge"])
+def graph_audit() -> dict:
+    """Wrong or uncategorised branches: problems without situation / category / kind, follow-up-shaped problems, untyped actions, orphan feedback."""
+    import kgraph
+    return kgraph.kg().audit()
+
+
+@app.post("/api/v1/graph/repair", tags=["knowledge"])
+def graph_repair() -> dict:
+    """Repair what the audit finds (nothing is deleted): kinds, situations, categories with domains, follow-up marking, action types. Returns before / fixed / after."""
+    import kgraph
+    return kgraph.kg().repair()
 
 
 @app.get("/api/v1/graph/stats", tags=["knowledge"])

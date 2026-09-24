@@ -41,6 +41,7 @@ TASKS: dict[str, tuple[str, list[str], dict]] = {
     "kb-build": ("Build the knowledge base (ground truth / boundaries / insights) from the raw CSVs", [PY, "agent/knowledge_build.py"], {}),
     "kb-sync": ("Push the knowledge base to Cognee (sends the curated knowledge to your tenant)", [PY, "agent/knowledge.py", "sync"], {}),
     "kg-seed": ("Seed the local knowledge graph (26 closures, accepted answers, question bank, LLM extraction; --no-llm skips it)", [PY, "agent/kgraph_build.py"], {}),
+    "kg-audit": ("Knowledge graph health: wrong / uncategorised branches (--fix repairs them: kinds, situations, categories, domains, action types) and the taxonomy", [PY, "-c", "import sys, json; sys.path[:0]=['agent','.']; import kgraph; g=kgraph.kg(); print(json.dumps(g.repair() if '--fix' in sys.argv else g.audit(), indent=1)); print(json.dumps(g.taxonomy(), indent=1))"], {}),
     "kg-export": ("Export the graph as Cypher -> knowledge/kg_export.cypher", [PY, "agent/kgraph.py", "export"], {}),
     "schemas": ("Write the JSON Schemas of every agent hand-over message -> docs/schemas/", [PY, "agent/schemas.py"], {}),
     # ---- ML engine

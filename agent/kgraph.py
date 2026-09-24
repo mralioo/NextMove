@@ -49,6 +49,30 @@ def _h(s: str, n: int = 10) -> str:
     return hashlib.sha1(s.encode()).hexdigest()[:n]
 
 
+# ----------------------------------------------------------------------------------------------- taxonomy (categorisation of everything the graph holds)
+CATEGORY_INFO = {
+    "A": ("Event impact", "Events"), "B": ("Anomalies and root causes", "Diagnostics"), "C": ("Closure response", "Disruptions"), "D": ("Station profile", "Stations"),
+    "E": ("Energy per passenger", "Energy"), "F": ("Network fragmentation", "Network"), "G": ("Correlated stations", "Network"), "H": ("Reroute behaviour", "Disruptions"),
+    "P": ("Pressure ranking", "Operations planning"), "X": ("Strategy (investment, special-event routing)", "Strategy"),
+}
+ACTION_TYPES = [                                              # (type, pattern) — the first types that match; "other" if none
+    ("staff_deployment", r"\b(staff|personnel|crew|colleagues?|officers?|agents?|security|team)\b"),
+    ("replacement_bus", r"\b(replacement bus|bus(es)?|shuttle|sev)\b"),
+    ("passenger_information", r"\b(inform\w*|announce\w*|announcement|notify|display|signage|app|communicat\w*|tell passengers)\b"),
+    ("rerouting", r"\b(re-?rout\w*|divert\w*|detour|alternative (route|line)|redirect\w*)\b"),
+    ("crowd_control", r"\b(gates?|barrier\w*|queue\w*|crowd\w*|entry|entrance|platform access|limit(ed)? entry|hold trains)\b"),
+    ("monitoring", r"\b(monitor\w*|watch\w*|observe\w*|check\w*|keep an eye|standby|stand by|prepare\w*)\b"),
+    ("service_change", r"\b(frequency|headway|extra trains?|additional trains?|short-?turn\w*|skip\w*)\b"),
+    ("coordination", r"\b(call\w*|escalat\w*|coordinat\w*|contact\w*|dispatch\w*|control centre|supervisor)\b"),
+]
+
+
+def action_types(text: str) -> list[str]:
+    low = (text or "").lower()
+    got = [t for t, pat in ACTION_TYPES if re.search(pat, low)]
+    return got or ["other"]
+
+
 # ----------------------------------------------------------------------------------------------- actions from facts
 def actions_from_facts(facts: dict) -> tuple[list[str], list[str]]:
     """(actions, options) an accepted answer implies — deterministic, straight from the specialist's facts."""
@@ -128,11 +152,35 @@ class KnowledgeGraph:
         if s_row and d_row:
             self._mirror("edge", s_row, rel, d_row, w_total)
 
-    def record_case(self, case) -> str:
-        """Add / reinforce one problem → answer → actions/options record. Returns the Problem key."""
+    def ensure_category(self, code: str) -> int:
+        """Category node with its human label and its Domain (Events, Disruptions, Stations, Network, Energy, Diagnostics, Operations planning, Strategy)."""
+        label, domain = CATEGORY_INFO.get(code, (code, "Other"))
+        cat = self.node("Category", code, title=label, domain=domain)
+        self.edge(cat, "IN_DOMAIN", self.node("Domain", domain))
+        return cat
+
+    def _type_edges(self, node_id: int, text: str) -> None:
+        for t in action_types(text):
+            self.edge(node_id, "OF_TYPE", self.node("ActionType", t))
+
+    def record_case(self, case, *, kind: str = "situation", parent_key: str | None = None, situation_key: str | None = None, conversation: str | None = None, operator: str | None = None) -> str:
+        """Add / reinforce one problem → answer → actions/options record. Returns the Problem key.
+        `kind`: situation (a question of its own) | variant (a rerun of the same situation: 'what about 22:30') — a variant is linked -VARIANT_OF-> its parent and shares the parent's Situation,
+        so a follow-up never becomes a second, unrelated branch. The Problem is also placed in a Situation and a Conversation, and its Category in a Domain."""
         pk = _h(_norm(case.question), 12)
-        cat = self.node("Category", case.category)
-        prob = self.node("Problem", pk, _keep=("source",), text=case.question, category=case.category, source=case.source, params=case.entities.model_dump(exclude_none=True, exclude_defaults=True))
+        cat = self.ensure_category(case.category)
+        prob = self.node("Problem", pk, _keep=("source", "kind"), text=case.question, category=case.category, source=case.source, kind=kind, params=case.entities.model_dump(exclude_none=True, exclude_defaults=True))
+        sk = situation_key or pk
+        sit = self.node("Situation", sk, _keep=("title",), category=case.category, title=case.question[:200] if sk == pk else None, entities=case.entities.model_dump(exclude_none=True, exclude_defaults=True) if sk == pk else None)
+        self.edge(prob, "PART_OF", sit)
+        self.edge(sit, "IN_CATEGORY", cat)
+        if parent_key and parent_key != pk:
+            with self._conn() as c:
+                par = c.execute("SELECT id FROM kg_nodes WHERE label='Problem' AND key=?", (parent_key,)).fetchone()
+            if par:
+                self.edge(prob, "VARIANT_OF", par[0])
+        if conversation:
+            self.edge(self.node("Conversation", conversation, operator=operator), "DISCUSSED", sit)
         with self._conn() as c:
             c.execute("UPDATE kg_nodes SET props=json_set(props, '$.n_asked', COALESCE(json_extract(props, '$.n_asked'), 0) + 1) WHERE id=?", (prob,))
         self.edge(prob, "IN_CATEGORY", cat)
@@ -140,6 +188,7 @@ class KnowledgeGraph:
         self.edge(prob, "ANSWERED_BY", ans, verdict=case.verdict, confidence=case.confidence)
         for a in case.actions:
             aid = self.node("Action", _norm(a)[:120], text=a)
+            self._type_edges(aid, a)
             self.edge(ans, "RECOMMENDS", aid)
             for st in case.entities.stations:
                 if _short(st).lower() in a.lower():
@@ -187,10 +236,19 @@ class KnowledgeGraph:
         an action report also creates  Feedback -DESCRIBES-> OperatorAction -AT-> Station / -ON_LINE-> Line  and links OperatorAction -MATCHES-> Action when it
         carries out something the answer recommended. Precedents (operator_precedents) are read back from exactly these nodes."""
         pk = fb.get("problem_key") or (art or {}).get("problem_key") or _h(_norm(question), 12)
-        prob = self.node("Problem", pk, _keep=("source",), text=question or None, category=category or fb.get("category"), source="runtime")
+        # feedback belongs to the situation it was given for; if that situation was never recorded (a decline, an answer that was not accepted) the Problem is marked feedback_only:
+        # it stays out of similarity search and precedents instead of becoming a wrong branch of the graph
+        prob = self.node("Problem", pk, _keep=("source", "kind"), text=question or None, category=category or fb.get("category"), source="runtime", kind="feedback_only")
+        cat_id = self.ensure_category(category or fb.get("category") or "?") if (category or fb.get("category")) else None
         fid = self.node("Feedback", f"fb{fb['feedback_id']}", kind=fb["kind"], score=fb.get("score"), comment=(fb.get("comment") or "")[:500] or None, followed=fb.get("followed"),
                         outcome=fb.get("outcome"), action=fb.get("action_text"), occurred_at=fb.get("occurred_at"), operator=fb.get("operator_id"), turn_id=fb["turn_id"], ts=fb.get("ts"))
         self.edge(prob, "RECEIVED_FEEDBACK", fid)
+        if cat_id:
+            self.edge(fid, "IN_CATEGORY", cat_id)
+        with self._conn() as c:
+            sit = c.execute("SELECT e.dst FROM kg_edges e WHERE e.src=? AND e.rel='PART_OF' LIMIT 1", (prob,)).fetchone()
+        if sit:
+            self.edge(fid, "ABOUT_SITUATION", sit[0])
         if art and art.get("turn_id"):
             self.edge(self.node("Artifact", str(art["turn_id"])), "RECEIVED_FEEDBACK", fid)
         if fb.get("score") is not None and art and art.get("brief"):
@@ -201,7 +259,8 @@ class KnowledgeGraph:
                 n, tot = int(pr.get("n_ratings") or 0) + 1, float(pr.get("score_sum") or 0) + fb["score"]
                 self.node("Answer", _h(art["brief"], 12), n_ratings=n, score_sum=tot, mean_score=round(tot / n, 2))
         if fb.get("action_text"):
-            act = self.node("OperatorAction", _h(_norm(fb["action_text"]), 12), text=fb["action_text"][:300])
+            act = self.node("OperatorAction", _h(_norm(fb["action_text"]), 12), text=fb["action_text"][:300], types=action_types(fb["action_text"]))
+            self._type_edges(act, fb["action_text"])
             self.edge(fid, "DESCRIBES", act)
             self.edge(prob, "OPERATOR_TOOK", act)
             for st in fb.get("stations") or []:
@@ -262,6 +321,77 @@ class KnowledgeGraph:
                         "situation": (p.get("text") or "")[:200], "category": p.get("category")})
         return out[:limit]
 
+    # -- housekeeping: find and repair wrong branches
+    def audit(self) -> dict:
+        """What is wrong or uncategorised in the graph. Each list holds the Problem keys (or ids) concerned."""
+        probs = self._problems()
+        with self._conn() as c:
+            in_sit = {r[0] for r in c.execute("SELECT src FROM kg_edges WHERE rel='PART_OF'")}
+            in_cat = {r[0] for r in c.execute("SELECT src FROM kg_edges WHERE rel='IN_CATEGORY'")}
+            untyped = [k for i, k, p in c.execute("SELECT id, key, props FROM kg_nodes WHERE label IN ('Action','OperatorAction')") if not c.execute("SELECT 1 FROM kg_edges WHERE src=? AND rel='OF_TYPE' LIMIT 1", (i,)).fetchone()]
+            fb_orphans = [k for k, in c.execute("SELECT f.key FROM kg_nodes f WHERE f.label='Feedback' AND NOT EXISTS (SELECT 1 FROM kg_edges e WHERE e.dst=f.id AND e.rel='RECEIVED_FEEDBACK')")]
+        out = {"problems": len(probs), "no_situation": [], "no_category": [], "followup_shaped": [], "no_kind": [], "untyped_actions": untyped, "orphan_feedback": fb_orphans, "feedback_only_problems": []}
+        for pid, key, props in probs:
+            if pid not in in_sit:
+                out["no_situation"].append(key)
+            if not props.get("category") or pid not in in_cat:
+                out["no_category"].append(key)
+            if not props.get("kind"):
+                out["no_kind"].append(key)
+            if props.get("kind") == "feedback_only":
+                out["feedback_only_problems"].append(key)
+            ents = props.get("params") or {}
+            has_ent = any(ents.get(k) for k in ("stations", "lines", "venue", "event"))
+            if not props.get("kind") == "variant" and len((props.get("text") or "").split()) <= 6 and not has_ent and props.get("source") == "runtime":
+                out["followup_shaped"].append(key)
+        out["issues"] = sum(len(v) for k, v in out.items() if isinstance(v, list) and k != "feedback_only_problems")
+        return out
+
+    def repair(self) -> dict:
+        """Fix what audit() finds without deleting anything: every Problem gets a kind, a Category (with Domain) and a Situation (its own if it has none); short follow-up-shaped runtime
+        Problems without entities are marked `followup` (excluded from similarity and precedents); Actions / OperatorActions get their ActionType."""
+        a = self.audit()
+        fixed = {"situations": 0, "categories": 0, "kinds": 0, "followups": 0, "action_types": 0}
+        with self._conn() as c:
+            ids = {k: i for i, k, p in c.execute("SELECT id, key, props FROM kg_nodes WHERE label='Problem'")}
+        for key in a["no_kind"]:
+            self.node("Problem", key, kind="situation")
+            fixed["kinds"] += 1
+        for key in a["no_situation"]:
+            pr = next((p for i, k, p in self._problems() if k == key), {})
+            sit = self.node("Situation", key, category=pr.get("category"), title=(pr.get("text") or "")[:200], entities=pr.get("params"))
+            self.edge(ids[key], "PART_OF", sit)
+            if pr.get("category"):
+                self.edge(sit, "IN_CATEGORY", self.ensure_category(pr["category"]))
+            fixed["situations"] += 1
+        for key in a["no_category"]:
+            pr = next((p for i, k, p in self._problems() if k == key), {})
+            if pr.get("category"):
+                self.edge(ids[key], "IN_CATEGORY", self.ensure_category(pr["category"]))
+                fixed["categories"] += 1
+        for key in a["followup_shaped"]:
+            self.node("Problem", key, kind="followup")
+            fixed["followups"] += 1
+        with self._conn() as c:
+            todo = [(i, p) for i, l, p in c.execute("SELECT id, label, props FROM kg_nodes WHERE label IN ('Action','OperatorAction')") if not c.execute("SELECT 1 FROM kg_edges WHERE src=? AND rel='OF_TYPE' LIMIT 1", (i,)).fetchone()]
+        for i, p in todo:
+            self._type_edges(i, json.loads(p or "{}").get("text", ""))
+            fixed["action_types"] += 1
+        for code in CATEGORY_INFO:
+            with self._conn() as c:
+                has = c.execute("SELECT 1 FROM kg_nodes WHERE label='Category' AND key=?", (code,)).fetchone()
+            if has:
+                self.ensure_category(code)
+        return {"before": {k: (len(v) if isinstance(v, list) else v) for k, v in a.items()}, "fixed": fixed, "after": {k: (len(v) if isinstance(v, list) else v) for k, v in self.audit().items()}}
+
+    def taxonomy(self) -> dict:
+        """The graph by category and domain: how many situations, problems and operator actions each Category holds — and the action types operators used."""
+        with self._conn() as c:
+            cats = c.execute("SELECT c.key, json_extract(c.props,'$.title'), json_extract(c.props,'$.domain'), (SELECT COUNT(*) FROM kg_edges e WHERE e.dst=c.id AND e.rel='IN_CATEGORY' AND EXISTS "
+                             "(SELECT 1 FROM kg_nodes s WHERE s.id=e.src AND s.label='Situation')) FROM kg_nodes c WHERE c.label='Category' ORDER BY 1").fetchall()
+            types = c.execute("SELECT t.key, COUNT(e.id) FROM kg_nodes t JOIN kg_edges e ON e.dst=t.id AND e.rel='OF_TYPE' JOIN kg_nodes a ON a.id=e.src AND a.label='OperatorAction' WHERE t.label='ActionType' GROUP BY t.key ORDER BY 2 DESC").fetchall()
+        return {"categories": [{"code": k, "label": lb, "domain": d, "situations": n} for k, lb, d, n in cats], "operator_action_types": dict(types)}
+
     # -- reads
     def stats(self) -> dict:
         with self._conn() as c:
@@ -292,6 +422,8 @@ class KnowledgeGraph:
         ents = {_short(s).lower() for s in (entities.stations if entities else [])} | {x.lower() for x in (entities.lines if entities else [])}
         scored = []
         for pid, key, props in self._problems():
+            if props.get("kind") in ("followup", "feedback_only"):              # a 'why?' or a feedback whose situation was never recorded is not a situation to match
+                continue
             t = _tokens(props.get("text", ""))
             jac = len(q & t) / len(q | t) if q | t else 0.0
             pe = {_short(s).lower() for s in (props.get("params", {}).get("stations") or [])} | {x.lower() for x in (props.get("params", {}).get("lines") or [])}

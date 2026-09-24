@@ -2,6 +2,7 @@
 
 | Document | What it is | Status |
 | --- | --- | --- |
+| [`conversation_threads_and_graph.md`](conversation_threads_and_graph.md) | One conversation = one situation: topic-switch choice, chat history, resumed conversations; categorised knowledge graph (situations, domains, action types), audit / repair | current |
 | [`operator_desktop.md`](operator_desktop.md) | React operator desktop: city map with replay, Toby the floating assistant, operations column, feedback controls; the endpoints it added | current |
 | [`operator_feedback_api.md`](operator_feedback_api.md) | Operator feedback loop (score of a response, action taken → knowledge graph, precedents) and the endpoints for the UI | current |
 | [`brief_answers_and_operator_kb.md`](brief_answers_and_operator_kb.md) | Brief answers by default, full report on request (why / evidence / sources / tools); artifact bundles saved to the operator knowledge base, graph and memory | current |

@@ -34,12 +34,12 @@ class AgentUnavailable(RuntimeError):
     pass
 
 
-def ask(operator_id: str, session_id: str, message: str, app_name: str = "agent") -> dict:
-    """Run one user message. Creates the ADK session on first use."""
+def ask(operator_id: str, session_id: str, message: str, app_name: str = "agent", link_turn_id: int | None = None) -> dict:
+    """Run one user message. Creates the ADK session on first use; `link_turn_id` starts it CONNECTED to an earlier answer (the situation of a conversation the operator resumes)."""
     t0 = time.time()
     try:
         try:
-            _post(f"/apps/{app_name}/users/{operator_id}/sessions/{session_id}", {}, 20)
+            _post(f"/apps/{app_name}/users/{operator_id}/sessions/{session_id}", {"state": {"link_turn_id": int(link_turn_id)}} if link_turn_id else {}, 20)
         except urllib.error.HTTPError as e:            # 400/409 = the session exists already
             if e.code not in (400, 409, 422):
                 raise
