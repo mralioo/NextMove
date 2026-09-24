@@ -3,7 +3,7 @@
 Contains data organization, schema, and descriptions of the provided information which will be used for the hackathon challenge. All timestamps in the files are presented as Berlin local time.
 Note that `flows.csv` and `weather_data.csv` share the same 15-minute timestamp grain.
 
-## stations_with_ubahn.csv
+## stations_with_ubahn.csv (training dataset)
 Constains real U-Bahn stations (for 8 out of 9 lines).
 Note that one U-Bahn line is not available frp, the real network.
 
@@ -15,7 +15,7 @@ Note that one U-Bahn line is not available frp, the real network.
 | `latitude` | decimal | WGS84 latitude of the station. |
 | `u_bahn_lines` | string | Serving U-Bahn line or lines (comma-separated when multiple). |
 
-## berlin_ubahn_connections.csv
+## berlin_ubahn_connections.csv (training dataset)
 Contains real bidirectional connections between the U-Bahn stations.
 Note that station adjecency matrix can be created using this file.
 
@@ -24,7 +24,7 @@ Note that station adjecency matrix can be created using this file.
 | `station_id_1` | string, foreign key | VBB station endpoint; references `stations_with_ubahn.station_id`. |
 | `station_id_2` | string, foreign key | VBB station other endpoint; references `stations_with_ubahn.station_id`. |
 
-## berlin_ubahn_lines_used.csv
+## berlin_ubahn_lines_used.csv (training dataset)
 Contains Berlin U-Bahn metadata.
 
 | Column | Type | Description |
@@ -36,8 +36,8 @@ Contains Berlin U-Bahn metadata.
 | `product` | string | Product type; currently `subway`. |
 | `n_variants` | integer | Number of alternative routes during the operations. |
 
-## flows.csv
-Contains 168 station-level passenger flow simulated time series. One row every 15 minutes, number of passengers per corresponding station (column-wise).
+## flows_pre_innotrans.csv / flows_rest.csv
+Contains 168 station-level passenger flow simulated time series. One row every 15 minutes, number of passengers per corresponding station (column-wise). The training file is `flows_pre_innotrans.csv`; the testing file is `flows_rest.csv`.
 Station names match values in `stations_with_ubahn.station_name`.
 
 | Column | Type | Description |
@@ -45,8 +45,8 @@ Station names match values in `stations_with_ubahn.station_name`.
 | `timestamp` | datetime | 15-minute observation timestamp. |
 | One column per station name | integer | Simulated passenger flow/count at that station for the timestamp. |
 
-## berlin_events_summer_2026.csv
-Contains real events in the city of Berlin, from 2026-06-10 until 2026-09-21.
+## berlin_events_summer_2026_pre_innotrans.csv / berlin_events_summer_2026_rest.csv
+Contains real events in the city of Berlin. The training file covers 2026-06-10 through 2026-09-21; the testing file covers the evaluation period. The testing file has the same fields as the table below but is provided without a header row.
 
 | Column | Type | Description |
 | --- | --- | --- |
@@ -63,8 +63,8 @@ Contains real events in the city of Berlin, from 2026-06-10 until 2026-09-21.
 | `estimated_attendance` | integer | Estimated attendee count. |
 | `event_url` | URL/string | Event source URL. |
 
-## closures.csv
-Contains station closures, simulated data.
+## closures_pre_innotrans.csv / closures_rest.csv
+Contains station closures, simulated data. The training file is `closures_pre_innotrans.csv`; the testing file is `closures_rest.csv`.
 
 | Column | Type | Description |
 | --- | --- | --- |
@@ -72,8 +72,8 @@ Contains station closures, simulated data.
 | `duration` | string | Human-readable duration, for example `3h30min`. |
 | `description` | string | Closure or disruption description. |
 
-## weather_data.csv
-Contains the real weather data for the Berlin metro area, from 2026-06-10 to 2026-09-21.
+## weather_data_pre_innotrans.csv / weather_data_rest.csv
+Contains the real weather data for the Berlin metro area. The training file is `weather_data_pre_innotrans.csv`; the testing file is `weather_data_rest.csv`.
 
 | Column | Type | Description |
 | --- | --- | --- |
@@ -87,13 +87,17 @@ Contains the real weather data for the Berlin metro area, from 2026-06-10 to 202
 | `cldc` | decimal | Cloud cover, percent. |
 | `coco` | decimal/integer code | Weather-condition category code, such as clear, cloudy, thunderstorms, etc. |
 
-## energy_consumption.csv
+## energy_consumption_pre_innotrans.csv / energy_consumption_rest.csv
 Contains daily energy consumption per line, simulated data.
 | Column | Type | Description |
 | --- | --- | --- |
 | `timestamp` | datetime | Date in MM-DD-YYYY , MM - month, DD - day in the month, YYYY - year|
 | One column per line | integer | Simulated energy consumption in MWh per line for the date. |
 
+
+## Dataset split
+
+Training-only network reference files are provided in `data/training dataset/`. The testing dataset contains only the rest-period records and reuses the training network reference files for station and line metadata.
 
 ## Relationships
 

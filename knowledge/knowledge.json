@@ -14,10 +14,10 @@
    "P",
    "X"
   ],
-  "text": "The flow data covers 2026-06-10 05:00 to 2026-09-22 00:45 at 15-minute grain for 167 stations on the lines U1, U2, U3, U5, U6, U7, U8, U9 (there is no U4 data). Dates outside this window cannot be answered from data; only clearly labelled scenarios are possible.",
+  "text": "The flow data covers 2026-06-10 05:00 to 2026-10-01 00:45 at 15-minute grain for 167 stations on the lines U1, U2, U3, U5, U6, U7, U8, U9 (there is no U4 data). Dates outside this window cannot be answered from data; only clearly labelled scenarios are possible.",
   "value": {
    "start": "2026-06-10 05:00:00",
-   "end": "2026-09-22 00:45:00",
+   "end": "2026-10-01 00:45:00",
    "n_stations": 167,
    "lines": [
     "U1",
@@ -61,11 +61,11 @@
    "P",
    "X"
   ],
-  "text": "The events file has 417 events (158 with a venue name) from 2026-06-10 to 2026-09-21. Events carry a venue name and address but NO station key or coordinates, and attendance is an organiser estimate. The file contains 0 InnoTrans/Messe events.",
+  "text": "The events file has 457 events (182 with a venue name) from 2026-06-10 to 2026-09-30. Events carry a venue name and address but NO station key or coordinates, and attendance is an organiser estimate. The file contains 4 InnoTrans/Messe events.",
   "value": {
-   "n_events": 417,
-   "n_with_venue": 158,
-   "innotrans_events": 0
+   "n_events": 457,
+   "n_with_venue": 182,
+   "innotrans_events": 4
   },
   "source": "berlin_events*.csv"
  },
@@ -83,9 +83,9 @@
    "H",
    "P"
   ],
-  "text": "The passenger flows are simulated. 15831 readings equal exactly 500 (a clipping artefact, 1.1% of readings) although values up to 3000 exist.",
+  "text": "The passenger flows are simulated. 17711 readings equal exactly 500 (a clipping artefact, 1.2% of readings) although values up to 3000 exist.",
   "value": {
-   "n_at_500": 15831,
+   "n_at_500": 17711,
    "max": 3000
   },
   "source": "flows*.csv"
@@ -97,13 +97,13 @@
    "C",
    "H"
   ],
-  "text": "There are 26 recorded closures (reasons: safety inspection x9, switch replacement x6, track maintenance x4, signal upgrades x4, power system maintenance x3). They are simulated maintenance closures; closed stations read 0 and neighbouring stations show no measurable extra load.",
+  "text": "There are 30 recorded closures (reasons: safety inspection x10, switch replacement x7, track maintenance x6, signal upgrades x4, power system maintenance x3). They are simulated maintenance closures; closed stations read 0 and neighbouring stations show no measurable extra load.",
   "value": {
-   "n_closures": 26,
+   "n_closures": 30,
    "reasons": {
-    "safety inspection": 9,
-    "switch replacement": 6,
-    "track maintenance": 4,
+    "safety inspection": 10,
+    "switch replacement": 7,
+    "track maintenance": 6,
     "signal upgrades": 4,
     "power system maintenance": 3
    }
@@ -188,14 +188,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #0: Line U3 suspended on a section between Oskar-Helene-Heim and Krumme Lanke due to track maintenance. Start 2026-06-15 08:00, duration 2h30min (2.50 h), reason: track maintenance.",
+  "text": "Closure #0: Station Boddinstr. closed due to safety inspection. Start 2026-09-23 08:10, duration 4h (4.00 h), reason: safety inspection.",
   "value": {
    "closure_id": 0,
-   "start": "2026-06-15 08:00:00",
-   "hours": 2.5,
-   "reason": "track maintenance",
-   "line": "U3",
-   "description": "Line U3 suspended on a section between Oskar-Helene-Heim and Krumme Lanke due to track maintenance."
+   "start": "2026-09-23 08:10:00",
+   "hours": 4.0,
+   "reason": "safety inspection",
+   "line": null,
+   "description": "Station Boddinstr. closed due to safety inspection."
   },
   "source": "closures*.csv"
  },
@@ -205,14 +205,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #1: Station Schillingstr. closed due to track maintenance. Start 2026-06-15 12:30, duration 1h (1.00 h), reason: track maintenance.",
+  "text": "Closure #1: Line U7 suspended between Hermannplatz and Karl-Marx-Str. due to track maintenance. Start 2026-09-25 20:45, duration 2h (2.00 h), reason: track maintenance.",
   "value": {
    "closure_id": 1,
-   "start": "2026-06-15 12:30:00",
-   "hours": 1.0,
+   "start": "2026-09-25 20:45:00",
+   "hours": 2.0,
    "reason": "track maintenance",
-   "line": null,
-   "description": "Station Schillingstr. closed due to track maintenance."
+   "line": "U7",
+   "description": "Line U7 suspended between Hermannplatz and Karl-Marx-Str. due to track maintenance."
   },
   "source": "closures*.csv"
  },
@@ -222,14 +222,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #2: Line U3 suspended on a section between Spichernstr. and Oskar-Helene-Heim due to switch replacement. Start 2026-06-23 21:00, duration 3h (3.00 h), reason: switch replacement.",
+  "text": "Closure #2: Line U8 suspended on a section between Heinrich-Heine-Str. and Weinmeisterstr. due to track maintenance. Start 2026-09-26 22:20, duration 1h30min (1.50 h), reason: track maintenance.",
   "value": {
    "closure_id": 2,
-   "start": "2026-06-23 21:00:00",
-   "hours": 3.0,
-   "reason": "switch replacement",
-   "line": "U3",
-   "description": "Line U3 suspended on a section between Spichernstr. and Oskar-Helene-Heim due to switch replacement."
+   "start": "2026-09-26 22:20:00",
+   "hours": 1.5,
+   "reason": "track maintenance",
+   "line": "U8",
+   "description": "Line U8 suspended on a section between Heinrich-Heine-Str. and Weinmeisterstr. due to track maintenance."
   },
   "source": "closures*.csv"
  },
@@ -239,14 +239,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #3: Station Zitadelle closed due to signal upgrades. Start 2026-06-27 06:10, duration 3h (3.00 h), reason: signal upgrades.",
+  "text": "Closure #3: Line U2 suspended on a section between Bismarckstr. and Neu-Westend due to switch replacement. Start 2026-09-27 08:30, duration 4h (4.00 h), reason: switch replacement.",
   "value": {
    "closure_id": 3,
-   "start": "2026-06-27 06:10:00",
-   "hours": 3.0,
-   "reason": "signal upgrades",
-   "line": null,
-   "description": "Station Zitadelle closed due to signal upgrades."
+   "start": "2026-09-27 08:30:00",
+   "hours": 4.0,
+   "reason": "switch replacement",
+   "line": "U2",
+   "description": "Line U2 suspended on a section between Bismarckstr. and Neu-Westend due to switch replacement."
   },
   "source": "closures*.csv"
  },
@@ -256,14 +256,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #4: Station Neukölln closed due to switch replacement. Start 2026-06-30 17:50, duration 3h30min (3.50 h), reason: switch replacement.",
+  "text": "Closure #4: Line U3 suspended on a section between Oskar-Helene-Heim and Krumme Lanke due to track maintenance. Start 2026-06-15 08:00, duration 2h30min (2.50 h), reason: track maintenance.",
   "value": {
    "closure_id": 4,
-   "start": "2026-06-30 17:50:00",
-   "hours": 3.5,
-   "reason": "switch replacement",
-   "line": null,
-   "description": "Station Neukölln closed due to switch replacement."
+   "start": "2026-06-15 08:00:00",
+   "hours": 2.5,
+   "reason": "track maintenance",
+   "line": "U3",
+   "description": "Line U3 suspended on a section between Oskar-Helene-Heim and Krumme Lanke due to track maintenance."
   },
   "source": "closures*.csv"
  },
@@ -273,14 +273,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #5: Station Cottbusser Platz closed due to safety inspection. Start 2026-06-30 20:00, duration 3h (3.00 h), reason: safety inspection.",
+  "text": "Closure #5: Station Schillingstr. closed due to track maintenance. Start 2026-06-15 12:30, duration 1h (1.00 h), reason: track maintenance.",
   "value": {
    "closure_id": 5,
-   "start": "2026-06-30 20:00:00",
-   "hours": 3.0,
-   "reason": "safety inspection",
+   "start": "2026-06-15 12:30:00",
+   "hours": 1.0,
+   "reason": "track maintenance",
    "line": null,
-   "description": "Station Cottbusser Platz closed due to safety inspection."
+   "description": "Station Schillingstr. closed due to track maintenance."
   },
   "source": "closures*.csv"
  },
@@ -290,14 +290,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #6: Station Walther-Schreiber-Platz closed due to track maintenance. Start 2026-07-02 08:10, duration 4h30min (4.50 h), reason: track maintenance.",
+  "text": "Closure #6: Line U3 suspended on a section between Spichernstr. and Oskar-Helene-Heim due to switch replacement. Start 2026-06-23 21:00, duration 3h (3.00 h), reason: switch replacement.",
   "value": {
    "closure_id": 6,
-   "start": "2026-07-02 08:10:00",
-   "hours": 4.5,
-   "reason": "track maintenance",
-   "line": null,
-   "description": "Station Walther-Schreiber-Platz closed due to track maintenance."
+   "start": "2026-06-23 21:00:00",
+   "hours": 3.0,
+   "reason": "switch replacement",
+   "line": "U3",
+   "description": "Line U3 suspended on a section between Spichernstr. and Oskar-Helene-Heim due to switch replacement."
   },
   "source": "closures*.csv"
  },
@@ -307,14 +307,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #7: Line U8 suspended on a section between Leinestr. and Hermannplatz due to signal upgrades. Start 2026-07-11 08:20, duration 1h (1.00 h), reason: signal upgrades.",
+  "text": "Closure #7: Station Zitadelle closed due to signal upgrades. Start 2026-06-27 06:10, duration 3h (3.00 h), reason: signal upgrades.",
   "value": {
    "closure_id": 7,
-   "start": "2026-07-11 08:20:00",
-   "hours": 1.0,
+   "start": "2026-06-27 06:10:00",
+   "hours": 3.0,
    "reason": "signal upgrades",
-   "line": "U8",
-   "description": "Line U8 suspended on a section between Leinestr. and Hermannplatz due to signal upgrades."
+   "line": null,
+   "description": "Station Zitadelle closed due to signal upgrades."
   },
   "source": "closures*.csv"
  },
@@ -324,14 +324,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #8: Line U6 suspended on a section between Hallesches Tor and Kaiserin-Augusta-Str. due to safety inspection. Start 2026-07-13 13:50, duration 1h30min (1.50 h), reason: safety inspection.",
+  "text": "Closure #8: Station Neukölln closed due to switch replacement. Start 2026-06-30 17:50, duration 3h30min (3.50 h), reason: switch replacement.",
   "value": {
    "closure_id": 8,
-   "start": "2026-07-13 13:50:00",
-   "hours": 1.5,
-   "reason": "safety inspection",
-   "line": "U6",
-   "description": "Line U6 suspended on a section between Hallesches Tor and Kaiserin-Augusta-Str. due to safety inspection."
+   "start": "2026-06-30 17:50:00",
+   "hours": 3.5,
+   "reason": "switch replacement",
+   "line": null,
+   "description": "Station Neukölln closed due to switch replacement."
   },
   "source": "closures*.csv"
  },
@@ -341,14 +341,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #9: Station Theodor-Heuss-Platz closed due to switch replacement. Start 2026-07-14 16:30, duration 2h (2.00 h), reason: switch replacement.",
+  "text": "Closure #9: Station Cottbusser Platz closed due to safety inspection. Start 2026-06-30 20:00, duration 3h (3.00 h), reason: safety inspection.",
   "value": {
    "closure_id": 9,
-   "start": "2026-07-14 16:30:00",
-   "hours": 2.0,
-   "reason": "switch replacement",
+   "start": "2026-06-30 20:00:00",
+   "hours": 3.0,
+   "reason": "safety inspection",
    "line": null,
-   "description": "Station Theodor-Heuss-Platz closed due to switch replacement."
+   "description": "Station Cottbusser Platz closed due to safety inspection."
   },
   "source": "closures*.csv"
  },
@@ -358,14 +358,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #10: Station Krumme Lanke closed due to switch replacement. Start 2026-07-16 11:20, duration 1h30min (1.50 h), reason: switch replacement.",
+  "text": "Closure #10: Station Walther-Schreiber-Platz closed due to track maintenance. Start 2026-07-02 08:10, duration 4h30min (4.50 h), reason: track maintenance.",
   "value": {
    "closure_id": 10,
-   "start": "2026-07-16 11:20:00",
-   "hours": 1.5,
-   "reason": "switch replacement",
+   "start": "2026-07-02 08:10:00",
+   "hours": 4.5,
+   "reason": "track maintenance",
    "line": null,
-   "description": "Station Krumme Lanke closed due to switch replacement."
+   "description": "Station Walther-Schreiber-Platz closed due to track maintenance."
   },
   "source": "closures*.csv"
  },
@@ -375,14 +375,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #11: Station Turmstr. closed due to switch replacement. Start 2026-08-05 06:15, duration 3h (3.00 h), reason: switch replacement.",
+  "text": "Closure #11: Line U8 suspended on a section between Leinestr. and Hermannplatz due to signal upgrades. Start 2026-07-11 08:20, duration 1h (1.00 h), reason: signal upgrades.",
   "value": {
    "closure_id": 11,
-   "start": "2026-08-05 06:15:00",
-   "hours": 3.0,
-   "reason": "switch replacement",
-   "line": null,
-   "description": "Station Turmstr. closed due to switch replacement."
+   "start": "2026-07-11 08:20:00",
+   "hours": 1.0,
+   "reason": "signal upgrades",
+   "line": "U8",
+   "description": "Line U8 suspended on a section between Leinestr. and Hermannplatz due to signal upgrades."
   },
   "source": "closures*.csv"
  },
@@ -392,14 +392,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #12: Line U5 suspended on a section between Kaulsdorf-Nord and Hönow due to safety inspection. Start 2026-08-05 21:00, duration 3h30min (3.50 h), reason: safety inspection.",
+  "text": "Closure #12: Line U6 suspended on a section between Hallesches Tor and Kaiserin-Augusta-Str. due to safety inspection. Start 2026-07-13 13:50, duration 1h30min (1.50 h), reason: safety inspection.",
   "value": {
    "closure_id": 12,
-   "start": "2026-08-05 21:00:00",
-   "hours": 3.5,
+   "start": "2026-07-13 13:50:00",
+   "hours": 1.5,
    "reason": "safety inspection",
-   "line": "U5",
-   "description": "Line U5 suspended on a section between Kaulsdorf-Nord and Hönow due to safety inspection."
+   "line": "U6",
+   "description": "Line U6 suspended on a section between Hallesches Tor and Kaiserin-Augusta-Str. due to safety inspection."
   },
   "source": "closures*.csv"
  },
@@ -409,14 +409,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #13: Line U7 suspended on a section between Paulsternstr. and Zitadelle due to safety inspection. Start 2026-08-08 20:10, duration 1h (1.00 h), reason: safety inspection.",
+  "text": "Closure #13: Station Theodor-Heuss-Platz closed due to switch replacement. Start 2026-07-14 16:30, duration 2h (2.00 h), reason: switch replacement.",
   "value": {
    "closure_id": 13,
-   "start": "2026-08-08 20:10:00",
-   "hours": 1.0,
-   "reason": "safety inspection",
-   "line": "U7",
-   "description": "Line U7 suspended on a section between Paulsternstr. and Zitadelle due to safety inspection."
+   "start": "2026-07-14 16:30:00",
+   "hours": 2.0,
+   "reason": "switch replacement",
+   "line": null,
+   "description": "Station Theodor-Heuss-Platz closed due to switch replacement."
   },
   "source": "closures*.csv"
  },
@@ -426,14 +426,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #14: Line U9 suspended on a section between Walther-Schreiber-Platz and Spichernstr. due to power system maintenance. Start 2026-08-15 11:30, duration 3h30min (3.50 h), reason: power system maintenance.",
+  "text": "Closure #14: Station Krumme Lanke closed due to switch replacement. Start 2026-07-16 11:20, duration 1h30min (1.50 h), reason: switch replacement.",
   "value": {
    "closure_id": 14,
-   "start": "2026-08-15 11:30:00",
-   "hours": 3.5,
-   "reason": "power system maintenance",
-   "line": "U9",
-   "description": "Line U9 suspended on a section between Walther-Schreiber-Platz and Spichernstr. due to power system maintenance."
+   "start": "2026-07-16 11:20:00",
+   "hours": 1.5,
+   "reason": "switch replacement",
+   "line": null,
+   "description": "Station Krumme Lanke closed due to switch replacement."
   },
   "source": "closures*.csv"
  },
@@ -443,14 +443,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #15: Line U7 suspended between Kleistpark and Bayerischer Platz due to safety inspection. Start 2026-08-17 15:40, duration 4h (4.00 h), reason: safety inspection.",
+  "text": "Closure #15: Station Turmstr. closed due to switch replacement. Start 2026-08-05 06:15, duration 3h (3.00 h), reason: switch replacement.",
   "value": {
    "closure_id": 15,
-   "start": "2026-08-17 15:40:00",
-   "hours": 4.0,
-   "reason": "safety inspection",
-   "line": "U7",
-   "description": "Line U7 suspended between Kleistpark and Bayerischer Platz due to safety inspection."
+   "start": "2026-08-05 06:15:00",
+   "hours": 3.0,
+   "reason": "switch replacement",
+   "line": null,
+   "description": "Station Turmstr. closed due to switch replacement."
   },
   "source": "closures*.csv"
  },
@@ -460,14 +460,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #16: Line U9 suspended on a section between Berliner Str. and Rathaus Steglitz due to safety inspection. Start 2026-08-19 12:30, duration 1h (1.00 h), reason: safety inspection.",
+  "text": "Closure #16: Line U5 suspended on a section between Kaulsdorf-Nord and Hönow due to safety inspection. Start 2026-08-05 21:00, duration 3h30min (3.50 h), reason: safety inspection.",
   "value": {
    "closure_id": 16,
-   "start": "2026-08-19 12:30:00",
-   "hours": 1.0,
+   "start": "2026-08-05 21:00:00",
+   "hours": 3.5,
    "reason": "safety inspection",
-   "line": "U9",
-   "description": "Line U9 suspended on a section between Berliner Str. and Rathaus Steglitz due to safety inspection."
+   "line": "U5",
+   "description": "Line U5 suspended on a section between Kaulsdorf-Nord and Hönow due to safety inspection."
   },
   "source": "closures*.csv"
  },
@@ -477,14 +477,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #17: Line U9 suspended on a section between Walther-Schreiber-Platz and Bundesplatz due to safety inspection. Start 2026-08-27 12:40, duration 4h (4.00 h), reason: safety inspection.",
+  "text": "Closure #17: Line U7 suspended on a section between Paulsternstr. and Zitadelle due to safety inspection. Start 2026-08-08 20:10, duration 1h (1.00 h), reason: safety inspection.",
   "value": {
    "closure_id": 17,
-   "start": "2026-08-27 12:40:00",
-   "hours": 4.0,
+   "start": "2026-08-08 20:10:00",
+   "hours": 1.0,
    "reason": "safety inspection",
-   "line": "U9",
-   "description": "Line U9 suspended on a section between Walther-Schreiber-Platz and Bundesplatz due to safety inspection."
+   "line": "U7",
+   "description": "Line U7 suspended on a section between Paulsternstr. and Zitadelle due to safety inspection."
   },
   "source": "closures*.csv"
  },
@@ -494,14 +494,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #18: Line U7 suspended on a section between Blaschkoallee and Rudow due to power system maintenance. Start 2026-08-30 18:10, duration 2h30min (2.50 h), reason: power system maintenance.",
+  "text": "Closure #18: Line U9 suspended on a section between Walther-Schreiber-Platz and Spichernstr. due to power system maintenance. Start 2026-08-15 11:30, duration 3h30min (3.50 h), reason: power system maintenance.",
   "value": {
    "closure_id": 18,
-   "start": "2026-08-30 18:10:00",
-   "hours": 2.5,
+   "start": "2026-08-15 11:30:00",
+   "hours": 3.5,
    "reason": "power system maintenance",
-   "line": "U7",
-   "description": "Line U7 suspended on a section between Blaschkoallee and Rudow due to power system maintenance."
+   "line": "U9",
+   "description": "Line U9 suspended on a section between Walther-Schreiber-Platz and Spichernstr. due to power system maintenance."
   },
   "source": "closures*.csv"
  },
@@ -511,14 +511,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #19: Station Lichtenberg Bhf closed due to signal upgrades. Start 2026-09-07 13:50, duration 3h30min (3.50 h), reason: signal upgrades.",
+  "text": "Closure #19: Line U7 suspended between Kleistpark and Bayerischer Platz due to safety inspection. Start 2026-08-17 15:40, duration 4h (4.00 h), reason: safety inspection.",
   "value": {
    "closure_id": 19,
-   "start": "2026-09-07 13:50:00",
-   "hours": 3.5,
-   "reason": "signal upgrades",
-   "line": null,
-   "description": "Station Lichtenberg Bhf closed due to signal upgrades."
+   "start": "2026-08-17 15:40:00",
+   "hours": 4.0,
+   "reason": "safety inspection",
+   "line": "U7",
+   "description": "Line U7 suspended between Kleistpark and Bayerischer Platz due to safety inspection."
   },
   "source": "closures*.csv"
  },
@@ -528,14 +528,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #20: Station Bismarckstr. closed due to safety inspection. Start 2026-09-07 20:20, duration 1h (1.00 h), reason: safety inspection.",
+  "text": "Closure #20: Line U9 suspended on a section between Berliner Str. and Rathaus Steglitz due to safety inspection. Start 2026-08-19 12:30, duration 1h (1.00 h), reason: safety inspection.",
   "value": {
    "closure_id": 20,
-   "start": "2026-09-07 20:20:00",
+   "start": "2026-08-19 12:30:00",
    "hours": 1.0,
    "reason": "safety inspection",
-   "line": null,
-   "description": "Station Bismarckstr. closed due to safety inspection."
+   "line": "U9",
+   "description": "Line U9 suspended on a section between Berliner Str. and Rathaus Steglitz due to safety inspection."
   },
   "source": "closures*.csv"
  },
@@ -545,14 +545,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #21: Line U6 suspended on a section between Kaiserin-Augusta-Str. and Platz der Luftbrücke due to track maintenance. Start 2026-09-14 10:45, duration 4h30min (4.50 h), reason: track maintenance.",
+  "text": "Closure #21: Line U9 suspended on a section between Walther-Schreiber-Platz and Bundesplatz due to safety inspection. Start 2026-08-27 12:40, duration 4h (4.00 h), reason: safety inspection.",
   "value": {
    "closure_id": 21,
-   "start": "2026-09-14 10:45:00",
-   "hours": 4.5,
-   "reason": "track maintenance",
-   "line": "U6",
-   "description": "Line U6 suspended on a section between Kaiserin-Augusta-Str. and Platz der Luftbrücke due to track maintenance."
+   "start": "2026-08-27 12:40:00",
+   "hours": 4.0,
+   "reason": "safety inspection",
+   "line": "U9",
+   "description": "Line U9 suspended on a section between Walther-Schreiber-Platz and Bundesplatz due to safety inspection."
   },
   "source": "closures*.csv"
  },
@@ -562,14 +562,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #22: Line U7 suspended on a section between Siemensdamm and Altstadt Spandau due to power system maintenance. Start 2026-09-14 23:15, duration 1h30min (1.50 h), reason: power system maintenance.",
+  "text": "Closure #22: Line U7 suspended on a section between Blaschkoallee and Rudow due to power system maintenance. Start 2026-08-30 18:10, duration 2h30min (2.50 h), reason: power system maintenance.",
   "value": {
    "closure_id": 22,
-   "start": "2026-09-14 23:15:00",
-   "hours": 1.5,
+   "start": "2026-08-30 18:10:00",
+   "hours": 2.5,
    "reason": "power system maintenance",
    "line": "U7",
-   "description": "Line U7 suspended on a section between Siemensdamm and Altstadt Spandau due to power system maintenance."
+   "description": "Line U7 suspended on a section between Blaschkoallee and Rudow due to power system maintenance."
   },
   "source": "closures*.csv"
  },
@@ -579,14 +579,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #23: Line U3 suspended on a section between Oskar-Helene-Heim and Krumme Lanke due to safety inspection. Start 2026-09-18 11:00, duration 4h (4.00 h), reason: safety inspection.",
+  "text": "Closure #23: Station Lichtenberg Bhf closed due to signal upgrades. Start 2026-09-07 13:50, duration 3h30min (3.50 h), reason: signal upgrades.",
   "value": {
    "closure_id": 23,
-   "start": "2026-09-18 11:00:00",
-   "hours": 4.0,
-   "reason": "safety inspection",
-   "line": "U3",
-   "description": "Line U3 suspended on a section between Oskar-Helene-Heim and Krumme Lanke due to safety inspection."
+   "start": "2026-09-07 13:50:00",
+   "hours": 3.5,
+   "reason": "signal upgrades",
+   "line": null,
+   "description": "Station Lichtenberg Bhf closed due to signal upgrades."
   },
   "source": "closures*.csv"
  },
@@ -596,14 +596,14 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #24: Station Turmstr. closed due to signal upgrades. Start 2026-09-20 05:10, duration 4h (4.00 h), reason: signal upgrades.",
+  "text": "Closure #24: Station Bismarckstr. closed due to safety inspection. Start 2026-09-07 20:20, duration 1h (1.00 h), reason: safety inspection.",
   "value": {
    "closure_id": 24,
-   "start": "2026-09-20 05:10:00",
-   "hours": 4.0,
-   "reason": "signal upgrades",
+   "start": "2026-09-07 20:20:00",
+   "hours": 1.0,
+   "reason": "safety inspection",
    "line": null,
-   "description": "Station Turmstr. closed due to signal upgrades."
+   "description": "Station Bismarckstr. closed due to safety inspection."
   },
   "source": "closures*.csv"
  },
@@ -613,9 +613,77 @@
   "cats": [
    "C"
   ],
-  "text": "Closure #25: Line U1 suspended on a section between Hallesches Tor and Schlesisches Tor due to switch replacement. Start 2026-09-21 18:00, duration 2h30min (2.50 h), reason: switch replacement.",
+  "text": "Closure #25: Line U6 suspended on a section between Kaiserin-Augusta-Str. and Platz der Luftbrücke due to track maintenance. Start 2026-09-14 10:45, duration 4h30min (4.50 h), reason: track maintenance.",
   "value": {
    "closure_id": 25,
+   "start": "2026-09-14 10:45:00",
+   "hours": 4.5,
+   "reason": "track maintenance",
+   "line": "U6",
+   "description": "Line U6 suspended on a section between Kaiserin-Augusta-Str. and Platz der Luftbrücke due to track maintenance."
+  },
+  "source": "closures*.csv"
+ },
+ {
+  "id": "GT-CL-26",
+  "kind": "ground_truth",
+  "cats": [
+   "C"
+  ],
+  "text": "Closure #26: Line U7 suspended on a section between Siemensdamm and Altstadt Spandau due to power system maintenance. Start 2026-09-14 23:15, duration 1h30min (1.50 h), reason: power system maintenance.",
+  "value": {
+   "closure_id": 26,
+   "start": "2026-09-14 23:15:00",
+   "hours": 1.5,
+   "reason": "power system maintenance",
+   "line": "U7",
+   "description": "Line U7 suspended on a section between Siemensdamm and Altstadt Spandau due to power system maintenance."
+  },
+  "source": "closures*.csv"
+ },
+ {
+  "id": "GT-CL-27",
+  "kind": "ground_truth",
+  "cats": [
+   "C"
+  ],
+  "text": "Closure #27: Line U3 suspended on a section between Oskar-Helene-Heim and Krumme Lanke due to safety inspection. Start 2026-09-18 11:00, duration 4h (4.00 h), reason: safety inspection.",
+  "value": {
+   "closure_id": 27,
+   "start": "2026-09-18 11:00:00",
+   "hours": 4.0,
+   "reason": "safety inspection",
+   "line": "U3",
+   "description": "Line U3 suspended on a section between Oskar-Helene-Heim and Krumme Lanke due to safety inspection."
+  },
+  "source": "closures*.csv"
+ },
+ {
+  "id": "GT-CL-28",
+  "kind": "ground_truth",
+  "cats": [
+   "C"
+  ],
+  "text": "Closure #28: Station Turmstr. closed due to signal upgrades. Start 2026-09-20 05:10, duration 4h (4.00 h), reason: signal upgrades.",
+  "value": {
+   "closure_id": 28,
+   "start": "2026-09-20 05:10:00",
+   "hours": 4.0,
+   "reason": "signal upgrades",
+   "line": null,
+   "description": "Station Turmstr. closed due to signal upgrades."
+  },
+  "source": "closures*.csv"
+ },
+ {
+  "id": "GT-CL-29",
+  "kind": "ground_truth",
+  "cats": [
+   "C"
+  ],
+  "text": "Closure #29: Line U1 suspended on a section between Hallesches Tor and Schlesisches Tor due to switch replacement. Start 2026-09-21 18:00, duration 2h30min (2.50 h), reason: switch replacement.",
+  "value": {
+   "closure_id": 29,
    "start": "2026-09-21 18:00:00",
    "hours": 2.5,
    "reason": "switch replacement",
@@ -630,12 +698,12 @@
   "cats": [
    "D"
   ],
-  "text": "Rudow: weekday commute peak at 18:00 with 218.8 passengers per 15 min; the mean of all stations' own weekday peaks is 264.7; Rudow does not exceed it.",
+  "text": "Rudow: weekday commute peak at 18:00 with 223.2 passengers per 15 min; the mean of all stations' own weekday peaks is 265.8; Rudow does not exceed it.",
   "value": {
    "station": "U Rudow (Berlin)",
    "peak_hour": 18,
-   "peak_value": 218.84459459459458,
-   "network_mean_peak": 264.66202055348765,
+   "peak_value": 223.20987654320987,
+   "network_mean_peak": 265.78038367709024,
    "exceeds": false
   },
   "source": "flows*.csv"
@@ -647,14 +715,14 @@
    "D",
    "P"
   ],
-  "text": "Highest weekday hourly-average flows per 15 min: Spichernstr. 840 (peak 17:00); Kurfürstendamm 818 (peak 18:00); Berliner Str. 765 (peak 7:00); Wittenbergplatz 752 (peak 8:00); Zoologischer Garten Bhf 731 (peak 18:00).",
+  "text": "Highest weekday hourly-average flows per 15 min: Kurfürstendamm 835 (peak 18:00); Spichernstr. 834 (peak 17:00); Berliner Str. 770 (peak 7:00); Wittenbergplatz 763 (peak 17:00); Zoologischer Garten Bhf 731 (peak 18:00).",
   "value": {
    "top": {
-    "U Spichernstr. (Berlin)": 840.2466216216217,
-    "U Kurfürstendamm (Berlin)": 817.9256756756756,
-    "U Berliner Str. (Berlin)": 765.1182432432432,
-    "U Wittenbergplatz (Berlin)": 751.7702702702703,
-    "S+U Zoologischer Garten Bhf (Berlin)": 730.9087837837837
+    "U Kurfürstendamm (Berlin)": 834.6975308641976,
+    "U Spichernstr. (Berlin)": 834.5,
+    "U Berliner Str. (Berlin)": 769.9753086419753,
+    "U Wittenbergplatz (Berlin)": 763.3827160493827,
+    "S+U Zoologischer Garten Bhf (Berlin)": 731.2808641975308
    }
   },
   "source": "flows*.csv"
@@ -665,17 +733,17 @@
   "cats": [
    "E"
   ],
-  "text": "Energy per passenger (Wh, total daily MWh / passengers at the line's stations): U5 550; U6 525; U8 487; U7 431; U3 329; U1 260; U2 258; U9 255. Worst: U5 (550 Wh), best: U9 (255 Wh). Passengers are approximated per line (interchanges count on every line they serve).",
+  "text": "Energy per passenger (Wh, total daily MWh / passengers at the line's stations): U5 546; U6 521; U8 484; U7 427; U3 326; U1 258; U2 256; U9 253. Worst: U5 (546 Wh), best: U9 (253 Wh). Passengers are approximated per line (interchanges count on every line they serve).",
   "value": {
    "ranking": {
-    "U5": 550.0485358759117,
-    "U6": 525.4743680175192,
-    "U8": 487.2002518090457,
-    "U7": 431.1735969038886,
-    "U3": 328.8847205866429,
-    "U1": 260.3111012073491,
-    "U2": 258.22879925323065,
-    "U9": 254.77093810575127
+    "U5": 545.5059752522815,
+    "U6": 520.8069977715709,
+    "U8": 483.9345660158155,
+    "U7": 427.46508703482056,
+    "U3": 325.97390171658105,
+    "U1": 258.0317694076194,
+    "U2": 255.99071947248368,
+    "U9": 252.63330372504834
    },
    "worst": "U5",
    "best": "U9"
@@ -688,32 +756,32 @@
   "cats": [
    "F"
   ],
-  "text": "Stations whose closure fragments the network most (passengers affected per day = own + cut-off stations): Alexanderplatz Bhf 179528 (25 stations cut off, 3 parts); Bismarckstr. 133714 (18 stations cut off, 3 parts); Schillingstr. 131108 (18 stations cut off, 2 parts); Strausberger Platz 124296 (17 stations cut off, 2 parts); Weberwiese 117540 (16 stations cut off, 2 parts). Trains are assumed not to run through a closed station.",
+  "text": "Stations whose closure fragments the network most (passengers affected per day = own + cut-off stations): Alexanderplatz Bhf 181565 (25 stations cut off, 3 parts); Bismarckstr. 135127 (18 stations cut off, 3 parts); Schillingstr. 132553 (18 stations cut off, 2 parts); Strausberger Platz 125632 (17 stations cut off, 2 parts); Weberwiese 118800 (16 stations cut off, 2 parts). Trains are assumed not to run through a closed station.",
   "value": {
    "top": [
     {
      "station": "S+U Alexanderplatz Bhf (Berlin)",
-     "pax": 179527.9238095238,
+     "pax": 181564.71929824562,
      "cut": 25
     },
     {
      "station": "U Bismarckstr. (Berlin)",
-     "pax": 133713.83809523808,
+     "pax": 135126.72807017545,
      "cut": 18
     },
     {
      "station": "U Schillingstr. (Berlin)",
-     "pax": 131107.59047619047,
+     "pax": 132552.88596491228,
      "cut": 18
     },
     {
      "station": "U Strausberger Platz (Berlin)",
-     "pax": 124296.06666666667,
+     "pax": 125632.49122807017,
      "cut": 17
     },
     {
      "station": "U Weberwiese (Berlin)",
-     "pax": 117540.06666666668,
+     "pax": 118800.08771929824,
      "cut": 16
     }
    ]
@@ -726,15 +794,15 @@
   "cats": [
    "A"
   ],
-  "text": "Uber Arena: 14 events in the data (median attendance 1758). In the hour after they end the flow is, versus the same weekday hour in neighbouring weeks, Schlesisches Tor x5.1; Warschauer Str. x4.7; Senefelderplatz x1.8; Hermannplatz x0.8. The event effect is local to the 1-2 stations next to the venue.",
+  "text": "Uber Arena: 18 events in the data (median attendance 1765). In the hour after they end the flow is, versus the same weekday hour in neighbouring weeks, Warschauer Str. x6.5; Schlesisches Tor x6.2; Rosa-Luxemburg-Platz x2.0; Hermannplatz x1.3. The event effect is local to the 1-2 stations next to the venue.",
   "value": {
-   "n_events": 14,
+   "n_events": 18,
    "top": {
-    "U Schlesisches Tor (Berlin)": 5.128688535940291,
-    "S+U Warschauer Str. (Berlin)": 4.719797323152196,
-    "U Senefelderplatz (Berlin)": 1.7586206896551724
+    "S+U Warschauer Str. (Berlin)": 6.497139598796014,
+    "U Schlesisches Tor (Berlin)": 6.221789883268482,
+    "U Rosa-Luxemburg-Platz (Berlin)": 2.019093105706479
    },
-   "hermannplatz": 0.7931329423264907
+   "hermannplatz": 1.2536069409241568
   },
   "source": "berlin_events*.csv, flows*.csv"
  },
@@ -745,10 +813,10 @@
    "B",
    "P"
   ],
-  "text": "Rain (> 0.5 mm per 15 min, 419 slots) lifts total network flow to x1.29 of the dry value for the same weekday and time, and the number of stations pinned at 500 rises from 1.8 to 2.9 per slot.",
+  "text": "Rain (> 0.5 mm per 15 min, 419 slots) lifts total network flow to x1.27 of the dry value for the same weekday and time, and the number of stations pinned at 500 rises from 1.9 to 2.9 per slot.",
   "value": {
-   "rain_ratio": 1.2872498708824633,
-   "hits_dry": 1.8482470573345147,
+   "rain_ratio": 1.27143978566475,
+   "hits_dry": 1.9119591694698992,
    "hits_rain": 2.9307875894988067
   },
   "source": "weather_data*.csv, flows*.csv"
