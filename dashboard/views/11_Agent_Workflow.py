@@ -453,6 +453,26 @@ try:
 except Exception as e:
     st.warning(f"Operator knowledge base not available ({type(e).__name__}: {e}).")
 
+st.subheader("Operator feedback loop — scores and what the operators did")
+try:
+    from knowledge import kb as _kbf
+    _fs = _kbf().feedback_stats()
+    f1, f2, f3, f4 = st.columns(4)
+    f1.metric("Scores", _fs["n_scores"], f"mean {_fs['mean_score']}" if _fs["mean_score"] is not None else "none yet", delta_color="off")
+    f2.metric("Action reports", _fs["n_action_reports"], f"{round((_fs['action_report_rate'] or 0) * 100)}% of action-requiring answers", delta_color="off")
+    f3.metric("Advice followed", ", ".join(f"{k}: {v}" for k, v in _fs["followed"].items() if k) or "—")
+    f4.metric("Outcomes", ", ".join(f"{k}: {v}" for k, v in _fs["outcome"].items() if k) or "—")
+    with _sql.connect(DEFAULT_DB) as _c2:
+        _fb = pd.read_sql_query("SELECT f.id, datetime(f.ts,'unixepoch','localtime') AS at, f.user_id AS operator, f.turn_id, f.category, f.score, f.followed, f.outcome, f.action_text, f.comment "
+                                "FROM operator_feedback f WHERE f.deleted=0 ORDER BY f.id DESC LIMIT 100", _c2)
+    if _fb.empty:
+        st.info("No feedback yet. The UI sends it to the operator API (`POST /api/v1/turns/{turn_id}/score` and `/action`, docs: `docs/operator_feedback_api.md`); it lands here, in the knowledge graph "
+                "(Feedback / OperatorAction nodes) and in the precedent line of later answers.")
+    else:
+        st.dataframe(_fb, hide_index=True, use_container_width=True)
+except Exception as e:
+    st.warning(f"Operator feedback not available ({type(e).__name__}: {e}).")
+
 # =========================================================================================== 6 · what is missing
 st.header("6 · What is still missing")
 st.markdown(

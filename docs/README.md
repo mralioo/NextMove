@@ -2,6 +2,7 @@
 
 | Document | What it is | Status |
 | --- | --- | --- |
+| [`operator_feedback_api.md`](operator_feedback_api.md) | Operator feedback loop (score of a response, action taken → knowledge graph, precedents) and the endpoints for the UI | current |
 | [`brief_answers_and_operator_kb.md`](brief_answers_and_operator_kb.md) | Brief answers by default, full report on request (why / evidence / sources / tools); artifact bundles saved to the operator knowledge base, graph and memory | current |
 | [`presentation_guide.md`](presentation_guide.md) | Talk for the fair: story, slides, demo script, Q&A, plus the full report (specs, stack, design, numbers, limits) | current |
 | [`running_the_system.md`](running_the_system.md) | `make up` / `down` / `status`, what starts, ports, troubleshooting | current |

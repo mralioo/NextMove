@@ -337,6 +337,15 @@ class WriterAgent(BaseAgent):
                 brief_text = writer.shorten(narr) if mode == "detail" else answer.split("\n_Confidence")[0]
                 art = artifacts.build(question=q, session_id=ctx.session.id, plan=st.get("sp") or {}, result=st.get("result"), verdict=st.get("verdict"), facts=facts, timing=timing, refs=refs,
                                       brief=brief_text, sources_line=line, sanity=None, source=source, answer_mode=mode, data_window=_window())
+                import feedback as fb
+                art["requires_action"] = bool(writer.wants_action(q) or plan.category in ("C", "A", "P"))         # the UI then asks "what did you do about it?"
+                art["recommended_actions"] = fb.recommended_actions(brief_text, facts)
+                if supervisor.HISTORY_ON():                                    # operator precedents: what operators did in similar situations and how it went (feedback loop)
+                    from kgraph import _h, _norm
+                    art["precedents"] = fb.precedents(q, plan.category, plan.entities, exclude_key=_h(_norm(q), 12))
+                    art["precedent"] = fb.precedent_line(art["precedents"]) or None
+                    if art["precedent"] and mode == "brief" and "\n_Confidence" in answer:
+                        answer = answer.replace("\n_Confidence", "\n" + art["precedent"] + "\n_Confidence", 1)
                 if mode == "detail":
                     art["report"] = answer = artifacts.full_report(art, narr)
             except Exception as e:                                         # an artifact bug must never cost the operator the answer
@@ -364,7 +373,8 @@ class WriterAgent(BaseAgent):
             f"+ writer {parts['writer_s']} s (LLM inference {parts['writer_llm_s']} s)"))]), custom_metadata={"kind": "timing", **parts})
         final = _text_event(self.name, answer, delta)
         final.custom_metadata = {"kind": "answer", "source": source, "answer_mode": mode if source in ("worker", "follow_up") else None, "answer_words": len(answer.split()),
-                                 "artifact_turn_id": (art or {}).get("turn_id"), **parts, "model": info.get("model"), "tok_in": info.get("tok_in"), "tok_out": info.get("tok_out"), "guard": info.get("guard")}
+                                 "artifact_turn_id": (art or {}).get("turn_id"), "turn_id": timing.get("sanity", {}).get("turn_id"), "requires_action": (art or {}).get("requires_action"),
+                                 "precedent": (art or {}).get("precedent"), **parts, "model": info.get("model"), "tok_in": info.get("tok_in"), "tok_out": info.get("tok_out"), "guard": info.get("guard")}
         if info.get("tok_in") or info.get("tok_out"):
             final.usage_metadata = types.GenerateContentResponseUsageMetadata(prompt_token_count=info.get("tok_in") or 0, candidates_token_count=info.get("tok_out") or 0,
                                                                               total_token_count=(info.get("tok_in") or 0) + (info.get("tok_out") or 0))

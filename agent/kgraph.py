@@ -180,6 +180,81 @@ class KnowledgeGraph:
             row = c.execute("SELECT props FROM kg_nodes WHERE label='Artifact' AND key=?", (str(turn_id),)).fetchone()
         return json.loads(row[0]) if row else None
 
+    # -- operator feedback (the loop): scores of answers and what the operator actually did
+    def record_feedback(self, fb: dict, art: dict | None = None, question: str = "", category: str = "") -> None:
+        """One operator feedback record -> graph.
+        Problem -RECEIVED_FEEDBACK-> Feedback (score, comment, kind); Artifact -RECEIVED_FEEDBACK-> Feedback; the Answer node keeps n_ratings / mean_score;
+        an action report also creates  Feedback -DESCRIBES-> OperatorAction -AT-> Station / -ON_LINE-> Line  and links OperatorAction -MATCHES-> Action when it
+        carries out something the answer recommended. Precedents (operator_precedents) are read back from exactly these nodes."""
+        pk = fb.get("problem_key") or (art or {}).get("problem_key") or _h(_norm(question), 12)
+        prob = self.node("Problem", pk, _keep=("source",), text=question or None, category=category or fb.get("category"), source="runtime")
+        fid = self.node("Feedback", f"fb{fb['feedback_id']}", kind=fb["kind"], score=fb.get("score"), comment=(fb.get("comment") or "")[:500] or None, followed=fb.get("followed"),
+                        outcome=fb.get("outcome"), action=fb.get("action_text"), occurred_at=fb.get("occurred_at"), operator=fb.get("operator_id"), turn_id=fb["turn_id"], ts=fb.get("ts"))
+        self.edge(prob, "RECEIVED_FEEDBACK", fid)
+        if art and art.get("turn_id"):
+            self.edge(self.node("Artifact", str(art["turn_id"])), "RECEIVED_FEEDBACK", fid)
+        if fb.get("score") is not None and art and art.get("brief"):
+            with self._conn() as c:
+                row = c.execute("SELECT id, props FROM kg_nodes WHERE label='Answer' AND key=?", (_h(art["brief"], 12),)).fetchone()
+            if row:
+                pr = json.loads(row[1] or "{}")
+                n, tot = int(pr.get("n_ratings") or 0) + 1, float(pr.get("score_sum") or 0) + fb["score"]
+                self.node("Answer", _h(art["brief"], 12), n_ratings=n, score_sum=tot, mean_score=round(tot / n, 2))
+        if fb.get("action_text"):
+            act = self.node("OperatorAction", _h(_norm(fb["action_text"]), 12), text=fb["action_text"][:300])
+            self.edge(fid, "DESCRIBES", act)
+            self.edge(prob, "OPERATOR_TOOK", act)
+            for st in fb.get("stations") or []:
+                self.edge(act, "AT", self.node("Station", _short(st)))
+            for ln in fb.get("lines") or []:
+                self.edge(act, "ON_LINE", self.node("Line", ln))
+            at = _tokens(fb["action_text"])
+            for r in (art or {}).get("recommended_actions", []):
+                rt = _tokens(r)
+                if rt and len(at & rt) / len(rt) >= 0.4:
+                    self.edge(act, "MATCHES", self.node("Action", _norm(r)[:120], text=r))
+
+    def _feedback_of(self, problem_id: int) -> list[dict]:
+        with self._conn() as c:
+            return [json.loads(p or "{}") for (p,) in c.execute("SELECT n.props FROM kg_edges e JOIN kg_nodes n ON n.id=e.dst WHERE e.src=? AND e.rel='RECEIVED_FEEDBACK' AND n.label='Feedback'", (problem_id,))]
+
+    def operator_precedents(self, question: str, category: str = "", entities=None, k: int = 2, min_sim: float = 0.35, exclude_key: str | None = None) -> list[dict]:
+        """What operators did in SIMILAR past situations and how it went: per similar problem the reported actions (with followed / outcome / score), the mean score of the answer,
+        ranked by similarity. Only problems with at least one operator report are returned."""
+        out = []
+        for case in self.similar(question, category, entities, k=12, min_sim=min_sim):
+            if exclude_key and case.problem_id == exclude_key:
+                continue
+            with self._conn() as c:
+                row = c.execute("SELECT id FROM kg_nodes WHERE label='Problem' AND key=?", (case.problem_id,)).fetchone()
+            fbs = self._feedback_of(row[0]) if row else []
+            if not fbs:
+                continue
+            scores = [f["score"] for f in fbs if f.get("score") is not None]
+            acts = [{"action": f["action"], "followed": f.get("followed"), "outcome": f.get("outcome"), "score": f.get("score"), "operator": f.get("operator"), "occurred_at": f.get("occurred_at")}
+                    for f in fbs if f.get("action")]
+            out.append({"problem_key": case.problem_id, "problem": case.problem, "category": case.category, "similarity": case.similarity, "n_reports": len(fbs),
+                        "mean_score": round(sum(scores) / len(scores), 2) if scores else None, "actions": acts, "recommended": case.actions})
+        return sorted(out, key=lambda x: -x["similarity"])[:k]
+
+    def operator_actions(self, category: str = "", station: str = "", min_score: float | None = None, limit: int = 30) -> list[dict]:
+        """Every action operators reported, newest first, optionally by category / station / minimum score of the report."""
+        with self._conn() as c:
+            rows = c.execute("""SELECT f.props, p.props FROM kg_nodes f JOIN kg_edges e ON e.dst=f.id AND e.rel='RECEIVED_FEEDBACK' JOIN kg_nodes p ON p.id=e.src AND p.label='Problem'
+                                WHERE f.label='Feedback' AND json_extract(f.props,'$.action') IS NOT NULL ORDER BY f.ts DESC LIMIT 400""").fetchall()
+        out = []
+        for fp, pp in rows:
+            f, p = json.loads(fp), json.loads(pp)
+            if category and p.get("category") != category:
+                continue
+            if station and station.lower() not in (f.get("action") or "").lower():
+                continue
+            if min_score is not None and (f.get("score") is None or f["score"] < min_score):
+                continue
+            out.append({"action": f["action"], "followed": f.get("followed"), "outcome": f.get("outcome"), "score": f.get("score"), "operator": f.get("operator"), "occurred_at": f.get("occurred_at"),
+                        "situation": (p.get("text") or "")[:200], "category": p.get("category")})
+        return out[:limit]
+
     # -- reads
     def stats(self) -> dict:
         with self._conn() as c:

@@ -173,12 +173,16 @@ class KnowledgeBase:
         with self._conn() as c:
             c.execute("CREATE TABLE IF NOT EXISTS turns (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT, user_id TEXT, ts REAL, question TEXT, cat TEXT, "
                       "answer TEXT, facts_json TEXT, sanity_json TEXT)")
-            for col, typ in (("verdict", "TEXT"), ("confidence", "REAL"), ("plan_key", "TEXT"), ("data_end", "TEXT"), ("accepted", "INTEGER"), ("plan_json", "TEXT"), ("artifact_json", "TEXT")):
+            for col, typ in (("verdict", "TEXT"), ("confidence", "REAL"), ("plan_key", "TEXT"), ("data_end", "TEXT"), ("accepted", "INTEGER"), ("plan_json", "TEXT"), ("artifact_json", "TEXT"), ("operator_score", "REAL"), ("n_feedback", "INTEGER")):
                 try:                                       # turn store created before v3: add the columns the supervisor's history lookup needs
                     c.execute(f"ALTER TABLE turns ADD COLUMN {col} {typ}")
                 except sqlite3.OperationalError:
                     pass
             c.execute("CREATE TABLE IF NOT EXISTS insights (id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, text TEXT, cats TEXT, source TEXT)")
+            # operator feedback: a score of an answer and / or what the operator actually did about the situation (see feedback.py)
+            c.execute("CREATE TABLE IF NOT EXISTS operator_feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, turn_id INTEGER, session_id TEXT, user_id TEXT, kind TEXT, score INTEGER, "
+                      "comment TEXT, action_text TEXT, followed TEXT, outcome TEXT, occurred_at TEXT, stations_json TEXT, lines_json TEXT, category TEXT, problem_key TEXT, deleted INTEGER DEFAULT 0)")
+            c.execute("CREATE INDEX IF NOT EXISTS fb_turn ON operator_feedback(turn_id)")
 
     def _conn(self):
         return sqlite3.connect(self.db, timeout=10)
@@ -231,6 +235,98 @@ class KnowledgeBase:
                 c.execute("UPDATE turns SET artifact_json=json_set(artifact_json, '$.turn_id', ?) WHERE id=?", (tid, tid))
             return tid
 
+    # -- operator feedback (score of the response, what the operator did): the raw records; the graph and precedents are fed by feedback.py
+    def turn_info(self, turn_id: int) -> dict | None:
+        with self._conn() as c:
+            r = c.execute("SELECT id, session_id, user_id, ts, question, cat, answer, confidence, accepted, operator_score, n_feedback, artifact_json FROM turns WHERE id=?", (turn_id,)).fetchone()
+        if not r:
+            return None
+        art = json.loads(r[11]) if r[11] else None
+        return {"turn_id": r[0], "session_id": r[1], "operator_id": r[2], "ts": r[3], "question": r[4], "category": r[5], "answer": r[6], "confidence": r[7], "accepted": bool(r[8]),
+                "operator_score": r[9], "n_feedback": r[10] or 0, "has_artifact": art is not None, "has_report": bool(art and art.get("report")),
+                "requires_action": bool(art and art.get("requires_action")), "recommended_actions": (art or {}).get("recommended_actions", []), "problem_key": (art or {}).get("problem_key"),
+                "tools": [t["tool"] for t in (art or {}).get("tools", [])], "precedent": (art or {}).get("precedent")}
+
+    def add_feedback(self, turn_id: int, *, session_id: str, user_id: str, kind: str, score: int | None = None, comment: str | None = None, action_text: str | None = None,
+                     followed: str | None = None, outcome: str | None = None, occurred_at: str | None = None, stations: list | None = None, lines: list | None = None,
+                     category: str | None = None, problem_key: str | None = None) -> int:
+        with self._conn() as c:
+            fid = c.execute("INSERT INTO operator_feedback (ts, turn_id, session_id, user_id, kind, score, comment, action_text, followed, outcome, occurred_at, stations_json, lines_json, category, problem_key) "
+                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (time.time(), turn_id, session_id, user_id, kind, score, comment, action_text, followed, outcome, occurred_at,
+                                                                       json.dumps(stations or []), json.dumps(lines or []), category, problem_key)).lastrowid
+            self._refresh_turn_feedback(c, turn_id)
+            return fid
+
+    def _refresh_turn_feedback(self, c, turn_id: int) -> None:
+        """The turn row carries the operators' latest verdict: mean score (a badly rated answer is no longer reused from history) and the number of reports."""
+        r = c.execute("SELECT AVG(score), COUNT(*) FROM operator_feedback WHERE turn_id=? AND deleted=0", (turn_id,)).fetchone()
+        c.execute("UPDATE turns SET operator_score=?, n_feedback=? WHERE id=?", (r[0], r[1], turn_id))
+
+    @staticmethod
+    def _fb_row(r) -> dict:
+        return {"feedback_id": r[0], "ts": r[1], "turn_id": r[2], "session_id": r[3], "operator_id": r[4], "kind": r[5], "score": r[6], "comment": r[7], "action_text": r[8], "followed": r[9],
+                "outcome": r[10], "occurred_at": r[11], "stations": json.loads(r[12] or "[]"), "lines": json.loads(r[13] or "[]"), "category": r[14], "problem_key": r[15]}
+
+    _FB_COLS = "id, ts, turn_id, session_id, user_id, kind, score, comment, action_text, followed, outcome, occurred_at, stations_json, lines_json, category, problem_key"
+
+    def get_feedback(self, feedback_id: int) -> dict | None:
+        with self._conn() as c:
+            r = c.execute(f"SELECT {self._FB_COLS} FROM operator_feedback WHERE id=? AND deleted=0", (feedback_id,)).fetchone()
+        return self._fb_row(r) if r else None
+
+    def feedback_for_turn(self, turn_id: int) -> list[dict]:
+        with self._conn() as c:
+            return [self._fb_row(r) for r in c.execute(f"SELECT {self._FB_COLS} FROM operator_feedback WHERE turn_id=? AND deleted=0 ORDER BY id", (turn_id,))]
+
+    def update_feedback(self, feedback_id: int, **fields) -> dict | None:
+        ok = {k: v for k, v in fields.items() if k in ("score", "comment", "action_text", "followed", "outcome", "occurred_at") and v is not None}
+        with self._conn() as c:
+            if ok:
+                c.execute("UPDATE operator_feedback SET " + ", ".join(f"{k}=?" for k in ok) + " WHERE id=? AND deleted=0", (*ok.values(), feedback_id))
+            r = c.execute("SELECT turn_id FROM operator_feedback WHERE id=? AND deleted=0", (feedback_id,)).fetchone()
+            if r:
+                self._refresh_turn_feedback(c, r[0])
+        return self.get_feedback(feedback_id)
+
+    def delete_feedback(self, feedback_id: int) -> bool:
+        with self._conn() as c:
+            r = c.execute("SELECT turn_id FROM operator_feedback WHERE id=? AND deleted=0", (feedback_id,)).fetchone()
+            if not r:
+                return False
+            c.execute("UPDATE operator_feedback SET deleted=1 WHERE id=?", (feedback_id,))
+            self._refresh_turn_feedback(c, r[0])
+        return True
+
+    def list_turns(self, operator_id: str = "", session_id: str = "", limit: int = 30, needs_action_report: bool = False) -> list[dict]:
+        """Recent turns of an operator / session with what the UI needs to show 'rate this' and 'tell us what you did'."""
+        q = "SELECT id FROM turns WHERE 1=1" + (" AND user_id=?" if operator_id else "") + (" AND session_id=?" if session_id else "")
+        args = [x for x in (operator_id, session_id) if x]
+        with self._conn() as c:
+            ids = [r[0] for r in c.execute(q + " ORDER BY id DESC LIMIT ?", (*args, limit * 3 if needs_action_report else limit))]
+            has_action = {r[0] for r in c.execute("SELECT DISTINCT turn_id FROM operator_feedback WHERE action_text IS NOT NULL AND deleted=0")}
+        out = []
+        for i in ids:
+            t = self.turn_info(i)
+            t["action_reported"] = i in has_action
+            if needs_action_report and not (t["requires_action"] and t["accepted"] and not t["action_reported"]):
+                continue
+            out.append(t)
+        return out[:limit]
+
+    def feedback_stats(self, operator_id: str = "") -> dict:
+        w, a = (" AND user_id=?", (operator_id,)) if operator_id else ("", ())
+        with self._conn() as c:
+            n, mean = c.execute(f"SELECT COUNT(score), AVG(score) FROM operator_feedback WHERE deleted=0{w}", a).fetchone()
+            hist = dict(c.execute(f"SELECT score, COUNT(*) FROM operator_feedback WHERE deleted=0 AND score IS NOT NULL{w} GROUP BY score", a).fetchall())
+            n_act = c.execute(f"SELECT COUNT(*) FROM operator_feedback WHERE deleted=0 AND action_text IS NOT NULL{w}", a).fetchone()[0]
+            followed = dict(c.execute(f"SELECT followed, COUNT(*) FROM operator_feedback WHERE deleted=0 AND action_text IS NOT NULL{w} GROUP BY followed", a).fetchall())
+            outcome = dict(c.execute(f"SELECT outcome, COUNT(*) FROM operator_feedback WHERE deleted=0 AND action_text IS NOT NULL{w} GROUP BY outcome", a).fetchall())
+            by_cat = {r[0] or "?": {"n": r[1], "mean_score": round(r[2], 2) if r[2] is not None else None} for r in c.execute(f"SELECT category, COUNT(score), AVG(score) FROM operator_feedback WHERE deleted=0 AND score IS NOT NULL{w} GROUP BY category", a)}
+            n_turn = c.execute("SELECT COUNT(*) FROM turns WHERE artifact_json IS NOT NULL AND json_extract(artifact_json,'$.requires_action')=1" + w.replace("user_id", "user_id"), a).fetchone()[0]
+        return {"n_scores": n, "mean_score": round(mean, 2) if mean is not None else None, "score_histogram": {str(k): v for k, v in sorted(hist.items())}, "n_action_reports": n_act,
+                "followed": followed, "outcome": outcome, "by_category": by_cat, "turns_requiring_action": n_turn,
+                "action_report_rate": round(n_act / n_turn, 3) if n_turn else None}
+
     # -- operator knowledge base: the artifact bundle of every answered turn (see artifacts.py)
     def attach_report(self, turn_id: int, report: str) -> None:
         """Store the full report on the artifact of the turn it explains (written the first time the operator asks 'why / evidence / which tools')."""
@@ -270,7 +366,7 @@ class KnowledgeBase:
         data window and not older than `max_age_s`. This is the local mirror of the Cognee session history."""
         q = set(_tok(question))
         with self._conn() as c:
-            rows = c.execute("SELECT id, session_id, ts, question, cat, answer, confidence, plan_key, data_end FROM turns WHERE accepted=1 AND ts>? ORDER BY id DESC LIMIT 400",
+            rows = c.execute("SELECT id, session_id, ts, question, cat, answer, confidence, plan_key, data_end FROM turns WHERE accepted=1 AND ts>? AND COALESCE(operator_score, 5) > 2 ORDER BY id DESC LIMIT 400",
                              (time.time() - max_age_s,)).fetchall()
         best = None
         for tid, sid, ts, q2, cat, ans, conf, pk, de in rows:

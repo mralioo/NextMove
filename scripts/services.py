@@ -9,6 +9,7 @@
 Services
     dashboard       Streamlit dashboard incl. the Agent Workflow page          http://localhost:8501 (next free port if taken)
     adk-web         ADK dev UI: chat with the agent, see every event / tool    http://localhost:8000
+    operator-api    Feedback loop + operator knowledge base API for the UI      http://127.0.0.1:8770  (docs at /docs; docs/operator_feedback_api.md)
     mcp-knowledge   MCP server: ground truth, sanity check, history, graph     http://127.0.0.1:8766/mcp   (streamable HTTP)
     neo4j           Neo4j (Docker container nextmove-neo4j, made by `./.venv/bin/python scripts/tasks.py neo4j-up`)   bolt://localhost:7687, browser :7474
     mcp-data        MCP server: datasets, analytics, TabPFN tools (optional)    http://127.0.0.1:8765/mcp   (--with-data-mcp; the agent itself
@@ -64,9 +65,9 @@ def save(st: dict) -> None:
 
 
 def healthy(name: str, port: int) -> bool:
-    if name in ("dashboard", "adk-web"):
+    if name in ("dashboard", "adk-web", "operator-api"):
         try:
-            return urllib.request.urlopen(f"http://127.0.0.1:{port}/", timeout=3).status < 500
+            return urllib.request.urlopen(f"http://127.0.0.1:{port}/" + ("api/v1/health" if name == "operator-api" else ""), timeout=3).status < 500
         except Exception:
             return False
     with socket.socket() as s:                       # MCP servers speak MCP, not plain HTTP: an open port is the check
@@ -122,6 +123,9 @@ def up(with_data: bool, adk: bool, neo: bool = True) -> None:
     if adk and "adk-web" not in running:
         port = free_port(int(os.environ.get("ADK_PORT", "8000")))
         st["adk-web"] = spawn("adk-web", [str(BIN / "adk"), "web", "--port", str(port), "agent/"], port)
+    if "operator-api" not in running:
+        port = free_port(int(os.environ.get("OPERATOR_API_PORT", "8770")))
+        st["operator-api"] = spawn("operator-api", [PY, "backend/operator_api.py"], port, env_extra={"OPERATOR_API_PORT": str(port)})
     if "mcp-knowledge" not in running:
         port = free_port(int(os.environ.get("MCP_KNOWLEDGE_PORT", "8766")))
         st["mcp-knowledge"] = spawn("mcp-knowledge", [PY, "mcp_server/knowledge_server.py"], port, env_extra={"MCP_TRANSPORT": "http", "MCP_PORT": str(port)})
@@ -154,7 +158,7 @@ def status() -> None:
         print("no services started by `make up`.")
         return
     urls = {"dashboard": "http://localhost:{p}   (page: Agent Workflow)", "adk-web": "http://localhost:{p}   (select the app 'agent')",
-            "neo4j": "bolt://localhost:{p}   browser http://localhost:7474 (user neo4j)", "mcp-knowledge": "http://127.0.0.1:{p}/mcp   (MCP, streamable HTTP)", "mcp-data": "http://127.0.0.1:{p}/mcp   (MCP, streamable HTTP)"}
+            "neo4j": "bolt://localhost:{p}   browser http://localhost:7474 (user neo4j)", "operator-api": "http://127.0.0.1:{p}   (docs: /docs)", "mcp-knowledge": "http://127.0.0.1:{p}/mcp   (MCP, streamable HTTP)", "mcp-data": "http://127.0.0.1:{p}/mcp   (MCP, streamable HTTP)"}
     print(f"\n  {'service':15s} {'pid':>7s}  {'state':9s} address")
     for n, v in st.items():
         ok = True if v.get("docker") else alive(v["pid"])

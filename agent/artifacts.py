@@ -86,6 +86,12 @@ def appendix(art: dict) -> str:
         if llm:
             bits.append("LLM calls: " + "; ".join(f"{r['role']} {r['model']} {r['seconds']} s ({r.get('tok_in')}→{r.get('tok_out')} tokens)" for r in llm))
         out.append("7. **Time and models:** " + " · ".join(bits) + ".")
+    if art.get("precedents"):
+        out.append("8. **Operator precedents (what operators did in similar past situations):**")
+        for p in art["precedents"]:
+            out.append(f"   - similar case ({round(p.get('similarity', 0) * 100)}%): {str(p.get('problem'))[:110]} — mean score {p.get('mean_score')}")
+            for a in p.get("actions") or []:
+                out.append(f"     · operators {a.get('action')} (followed advice: {a.get('followed') or '?'}; outcome: {a.get('outcome') or '?'}; score {a.get('score')})")
     out.append(f"_Stored in the operator knowledge base{' as artifact #' + str(art['turn_id']) if art.get('turn_id') else ''} ({art.get('created_at')})._")
     return "\n".join(out)
 

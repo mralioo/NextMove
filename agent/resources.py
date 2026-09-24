@@ -125,6 +125,7 @@ def links() -> list[dict]:
     dash = st.get("dashboard", {}).get("port")
     adk = st.get("adk-web", {}).get("port")
     kn = st.get("mcp-knowledge", {}).get("port")
+    opi = st.get("operator-api", {}).get("port")
     neo_up = _port_open(7474)
     c = knowledge.cognee()
     out: list[dict] = []
@@ -144,6 +145,8 @@ def links() -> list[dict]:
     add("Cognee Cloud (memory)", "Cognee API reference (ReDoc)", f"{c.base}/redoc" if c.base else None, "api", c.configured)
     add("Cognee Cloud (memory)", "Cognee knowledge-graph visualisation (local snapshot of the tenant's page)", str(snap), "snapshot", snap.exists(),
         "" if snap.exists() else "create it: ./.venv/bin/python scripts/tasks.py cognee-graph (or the button below)")
+    add("Operator API (feedback loop)", "Interactive API documentation (Swagger) — score, action report, turns, precedents", f"http://127.0.0.1:{opi}/docs" if opi else None, "api", opi and _port_open(opi),
+        "" if opi else "not running: make up")
     add("Knowledge MCP server", "MCP endpoint (for MCP clients; not a web page)", f"http://127.0.0.1:{kn}/mcp" if kn else None, "api", kn and _port_open(kn), "" if kn else "not running: make up")
     add("Knowledge MCP server", "Inspect the tools in a browser", "npx @modelcontextprotocol/inspector", "command", True, f"then connect to http://127.0.0.1:{kn or 8766}/mcp (streamable HTTP)")
     add("LangSmith", "LangSmith (only if you run `./.venv/bin/python scripts/tasks.py ls-eval --upload`)", "https://smith.langchain.com", "ui", bool(os.environ.get("LANGSMITH_API_KEY")), "" if os.environ.get("LANGSMITH_API_KEY") else "LANGSMITH_API_KEY not set: evaluations stay offline")

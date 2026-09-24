@@ -134,6 +134,26 @@ def operator_kb_get(turn_id: int) -> dict:
 
 
 @mcp.tool
+def operator_precedents(question: str, category: str = "", k: int = 2) -> list[dict]:
+    """What operators DID in situations similar to `question`, and how it went: the reported actions (followed the advice? outcome worked / partly / did_not_work? score 1-5), the mean
+    score of the answer given then, and the actions that answer recommended. Read this before recommending actions for a familiar situation; label it as precedent, never as a rule."""
+    import feedback
+    return feedback.precedents(question, category, None, k=k)
+
+
+@mcp.tool
+def operator_actions(category: str = "", station: str = "", min_score: float = 0, limit: int = 20) -> list[dict]:
+    """Actions operators reported having taken (newest first), optionally filtered by category (A-H, P), a station name in the action text, or a minimum score of the report."""
+    return kgraph.kg().operator_actions(category, station, min_score or None, limit)
+
+
+@mcp.tool
+def operator_feedback_stats(operator_id: str = "") -> dict:
+    """Scores and action reports so far: number, mean score, score histogram, how often the advice was followed, outcomes, by category, and the share of action-requiring answers that got an action report."""
+    return knowledge.kb().feedback_stats(operator_id)
+
+
+@mcp.tool
 def kg_stats() -> dict:
     """Size of the knowledge graph: nodes and relationships by type, problems by source."""
     return kgraph.kg().stats()
