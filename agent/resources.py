@@ -86,6 +86,70 @@ def _data() -> list[dict]:
     return rows
 
 
+def _service_state() -> dict:
+    f = REPO / ".run" / "services.json"
+    try:
+        st = json.loads(f.read_text())
+    except Exception:
+        return {}
+    alive = {}
+    for n, v in st.items():
+        if v.get("docker"):
+            alive[n] = v
+            continue
+        try:
+            os.kill(v["pid"], 0)
+            alive[n] = v
+        except OSError:
+            pass
+    return alive
+
+
+def _port_open(port: int) -> bool:
+    import socket
+    with socket.socket() as s:
+        s.settimeout(0.4)
+        return s.connect_ex(("127.0.0.1", port)) == 0
+
+
+def graph_snapshot_path() -> Path:
+    return REPO / ".run" / "cognee_graph.html"
+
+
+def links() -> list[dict]:
+    """Every UI / dashboard / API page that can be opened for the resources, with whether it is reachable now.
+    kind: ui (a web app) · api (interactive API docs) · snapshot (a local file) · command (something to run, no link)."""
+    import knowledge
+
+    st = _service_state()
+    dash = st.get("dashboard", {}).get("port")
+    adk = st.get("adk-web", {}).get("port")
+    kn = st.get("mcp-knowledge", {}).get("port")
+    neo_up = _port_open(7474)
+    c = knowledge.cognee()
+    out: list[dict] = []
+
+    def add(resource, label, url, kind, up, note=""):
+        out.append({"resource": resource, "label": label, "url": url, "kind": kind, "available": bool(up), "note": note})
+
+    for label, path in (("Dashboard", ""), ("Agent Workflow page", "/workflow"), ("Resources page", "/resources"), ("Observability (traces)", "/observability"), ("Evaluation", "/evaluation")):
+        add("Dashboard (Streamlit)", label, f"http://localhost:{dash}{path}" if dash else None, "ui", dash and _port_open(dash), "" if dash else "not running: make up")
+    add("ADK agent UI", "Chat with the agent · events · traces · Evals tab (eval_set_1)", f"http://localhost:{adk}/dev-ui/?app=agent" if adk else None, "ui", adk and _port_open(adk), "" if adk else "not running: make up")
+    add("ADK agent UI", "ADK API documentation (Swagger)", f"http://localhost:{adk}/docs" if adk else None, "api", adk and _port_open(adk))
+    add("Neo4j (knowledge graph)", "Neo4j Browser — explore the graph, run Cypher (user neo4j, password in .env)", "http://localhost:7474/browser/?connectURL=neo4j%3A%2F%2Flocalhost%3A7687", "ui", neo_up,
+        "" if neo_up else "not running: make neo4j-up")
+    snap = graph_snapshot_path()
+    add("Cognee Cloud (memory)", "Cognee web app — memory, datasets, graph (sign-in required)", "https://platform.cognee.ai", "ui", c.configured, "" if c.configured else "COGNEE_* not set")
+    add("Cognee Cloud (memory)", "Cognee API documentation for your tenant (Swagger)", f"{c.base}/docs" if c.base else None, "api", c.configured)
+    add("Cognee Cloud (memory)", "Cognee API reference (ReDoc)", f"{c.base}/redoc" if c.base else None, "api", c.configured)
+    add("Cognee Cloud (memory)", "Cognee knowledge-graph visualisation (local snapshot of the tenant's page)", str(snap), "snapshot", snap.exists(),
+        "" if snap.exists() else "create it: make cognee-graph (or the button below)")
+    add("Knowledge MCP server", "MCP endpoint (for MCP clients; not a web page)", f"http://127.0.0.1:{kn}/mcp" if kn else None, "api", kn and _port_open(kn), "" if kn else "not running: make up")
+    add("Knowledge MCP server", "Inspect the tools in a browser", "npx @modelcontextprotocol/inspector", "command", True, f"then connect to http://127.0.0.1:{kn or 8766}/mcp (streamable HTTP)")
+    add("LangSmith", "LangSmith (only if you run `make ls-eval ARGS=--upload`)", "https://smith.langchain.com", "ui", bool(os.environ.get("LANGSMITH_API_KEY")), "" if os.environ.get("LANGSMITH_API_KEY") else "LANGSMITH_API_KEY not set: evaluations stay offline")
+    return out
+
+
 def collect(cognee_deep: bool = True) -> dict:
     import kgraph
     import knowledge
@@ -104,14 +168,31 @@ def collect(cognee_deep: bool = True) -> dict:
     ck = REPO / "ml" / "checkpoints" / "manifest.json"
     man = json.loads(ck.read_text()) if ck.exists() else []
     res["tabpfn_checkpoints"] = [m if isinstance(m, str) else (m.get("name") or m.get("checkpoint") or str(m)[:40]) for m in (man.keys() if isinstance(man, dict) else man)]
+    res["links"] = links()
     res["env_keys_present"] = {k: bool(os.environ.get(k)) for k in ("TABPFN_API_TOKEN", "OPENAI_API_KEY", "COGNEE_API_KEY", "NEO4J_PASSWORD", "LANGSMITH_API_KEY", "SUPERVISOR_API_KEY")}
     return res
+
+
+def save_graph_snapshot() -> tuple[bool, str]:
+    """Fetch Cognee's interactive graph page for the dataset and save it under .run/ (the tenant's page needs the API key, so it is kept as a local file)."""
+    import knowledge
+
+    html = knowledge.cognee().visualize()
+    if not html:
+        return False, f"could not fetch the Cognee graph page: {knowledge.cognee().last_error or 'Cognee off'}"
+    p = graph_snapshot_path()
+    p.parent.mkdir(exist_ok=True)
+    p.write_text(html)
+    return True, f"{p} ({len(html) / 1e6:.1f} MB) — open it in a browser, or see the Resources page"
 
 
 def main() -> None:
     from env_loader import load_all_dotenvs
 
     load_all_dotenvs()
+    if len(sys.argv) > 1 and sys.argv[1] == "graph":
+        print(save_graph_snapshot()[1])
+        return
     r = collect()
     ok = lambda b: "OK " if b else "DOWN"
     c = r["cognee"]
@@ -137,6 +218,10 @@ def main() -> None:
     print("\nMCP servers")
     for s, tools in r["mcp_servers"].items():
         print(f"    {s}: {len(tools)} tools — " + ", ".join(t["tool"] for t in tools))
+    print("\nOpen it (UIs and dashboards)")
+    for l in r["links"]:
+        mark = "OK " if l["available"] else "-- "
+        print(f"  [{mark}] {l['resource']:26s} {l['label'][:70]}\n         {l['url'] or '(unavailable)'}" + (f"   ({l['note']})" if l["note"] else ""))
     print("\nModels   " + " · ".join(f"{k} {v}" for k, v in r["models"].items()))
     print(f"Datasets {len(r['datasets'])} files · TabPFN checkpoints: {', '.join(r['tabpfn_checkpoints']) or 'none'}")
     print("Keys     " + " · ".join(f"{k} {'set' if v else 'MISSING'}" for k, v in r["env_keys_present"].items()) + "\n")

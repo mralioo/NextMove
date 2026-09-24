@@ -24,6 +24,19 @@ make down             # stop everything `make up` started
 
 Options: `make up NO_ADK=1` (skip the chat UI) · `make up WITH_DATA_MCP=1` · `PORT=9000 make up` · `ADK_PORT=9001 make up`.
 
+## Where the UIs are
+
+The **Resources** page (and `make resources`) lists every UI with a working link once `make up` has run:
+
+| Resource | UI | Link |
+| --- | --- | --- |
+| Dashboard | Streamlit pages incl. Agent Workflow, Observability, Evaluation | http://localhost:8501 (actual port from `make status`) |
+| ADK agent | Chat, events, traces, **Evals** tab (`eval_set_1`) | `http://localhost:<adk port>/dev-ui/?app=agent` · API docs `/docs` |
+| Neo4j | Neo4j Browser — explore the graph, Cypher (user `neo4j`) | http://localhost:7474 |
+| Cognee Cloud | Web app (memory, datasets, graph; sign-in) · API docs of your tenant (`<COGNEE_API_BASE_URL>/docs`) · **graph visualisation** saved as a local page by `make cognee-graph` | https://platform.cognee.ai |
+| Knowledge MCP server | no web page; inspect the tools with `npx @modelcontextprotocol/inspector` and the endpoint shown by `make status` | — |
+| LangSmith | only if `LANGSMITH_API_KEY` is set and you upload | https://smith.langchain.com |
+
 ## What `make up` prepares
 
 Before starting, `scripts/services.py` makes sure two things exist and builds them if not:
@@ -44,7 +57,8 @@ It also warns if `.env` is missing. Keys the agent needs in `.env`: `TABPFN_API_
 | --- | --- |
 | Check the code without any LLM or network | `make check` (unit tests + guardrail suite + router accuracy) |
 | Score answers (small model) | `make eval ARGS="--suite challenge --ids CH1,CH3 --cheap"` · `make ls-eval` |
-| See every resource and whether it works (Cognee, KB, graph, Neo4j, MCP tools, models, keys) | `make resources` · dashboard page **Resources** |
+| See every resource and whether it works (Cognee, KB, graph, Neo4j, MCP tools, models, keys) and **open its UI** | `make resources` · dashboard page **Resources** ("Open the UIs") |
+| Cognee's interactive memory graph as a local file | `make cognee-graph` → `.run/cognee_graph.html` (also embedded on the Resources page) |
 | Load the graph into Neo4j / bring it level | `make neo4j-up` (first time) · `make neo4j-sync` |
 | Load the 3 ADK eval cases (approximate answers) | `make adk-evalset` → ADK UI → Evals → `eval_set_1` |
 | Rebuild knowledge after the Sept 22–30 data arrives | `make kb-build && make kb-sync && make kg-seed` |

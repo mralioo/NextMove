@@ -44,6 +44,37 @@ m[2].metric("Knowledge base", f"{kb['entries']} entries")
 m[3].metric("Graph (local / Neo4j)", f"{lg['nodes']} / {n.get('nodes', '–')} nodes")
 m[4].metric("MCP tools", sum(len(v) for v in r["mcp_servers"].values()))
 
+# ------------------------------------------------------------------------------------------ open the UIs
+st.header("Open the UIs")
+st.caption("Every resource that has a web UI, dashboard or interactive API page, and whether it is reachable right now. Local services come from `make up`.")
+import streamlit.components.v1 as components
+
+for L in r["links"]:
+    row = st.columns([3, 5, 2])
+    row[0].markdown(f"**{L['resource']}**")
+    row[1].markdown(L["label"] + (f"  \n<small>{L['note']}</small>" if L["note"] else ""), unsafe_allow_html=True)
+    if L["kind"] == "command":
+        row[2].code(L["url"], language="bash")
+    elif L["kind"] == "snapshot":
+        row[2].markdown("✅ saved below" if L["available"] else "—")
+    elif L["url"]:
+        row[2].link_button("Open ↗" if L["available"] else "Open (not reachable)", L["url"], disabled=not L["available"])
+    else:
+        row[2].markdown("—")
+
+with st.expander("Cognee memory graph (Cognee's own visualisation)", expanded=False):
+    snap = RS.graph_snapshot_path()
+    if st.button("Fetch a fresh snapshot from Cognee"):
+        ok_, msg = RS.save_graph_snapshot()
+        (st.success if ok_ else st.error)(msg)
+        collect.clear()
+    if snap.exists():
+        st.caption(f"Snapshot saved {pd.Timestamp(snap.stat().st_mtime, unit='s'):%Y-%m-%d %H:%M} — {snap.stat().st_size / 1e6:.1f} MB (interactive; drag, zoom, click nodes). `make cognee-graph` refreshes it.")
+        components.html(snap.read_text(), height=720, scrolling=True)
+        st.download_button("Download the snapshot", snap.read_bytes(), file_name="cognee_graph.html", mime="text/html")
+    else:
+        st.info("No snapshot yet: press the button (needs COGNEE_* in .env), or run `make cognee-graph`.")
+
 # ------------------------------------------------------------------------------------------ Cognee
 st.header("Cognee Cloud")
 st.markdown("Session memory (every answered turn is mirrored as a QA entry) and a knowledge graph Cognee built from our curated ground truth, boundaries and insights.")

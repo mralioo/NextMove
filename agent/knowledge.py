@@ -131,6 +131,21 @@ class CogneeClient:
         return self._req("POST", "/api/v1/remember/entry", timeout=30, json={
             "entry": {"type": "qa", "question": question, "answer": answer, "context": context[:1500]}, "dataset_name": dataset, "session_id": session_id})
 
+    def visualize(self, dataset: str = DATASET) -> str | None:
+        """Cognee's own interactive knowledge-graph page (self-contained HTML, ~2.5 MB, d3) for a dataset, or None."""
+        if not self.available:
+            return None
+        did = self.dataset_id(dataset)
+        if not did:
+            return None
+        try:
+            r = self._http().get("/api/v1/visualize", params={"dataset_id": did}, timeout=90)
+            r.raise_for_status()
+            return r.text
+        except Exception as e:
+            self.last_error = f"{type(e).__name__}: {str(e)[:120]}"
+            return None
+
     def session(self, session_id: str):
         return self._req("GET", f"/api/v1/sessions/{session_id}", timeout=15)
 

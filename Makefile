@@ -17,7 +17,7 @@ EVAL_MODEL ?= gpt-4o-mini
 FREE_PORT   = $(shell $(if $(wildcard $(PY)),$(PY),python3) -c "import socket,sys; p=int(sys.argv[1]); print(next(q for q in range(p, p+200) if socket.socket().connect_ex(('127.0.0.1', q))))" $(PORT))
 
 .DEFAULT_GOAL := help
-.PHONY: help up down status logs resources neo4j-up neo4j-down neo4j-sync adk-evalset venv install install-ml install-mcp install-agent install-all \
+.PHONY: help up down status logs resources cognee-graph neo4j-up neo4j-down neo4j-sync adk-evalset venv install install-ml install-mcp install-agent install-all \
         run build docker-run docker-stop docker-logs \
         train-overcrowding train-disruption train-all checkpoints validate-pressure \
         mcp-server mcp-knowledge agent-query agent-cli agent-web demo \
@@ -48,6 +48,9 @@ logs:  ## Follow the service logs (all, or one: make logs S=dashboard)
 
 resources:  ## Report every resource and whether it works: Cognee (health, datasets, graph, sessions), knowledge base, knowledge graph (SQLite + Neo4j), MCP tools, models, keys
 	@$(PY) agent/resources.py 2>&1 | grep -v WARNING
+
+cognee-graph:  ## Save Cognee's interactive knowledge-graph page (the memory) as .run/cognee_graph.html — the tenant page needs the API key, so it is kept as a local file
+	@$(PY) agent/resources.py graph 2>&1 | grep -v WARNING
 
 neo4j-up:  ## Create/start the local Neo4j (Docker image neo4j:5.26-community, data volume kept) and load the knowledge graph into it; needs NEO4J_PASSWORD in .env
 	@grep -q '^NEO4J_PASSWORD=' .env || { echo "Add NEO4J_URI=bolt://localhost:7687, NEO4J_USER=neo4j, NEO4J_PASSWORD=<pw> to .env first."; exit 1; }
