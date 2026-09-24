@@ -22,7 +22,7 @@ import time
 
 import litellm   # imported at start-up: the lazy import costs ~2-3 s on the first question
 
-WRITER_SYSTEM = """You write the final answer for a Berlin U-Bahn control-room operator. Use ONLY the FACTS json.
+_FULL_SYSTEM = """You write the final answer for a Berlin U-Bahn control-room operator. Use ONLY the FACTS json.
 Plain words, short sentences, no jargon, no filler. Max 130 words. Start with the VERDICT, then the evidence.
 Format:
 **Verdict:** 1-2 sentences: the answer / decision first.
@@ -55,6 +55,25 @@ Keys, category G (correlation): pairs[{a,b,r,hops=graph distance,lag=hours,line=
 Keys, category H (reroute): obs_over_exp{closed_station,hop1,hop2,endpoints}=observed/expected flow (1.0 = no change),noise. Finding: no measurable rerouting; the data has no origin-destination paths.
 Keys, category D: st[{s,avg_day,wk=[peak hour,avg passengers],we=[peak hour,passengers],net=network mean weekday peak,vs_net_pct,above,pred{at,pred,real,diff=real-pred,in_sample},risk{p%,real}}].
 Assumption codes (mention as ONE plain caveat, not codes): A1 share of passengers who divert is assumed (25/50/75%); A2 displaced riders go to the nearest open stations; A3 pressure is relative to each station's own history; A4 the 26 past closures show no measurable redistribution, so this is a scenario not a replay; A5 no train-load or capacity data exists."""
+
+
+_DETAIL_HEAD, _RULES = _FULL_SYSTEM.split("\nRules:\n", 1)
+_RULES = "Rules:\n" + _RULES
+
+BRIEF_HEAD = """You write the answer for a Berlin U-Bahn control-room operator who is busy and under stress. Use ONLY the FACTS json.
+Give the fewest words that let them act: MAX 55 words in total. Plain words, short sentences, no jargon, no filler, no sources, no method, no list of evidence.
+Quote only the 2-3 numbers that decide the action. Format (nothing else):
+**Verdict:** ONE sentence, max 25 words: the decision or the answer first, with the 1-2 numbers that decide it.
+**Do now:** max 3 bullets, each max 12 words (who / where / when). ONLY when WANTS_ACTION is true (the operator asks what to do, measures, staff, reroute, mitigation); otherwise leave it out completely.
+**Watch out:** ONE short sentence, max 20 words: the single assumption or limit that matters most; if CONFIDENCE is below 0.5 or ISSUES exist, say the result is uncertain.
+When WANTS_ARGUMENT or DETAIL is true the operator asked for the full picture: use the long format below instead.
+"""
+
+# the short brief is the default; the long report (verdict, evidence, do now, caveat, argument) is for an explicit request ("why", "evidence", "sources", "which tools", "full report")
+WRITER_SYSTEM_BRIEF = BRIEF_HEAD + _RULES
+WRITER_SYSTEM = _DETAIL_HEAD + "\n" + _RULES
+BRIEF_MAX_WORDS = int(os.environ.get("WRITER_BRIEF_MAX_WORDS", "70"))
+ANSWER_MODE = lambda: os.environ.get("TMT_ANSWER_MODE", "brief")       # brief (default, for the operator) | detail (every answer is the full report)
 
 
 # ------------------------------------------------------------------------------------ guard
@@ -131,11 +150,74 @@ def missing_disclosures(answer: str, facts: dict) -> list[str]:
     return out
 
 
-ARGUE = re.compile(r"\bwhy\b|explain|justify|argument|how come|reason for|how do you know|based on what|on what basis|what makes you", re.I)
 
 
 def wants_argument(question: str) -> bool:
     return bool(ARGUE.search(question))
+
+
+from detail_ask import ARGUE, DETAIL_ASK  # noqa: E402
+
+
+ACTION_ASK = re.compile(r"\b(what (should|do|can|to)\b|which measures|measures|deploy\w*|staff\w*|re-?rout\w*|mitigat\w*|intervention\w*|recommend\w*|suggest\w*|action|do now|prepare)\b", re.I)
+
+
+def wants_action(question: str) -> bool:
+    return bool(ACTION_ASK.search(question))
+
+
+def wants_detail(question: str) -> bool:
+    """The operator asked for the full picture (why / evidence / sources / which tools / full report): they get the long report instead of the brief."""
+    return bool(DETAIL_ASK.search(question) or ARGUE.search(question))
+
+
+_SECTION = re.compile(r"(?=\*\*[A-Za-z][A-Za-z '/-]{1,30}:\*\*)")
+
+
+def _cut_words(text: str, n: int) -> str:
+    words = text.split()
+    if len(words) <= n:
+        return text
+    cut = " ".join(words[:n])
+    k = max(cut.rfind(";"), cut.rfind(". "), cut.rfind(","))
+    return (cut[:k] if k > n * 3 else cut).rstrip(" ,;:") + "…"
+
+
+def shorten(text: str, max_words: int = 55) -> str:
+    """The brief, deterministically, from any long answer: the verdict, up to 3 actions, the one watch-out. Used when the LLM writes too much and by the template fallback."""
+    parts = [p.strip() for p in _SECTION.split(text) if p.strip()]
+    got: dict[str, str] = {}
+    for p in parts:
+        m = re.match(r"\*\*([^*:]+):\*\*\s*(.*)", p, re.S)
+        if m:
+            got.setdefault(m.group(1).strip().lower(), m.group(2).strip())
+        elif "lead" not in got:
+            got["lead"] = p
+    verdict = got.get("verdict") or got.get("lead") or next(iter(got.values()), text)
+    verdict = _cut_words(" ".join(verdict.split()), 30)
+    act = got.get("do now") or got.get("staff") or ""
+    bullets = [_cut_words(x.strip(" -•*\n"), 14) for x in re.split(r"\n\s*[-•*]\s*", "\n" + act) if x.strip(" -•*\n")][:3]
+    cav = got.get("watch out") or got.get("caveat") or ""
+    watch = _cut_words(re.split(r"(?<=[.!?])\s", cav.strip())[0], 22) if cav else ""
+
+    def render() -> str:
+        out = [f"**Verdict:** {verdict}"]
+        if bullets:
+            out.append("**Do now:**\n" + "\n".join(f"- {b}" for b in bullets))
+        if watch:
+            out.append("**Watch out:** " + watch)
+        return "\n".join(out)
+    while len(render().split()) > max_words + 25 and len(bullets) > 1:      # still too long: fewer actions, never a broken layout
+        bullets.pop()
+    return render()
+
+
+def confidence_footer(confidence: float | None, mode: str = "brief") -> str:
+    """One deterministic line under the brief: how sure, and how to get the full report."""
+    if confidence is None:
+        return ""
+    label = "high" if confidence >= 0.8 else ("medium" if confidence >= 0.55 else "low")
+    return f"\n_Confidence {label} ({round(confidence * 100)}%). Ask “why”, “evidence”, “sources” or “which tools” for the full report._"
 
 
 def build_references(route, result, verdict) -> list:
@@ -300,41 +382,43 @@ def warm_connection() -> None:
             pass
 
 
-async def write(question: str, facts: dict, wi=None) -> tuple[str, dict]:
-    """Returns (answer, info). info: model, tokens, guard result."""
+async def write(question: str, facts: dict, wi=None, mode: str = "brief") -> tuple[str, dict]:
+    """Returns (answer, info). info: model, tokens, guard result. `mode` brief = the short operator answer (default), detail = the full report."""
     from config import CONFIG
     from llm_config import litellm_params, sampling_params
 
     if facts.get("status") == "need":                    # asking for missing input is fixed text: no LLM, no latency, nothing to hallucinate
         return render_fallback(facts), {"model": "template", "guard": "template (need)", "tok_in": 0, "tok_out": 0}
+    brief = mode == "brief" and facts.get("status") in ("ok", "multi", "follow")
+    fallback = lambda: shorten(render_fallback(facts)) if brief else render_fallback(facts)
     if CONFIG.writer == "template":                     # experiment arm: no LLM in the loop at all
-        return render_fallback(facts), {"model": "template", "guard": "template (config)", "tok_in": 0, "tok_out": 0}
+        return fallback(), {"model": "template", "guard": "template (config)", "tok_in": 0, "tok_out": 0}
     cfg = litellm_params("WRITER")
     if cfg is None:
-        return render_fallback(facts), {"guard": "no-llm"}
+        return fallback(), {"guard": "no-llm"}
     model, kw = cfg
     extra = ""
     if wi is not None:
         extra = (f"\nCONFIDENCE: {wi.result.confidence}\nISSUES: {wi.verdict.issues[:3]}\nWANTS_ARGUMENT: {str(wi.wants_argument).lower()}\n"
-                 f"OBJECTIVE: {wi.objective.statement}")
+                 f"OBJECTIVE: {wi.objective.statement}\nDETAIL: {str(not brief).lower()}\nWANTS_ACTION: {str(wants_action(question)).lower()}")
     user = f"QUESTION: {question}{extra}\nFACTS: {json.dumps(facts, ensure_ascii=False, separators=(',', ':'))}"
     from observability import payload, set_attr, span
 
     budget = float(os.environ.get("WRITER_TIMEOUT_S", "10"))
-    with span("llm.write", **{"gen_ai.request.model": model, "tmt.budget_s": budget, "tmt.facts_status": facts.get("status"), "tmt.system_chars": len(WRITER_SYSTEM),
+    with span("llm.write", **{"gen_ai.request.model": model, "tmt.budget_s": budget, "tmt.facts_status": facts.get("status"), "tmt.system_chars": len(WRITER_SYSTEM_BRIEF if brief else WRITER_SYSTEM), "tmt.mode": "brief" if brief else "detail",
                               "tmt.prompt": payload(user, 5000), "tmt.wants_argument": bool(wi.wants_argument) if wi is not None else None}) as sp:
         from observability import log_llm
 
-        t_llm = time.time()
+        t_llm = time.time()      # max_tokens below: reasoning models spend part of it on hidden reasoning, a tight cap returns an empty text
         try:
             resp = await asyncio.wait_for(litellm.acompletion(
-                model=model, messages=[{"role": "system", "content": WRITER_SYSTEM}, {"role": "user", "content": user}],
-                max_tokens=1500, timeout=budget + 5, **sampling_params(model), **kw), timeout=budget)
+                model=model, messages=[{"role": "system", "content": WRITER_SYSTEM_BRIEF if brief else WRITER_SYSTEM}, {"role": "user", "content": user}],
+                max_tokens=1000 if brief else 1500, timeout=budget + 5, **sampling_params(model), **kw), timeout=budget)
         except (asyncio.TimeoutError, Exception) as e:      # slow/failed LLM: ship the deterministic answer, never block
             set_attr(sp, "tmt.error", f"{type(e).__name__}")
             set_attr(sp, "tmt.fallback", "template (LLM slow or failed)")
             log_llm("writer", model, time.time() - t_llm, prompt=user, error=type(e).__name__, started=t_llm)
-            return render_fallback(facts), {"model": model, "guard": f"template ({type(e).__name__}: LLM over {budget:.0f}s budget or failed)"}
+            return fallback(), {"model": model, "guard": f"template ({type(e).__name__}: LLM over {budget:.0f}s budget or failed)"}
         text = (resp.choices[0].message.content or "").strip()
         u = getattr(resp, "usage", None)
         log_llm("writer", model, time.time() - t_llm, u, user, text, started=t_llm)
@@ -349,8 +433,13 @@ async def write(question: str, facts: dict, wi=None) -> tuple[str, dict]:
         set_attr(gsp, "tmt.banned", banned)
         set_attr(gsp, "tmt.passed", not (bad or banned or not text))
     if bad or banned or not text:
-        return render_fallback(facts), {**info, "guard": f"fallback (ungrounded: {bad[:4]}, banned: {banned})"}
+        return fallback(), {**info, "guard": f"fallback (ungrounded: {bad[:4]}, banned: {banned})"}
+    if brief and not wants_action(question) and "**Do now:**" in text:        # nobody asked for actions: the brief stays an answer, not advice
+        text = re.sub(r"\*\*Do now:\*\*.*?(?=\n\*\*|\Z)", "", text, flags=re.S).replace("\n\n\n", "\n\n").strip()
+    if brief and len(text.split()) > BRIEF_MAX_WORDS:      # the model wrote too much for a stressed operator: cut it to the brief, deterministically
+        text = shorten(text)
+        info["guard"] = "pass (shortened)"
     miss = missing_disclosures(text, facts) if facts.get("status") == "ok" else []
     if miss:
         text += "\n**Assumed:** " + "; ".join(m.rstrip(".") for m in miss) + "."
-    return text, {**info, "guard": "pass" + (f" (+{len(miss)} disclosure)" if miss else "")}
+    return text, {**info, "guard": ("pass (shortened)" if info.get("guard") == "pass (shortened)" else "pass") + (f" (+{len(miss)} disclosure)" if miss else "")}

@@ -173,7 +173,7 @@ class KnowledgeBase:
         with self._conn() as c:
             c.execute("CREATE TABLE IF NOT EXISTS turns (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT, user_id TEXT, ts REAL, question TEXT, cat TEXT, "
                       "answer TEXT, facts_json TEXT, sanity_json TEXT)")
-            for col, typ in (("verdict", "TEXT"), ("confidence", "REAL"), ("plan_key", "TEXT"), ("data_end", "TEXT"), ("accepted", "INTEGER"), ("plan_json", "TEXT")):
+            for col, typ in (("verdict", "TEXT"), ("confidence", "REAL"), ("plan_key", "TEXT"), ("data_end", "TEXT"), ("accepted", "INTEGER"), ("plan_json", "TEXT"), ("artifact_json", "TEXT")):
                 try:                                       # turn store created before v3: add the columns the supervisor's history lookup needs
                     c.execute(f"ALTER TABLE turns ADD COLUMN {col} {typ}")
                 except sqlite3.OperationalError:
@@ -220,12 +220,50 @@ class KnowledgeBase:
     # -- history
     def remember_turn(self, session_id: str, user_id: str, question: str, cat: str, answer: str, facts: dict | None, sanity: dict | None = None, *,
                       verdict: str | None = None, confidence: float | None = None, plan_key: str | None = None, data_end: str | None = None,
-                      accepted: bool | None = None, plan: dict | None = None) -> int:
+                      accepted: bool | None = None, plan: dict | None = None, artifact: dict | None = None) -> int:
         with self._conn() as c:
-            return c.execute("INSERT INTO turns (session_id, user_id, ts, question, cat, answer, facts_json, sanity_json, verdict, confidence, plan_key, data_end, accepted, plan_json) "
-                             "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                             (session_id, user_id, time.time(), question, cat, answer, json.dumps(facts or {}, default=str), json.dumps(sanity or {}, default=str), verdict, confidence,
-                              plan_key, data_end, None if accepted is None else int(accepted), json.dumps(plan, default=str) if plan else None)).lastrowid
+            tid = c.execute("INSERT INTO turns (session_id, user_id, ts, question, cat, answer, facts_json, sanity_json, verdict, confidence, plan_key, data_end, accepted, plan_json, artifact_json) "
+                            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                            (session_id, user_id, time.time(), question, cat, answer, json.dumps(facts or {}, default=str), json.dumps(sanity or {}, default=str), verdict, confidence,
+                             plan_key, data_end, None if accepted is None else int(accepted), json.dumps(plan, default=str) if plan else None,
+                             json.dumps({**artifact, "turn_id": None}, default=str) if artifact else None)).lastrowid
+            if artifact:                                     # the bundle knows its own id
+                c.execute("UPDATE turns SET artifact_json=json_set(artifact_json, '$.turn_id', ?) WHERE id=?", (tid, tid))
+            return tid
+
+    # -- operator knowledge base: the artifact bundle of every answered turn (see artifacts.py)
+    def attach_report(self, turn_id: int, report: str) -> None:
+        """Store the full report on the artifact of the turn it explains (written the first time the operator asks 'why / evidence / which tools')."""
+        with self._conn() as c:
+            c.execute("UPDATE turns SET artifact_json=json_set(artifact_json, '$.report', ?) WHERE id=? AND artifact_json IS NOT NULL", (report, turn_id))
+
+    def get_artifact(self, turn_id: int) -> dict | None:
+        with self._conn() as c:
+            row = c.execute("SELECT artifact_json FROM turns WHERE id=?", (turn_id,)).fetchone()
+        return json.loads(row[0]) if row and row[0] else None
+
+    def last_artifact(self, user_id: str) -> dict | None:
+        """The bundle of the user's latest accepted answer (any session): what "why / evidence / which tools" refers to after a restart."""
+        with self._conn() as c:
+            row = c.execute("SELECT artifact_json FROM turns WHERE user_id=? AND accepted=1 AND artifact_json IS NOT NULL ORDER BY id DESC LIMIT 1", (user_id,)).fetchone()
+        return json.loads(row[0]) if row and row[0] else None
+
+    def find_artifacts(self, query: str, category: str = "", k: int = 3) -> list[dict]:
+        """Past accepted answers of the operator knowledge base that resemble `query` (word overlap), with their brief, confidence, tools and whether a full report exists."""
+        q = set(_tok(query))
+        with self._conn() as c:
+            rows = c.execute("SELECT id, ts, question, cat, confidence, artifact_json FROM turns WHERE accepted=1 AND artifact_json IS NOT NULL ORDER BY id DESC LIMIT 500").fetchall()
+        scored = []
+        for tid, ts, q2, cat, conf, aj in rows:
+            if category and cat != category:
+                continue
+            t = set(_tok(q2))
+            jac = len(q & t) / len(q | t) if q | t else 0.0
+            if jac > 0:
+                a = json.loads(aj)
+                scored.append({"turn_id": tid, "similarity": round(jac, 3), "question": q2, "category": cat, "confidence": conf, "brief": a.get("brief"), "tools": [x["tool"] for x in a.get("tools", [])],
+                               "datasets": a.get("datasets"), "has_report": bool(a.get("report")), "created_at": a.get("created_at")})
+        return sorted(scored, key=lambda x: -x["similarity"])[:k]
 
     def find_answered(self, question: str, plan_key: str | None, data_end: str | None, min_sim: float = 0.9, max_age_s: float = 24 * 3600) -> dict | None:
         """A previous ACCEPTED answer to (essentially) this question: same words (Jaccard >= min_sim) or the same subject (`plan_key`), on the same
@@ -275,8 +313,10 @@ class KnowledgeBase:
             n_turns = c.execute("SELECT COUNT(*) FROM turns").fetchone()[0]
             n_sessions = c.execute("SELECT COUNT(DISTINCT session_id) FROM turns").fetchone()[0]
             n_ins = c.execute("SELECT COUNT(*) FROM insights").fetchone()[0]
+            n_art = c.execute("SELECT COUNT(*) FROM turns WHERE artifact_json IS NOT NULL").fetchone()[0]
+            n_rep = c.execute("SELECT COUNT(*) FROM turns WHERE json_extract(artifact_json, '$.report') IS NOT NULL").fetchone()[0]
         kinds = Counter(e["kind"] for e in self.entries)
-        return {"entries": len(self.entries), "kinds": dict(kinds), "turns": n_turns, "sessions": n_sessions, "user_insights": n_ins}
+        return {"entries": len(self.entries), "kinds": dict(kinds), "turns": n_turns, "sessions": n_sessions, "user_insights": n_ins, "artifacts": n_art, "artifacts_with_report": n_rep}
 
     # -- sanity checking (deterministic; an evaluator, not a rewriter)
     def sanity_check(self, question: str, answer: str, facts: dict, plan: dict | None = None) -> dict:

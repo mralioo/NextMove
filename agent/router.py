@@ -95,7 +95,19 @@ FOLLOW = re.compile(r"^\s*(and|so|what about|how about)\b|\b(those|that|these|th
                     r"how confident|which of (those|these)|measured and|explain (that|why)|what data would", re.I)
 
 # a question ABOUT the previous answer (why / how sure / based on what): explained from the earlier facts, never re-run
-WHY_FOLLOW = re.compile(r"^\s*(and\s+)?why\b|how (do you know|sure|confident)|based on what|on what basis|justify|what makes you|are you sure|explain (that|why|how)", re.I)
+from detail_ask import DETAIL_ASK  # noqa: E402
+
+_WHY = re.compile(r"^\s*(and\s+)?why\b|how (do you know|sure|confident)|based on what|on what basis|justify|what makes you|are you sure|explain (that|why|how)", re.I)
+
+
+class _Either:
+    """WHY_FOLLOW.search(q): the older why-phrases OR an explicit request for evidence / sources / tools / the full report."""
+    @staticmethod
+    def search(q: str):
+        return _WHY.search(q) or DETAIL_ASK.search(q)
+
+
+WHY_FOLLOW = _Either()
 
 ALIASES = {"zoo": "zoologischer garten", "kotti": "kottbusser tor", "alex": "alexanderplatz",
            "hauptbahnhof": "berlin hauptbahnhof", "hbf": "berlin hauptbahnhof"}

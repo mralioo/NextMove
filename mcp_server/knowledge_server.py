@@ -120,6 +120,20 @@ def kg_add_case(question: str, category: str, answer: str, actions: str = "", op
 
 
 @mcp.tool
+def operator_kb_search(query: str, category: str = "", k: int = 3) -> list[dict]:
+    """OPERATOR KNOWLEDGE BASE: past accepted answers that resemble `query` — brief, confidence, tools used, datasets, whether a full report exists. Use it to recall what was decided
+    the last time a similar situation came up (returns turn ids for operator_kb_get)."""
+    return knowledge.kb().find_artifacts(query, category, k)
+
+
+@mcp.tool
+def operator_kb_get(turn_id: int) -> dict:
+    """The full artifact bundle of one answered turn: plan and objective, every MCP call with arguments / time / result preview, facts, confidence and reasons, the evaluator's checks,
+    LLM calls (model, seconds, tokens), references, the brief and (if it was ever asked for) the full report."""
+    return knowledge.kb().get_artifact(turn_id) or {"error": f"no artifact for turn {turn_id}"}
+
+
+@mcp.tool
 def kg_stats() -> dict:
     """Size of the knowledge graph: nodes and relationships by type, problems by source."""
     return kgraph.kg().stats()

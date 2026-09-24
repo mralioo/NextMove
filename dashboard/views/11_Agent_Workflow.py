@@ -418,6 +418,41 @@ try:
 except Exception as e:
     st.warning(f"Knowledge graph not available ({type(e).__name__}: {e}). Run `./.venv/bin/python scripts/tasks.py kg-seed`.")
 
+# =========================================================================================== 5c · operator knowledge base
+st.header("5c · Operator knowledge base — the artifacts behind every brief")
+st.markdown(
+    "The operator gets a **brief** (verdict, up to 3 actions, one watch-out, confidence). Behind it, every answered question stores an **artifact bundle** — the plan, every MCP call with its "
+    "arguments / time / result preview, the facts, the confidence and its reasons, the evaluator's checks, the LLM calls (model, seconds, tokens), the references. Asking *why*, *evidence*, "
+    "*sources*, *which tools* or *full report* returns the long report built from that bundle, nothing recomputed. The bundles are searchable (knowledge MCP tools `operator_kb_search` / "
+    "`operator_kb_get`), linked in the graph (Problem → Artifact → Tool / Dataset / Model / KBEntry) and summarised into the memory agent.")
+try:
+    import json as _json
+    import sqlite3 as _sql
+
+    from knowledge import DEFAULT_DB
+    _c = _sql.connect(DEFAULT_DB)
+    _rows = _c.execute("SELECT id, ts, question, cat, confidence, artifact_json FROM turns WHERE artifact_json IS NOT NULL ORDER BY id DESC LIMIT 100").fetchall()
+    if not _rows:
+        st.info("No artifact stored yet: ask the agent a question (ADK chat), then say *why* or *which tools did you call*.")
+    else:
+        _arts = [(_r, _json.loads(_r[5])) for _r in _rows]
+        k1, k2, k3 = st.columns(3)
+        k1.metric("Artifacts stored", len(_arts))
+        k2.metric("With a full report", sum(1 for _, a in _arts if a.get("report")))
+        k3.metric("Mean words of the brief", round(sum(len((a.get("brief") or "").split()) for _, a in _arts) / len(_arts)))
+        st.dataframe(pd.DataFrame([{"turn": r[0], "when": a.get("created_at"), "category": r[3], "question": r[2][:90], "confidence": r[4], "brief words": len((a.get("brief") or "").split()),
+                                    "tools": ", ".join(dict.fromkeys(t["tool"] for t in a.get("tools", []))), "full report": bool(a.get("report"))} for r, a in _arts]), hide_index=True, use_container_width=True)
+        pick = st.selectbox("Open an artifact", [f"#{r[0]} · {r[2][:80]}" for r, _ in _arts])
+        r, a = _arts[[f"#{x[0]} · {x[2][:80]}" for x, _ in _arts].index(pick)]
+        b1, b2 = st.columns(2)
+        b1.markdown("**Brief (what the operator saw)**")
+        b1.markdown(a.get("brief") or "")
+        b2.markdown("**Full report**" if a.get("report") else "**Full report** — not requested yet; this is what *why / evidence / which tools* would add:")
+        import artifacts as _art
+        b2.markdown(a.get("report") or _art.appendix(a))
+except Exception as e:
+    st.warning(f"Operator knowledge base not available ({type(e).__name__}: {e}).")
+
 # =========================================================================================== 6 · what is missing
 st.header("6 · What is still missing")
 st.markdown(

@@ -3,6 +3,7 @@
     ./.venv/bin/python evaluation/submission_run.py --label baseline                 # TRAINING + FINAL_TEST + held-out stress run + TEAM_EVIDENCE
     ./.venv/bin/python evaluation/submission_run.py --stages FINAL_TEST --ids F01    # a subset
     ./.venv/bin/python evaluation/submission_run.py --label cheap --cheap            # writer/evaluator on the small model
+    ./.venv/bin/python evaluation/submission_run.py --label full --env TMT_ANSWER_MODE=detail   # every answer as the full report (default: the operator's brief)
     ./.venv/bin/python evaluation/submission_run.py --label no-evaluator --env EVALUATOR_MODE=off --config '{"engine":"empirical"}'
 
 Stages    TRAINING · FINAL_TEST  the rows of `evaluation/team_answers_template v2.xlsx`, each in a fresh session through the real ADK app
@@ -99,7 +100,7 @@ def design_config(args, env_overrides: dict) -> dict:
         "pipeline": ["supervisor (rules router + guardrails + history + follow-up)", "worker (specialist playbook over MCP tools)", "evaluator (ground-truth checks + LLM in auto mode)",
                      "writer (verdict/evidence/do-now/caveat/sources + number guard)"],
         "switches": {"router": CONFIG.router, "memory": CONFIG.memory, "mcp_transport": CONFIG.mcp, "engine": CONFIG.engine, "writer": CONFIG.writer,
-                     "evaluator_mode": evaluator.MODE, "evaluator_llm_below_confidence": evaluator.LLM_CONF_BELOW, "history": os.environ.get("TMT_HISTORY", "on"),
+                     "evaluator_mode": evaluator.MODE, "evaluator_llm_below_confidence": evaluator.LLM_CONF_BELOW, "history": os.environ.get("TMT_HISTORY", "on"), "answer_mode": os.environ.get("TMT_ANSWER_MODE", "brief"),
                      "neo4j_mirror": os.environ.get("NEO4J_MIRROR", "auto")},
         "models": roles,
         "limits": {"max_iterations": LIMITS.max_iterations, "loop_deadline_s": LIMITS.loop_deadline_s, "max_answer_words": LIMITS.max_answer_words,

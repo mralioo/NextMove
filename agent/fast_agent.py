@@ -29,6 +29,7 @@ from google.genai import types
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import executor  # noqa: E402
 import router  # noqa: E402
+import artifacts  # noqa: E402
 import writer  # noqa: E402
 from config import CONFIG  # noqa: E402
 from mcp_runtime import get_runtime  # noqa: E402
@@ -78,8 +79,22 @@ SOURCES = "\n**Sources:**"
 
 
 def _strip_sources(text: str) -> str:
-    """The Sources line carries confidence / ids that are not in the facts: checks and stored answers use the text without it."""
-    return text.split(SOURCES)[0]
+    """The Sources line and the confidence footer carry ids / percentages that are not in the facts: checks and stored answers use the text without them."""
+    return text.split(SOURCES)[0].split("\n_Confidence")[0].split("\n**How this was worked out**")[0]
+
+
+async def _report_from_artifact(q: str, plan: SupervisorPlan, art: dict) -> tuple[str, str, dict]:
+    """The full report of an EARLIER answer, from its stored artifact bundle — nothing is recomputed. Returns (report, narrative, info). A report written before is reused as is."""
+    if art.get("report"):
+        return art["report"], art["report"], {"model": None, "guard": "stored report (nothing recomputed)"}
+    f = art["facts"]
+    v = art.get("verdict") or {}
+    res = WorkerResult(task_id="prev", iteration=1, status="ok", facts=f, confidence=art.get("confidence") or 0.5, confidence_reasons=art.get("confidence_reasons") or [],
+                       assumptions=[str(a) for a in art.get("assumptions") or []])
+    ver = EvaluatorVerdict(task_id="prev", iteration=1, verdict=v.get("verdict") or "accept", objective_met=True, score=v.get("score") or 0.9, issues=v.get("issues") or [])
+    wi = WriterInput(question=q, objective=plan.objective, verdict=ver, result=res, wants_argument=True)
+    narrative, info = await writer.write(f"{art['question']}\n(The operator now asks: {q})", f, wi, mode="detail")
+    return artifacts.full_report(art, narrative), narrative, info
 
 
 class SupervisorAgent(BaseAgent):
@@ -240,16 +255,45 @@ class WriterAgent(BaseAgent):
         legacy = st.get("plan") or {}
         info: dict = {}
         source, refs = "worker", []
+        narr: str | None = None                            # the writer's own text, before the deterministic method section / sources / footer are added
+        art: dict | None = None                            # the artifact bundle of this turn (see artifacts.py)
+        line = ""
+        K = _kb()
+        mode = "detail" if (writer.ANSWER_MODE() == "detail" or writer.wants_detail(q)) else "brief"
+        prev_art = None
+        if plan.decision == "follow_up" and plan.follow_up and plan.follow_up.mode == "explain" and mode == "detail":
+            last_f = st.get("last_facts") or {}
+            same = lambda a: bool(a) and json.dumps(a.get("facts"), sort_keys=True, default=str) == json.dumps(last_f, sort_keys=True, default=str)   # the bundle must be of THE answer being asked about
+            prev_art = st.get("last_artifact") if same(st.get("last_artifact")) else None
+            if prev_art is None and K is not None:
+                cand = K.last_artifact(ctx.session.user_id)
+                prev_art = cand if same(cand) else None
+            if prev_art is None and last_f.get("status") == "ok":          # an answer given before artifacts were stored: the narrative can still be written from its facts
+                prev_art = {"legacy": True, "question": (st.get("last_plan") or {}).get("question") or "the earlier question", "facts": last_f, "confidence": None, "created_at": "",
+                            "category": last_f.get("cat"), "verdict": {}, "tools": []}
+            if prev_art and (prev_art.get("facts") or {}).get("status") != "ok":
+                prev_art = None
         if plan.decision == "bounce":
             answer, info, source = plan.message or BOUNCE_MESSAGE, {"model": None, "guard": "bounce (unrelated question)"}, "bounce"
+        elif prev_art is not None:                         # "why / evidence / which tools / full report": answered from the stored artifact, nothing recomputed
+            answer, narr, info = await _report_from_artifact(q, plan, prev_art)
+            source, art = "follow_up", {**prev_art, "report": answer}
+            if K is not None and prev_art.get("turn_id") and not prev_art.get("report"):
+                K.attach_report(int(prev_art["turn_id"]), answer)                 # the operator knowledge base keeps the report next to the bundle
+                _index_report(ctx, q, art)                                        # ... and so do the knowledge graph and the memory agent
         elif plan.decision == "answer_from_history" and plan.history:
             h = plan.history
-            answer = h.answer + f"\n_(From the accepted analysis {h.age_s / 60:.0f} min ago on the same data window; nothing was recomputed.)_"
+            K1 = _kb()
+            art_h = K1.get_artifact(h.turn_id) if K1 is not None else None
+            # a stored answer from before the brief format is shortened; a stored bundle gives its brief and the confidence line
+            answer = ((art_h["brief"] + writer.confidence_footer(art_h.get("confidence"))) if art_h and art_h.get("brief") else writer.shorten(h.answer)) \
+                + f"\n_(From the accepted analysis {h.age_s / 60:.0f} min ago on the same data window; nothing was recomputed.)_"
             info, source = {"model": None, "guard": f"history ({h.kind}, similarity {h.similarity})"}, "history"
             K0 = _kb()
             old = K0.get_turn(h.turn_id) if K0 is not None else None
             if old and old.get("facts"):                    # the conversation continues from the reused answer: follow-ups need its facts and plan
                 st["last_facts"], st["last_plan"] = old["facts"], old.get("plan")
+                st["last_artifact"] = K0.get_artifact(h.turn_id)   # ... and "why / evidence / which tools" about it: the stored artifact bundle (None for an answer stored before artifacts existed)
         else:
             res = WorkerResult(**st["result"], facts=facts) if st.get("result") else WorkerResult(task_id="x", iteration=1, status="error", facts=facts, confidence=0.05)
             ver = EvaluatorVerdict.model_validate(st["verdict"]) if st.get("verdict") else EvaluatorVerdict(task_id="x", iteration=1, verdict="reject", objective_met=False, score=0.0)
@@ -258,54 +302,90 @@ class WriterAgent(BaseAgent):
                 info, source = {"model": None, "guard": "failsafe: evaluator rejected the result"}, "safe_fallback"
             else:
                 wi = WriterInput(question=q, objective=plan.objective, verdict=ver, result=res, wants_argument=writer.wants_argument(q))
-                answer, info = await writer.write(q, facts, wi)
+                answer, info = await writer.write(q, facts, wi, mode=mode)
+                narr = answer
                 if facts.get("status") in ("ok", "multi"):
                     with span("writer.references") as rsp:
                         refs = writer.build_references(plan.route, res, ver)
                         line = writer.sources_line(refs, res.confidence, ver.verdict)
                         set_attr(rsp, "tmt.references", [{"kind": r.kind, "id": r.id} for r in refs])
                         set_attr(rsp, "tmt.sources_line", line)
-                    answer += SOURCES + line[len("**Sources:**"):]
+                    if mode == "detail":
+                        answer += SOURCES + line[len("**Sources:**"):]
+                    else:                                    # the operator's answer: brief, no sources; how sure + how to get the details in one line
+                        answer += writer.confidence_footer(res.confidence)
                 source = "decline" if facts.get("status") in ("oos", "unsupported", "need") else ("follow_up" if facts.get("status") == "follow" else "worker")
-        body = _strip_sources(answer)
-        outg = check_output(body, facts, q) if source in ("worker", "follow_up", "decline") else []
+        body = _strip_sources(narr if narr is not None else answer)
+        outg = check_output(body, facts if prev_art is None else prev_art["facts"], q, brief=(mode == "brief" and source == "worker" and facts.get("status") in ("ok", "multi"))) if source in ("worker", "follow_up", "decline") else []
         timing = {**timing, "write_s": round(time.time() - t0, 2), **info,
                   "guardrails": timing.get("guardrails", []) + [g.model_dump() for g in outg if not g.passed]}
         timing["handover"] = {**timing.get("handover", {}), "writer": {"source": source, "objective": plan.objective.statement, "wants_argument": writer.wants_argument(q), "model": info.get("model"),
                                                                    "guard": info.get("guard"), "answer_words": len(body.split()), "references": [r.model_dump() for r in refs],
                                                                    "prompt": info.get("prompt"), "output_guardrails": [g.model_dump() for g in outg]}}
         timing.pop("prompt", None)
-        keep = (facts if facts.get("status") == "ok" else st.get("last_facts")) if CONFIG.memory != "none" else None   # follow-ups refer to the last real answer
-        delta = {"timing": timing, "last_facts": keep}
-        if source == "history" and st.get("last_plan"):
-            delta["last_plan"] = st["last_plan"]
-        K = _kb()
-        if K is not None and source in ("worker", "follow_up", "decline", "safe_fallback"):
-            timing["sanity"] = _sanity_and_remember(K, ctx, q, body, facts, legacy, plan, st.get("verdict"), st.get("result"), source)
-            if timing["sanity"].get("accepted") and facts.get("status") in ("ok", "multi"):
-                delta["last_plan"] = st["sp"]
         now = time.time()
-        for r in w_log:
-            yield _llm_event(self.name, r, t_start)
         prev = st.get("timing", {})
         total = round(now - t_start, 2) if t_start else None
         parts = {"supervisor_s": round(prev.get("route_ms", 0) / 1000, 3), "worker_evaluator_s": prev.get("tools_s"), "mcp_s": round(sum(c.get("s", 0) for c in prev.get("calls", [])), 2),
                  "writer_s": timing["write_s"], "writer_llm_s": round(sum(r["seconds"] for r in w_log), 2), "total_s": total}
         timing["stages"] = parts
         timing["llm"] = timing.get("llm", []) + w_log
+        if source == "worker" and facts.get("status") in ("ok", "multi") and prev_art is None:
+            # ---- the artifact bundle of this answer: brief now, full report if it was asked for
+            try:
+                from data_window import window as _window
+                brief_text = writer.shorten(narr) if mode == "detail" else answer.split("\n_Confidence")[0]
+                art = artifacts.build(question=q, session_id=ctx.session.id, plan=st.get("sp") or {}, result=st.get("result"), verdict=st.get("verdict"), facts=facts, timing=timing, refs=refs,
+                                      brief=brief_text, sources_line=line, sanity=None, source=source, answer_mode=mode, data_window=_window())
+                if mode == "detail":
+                    art["report"] = answer = artifacts.full_report(art, narr)
+            except Exception as e:                                         # an artifact bug must never cost the operator the answer
+                art = None
+                timing["artifact_error"] = f"{type(e).__name__}: {str(e)[:120]}"
+        keep = (facts if facts.get("status") == "ok" else st.get("last_facts")) if CONFIG.memory != "none" else None   # follow-ups refer to the last real answer
+        delta = {"timing": timing, "last_facts": keep}
+        if source == "history" and st.get("last_plan"):
+            delta["last_plan"] = st["last_plan"]
+        if source == "history":
+            delta["last_artifact"] = st.get("last_artifact")                   # "why / evidence" after a reused answer refers to ITS bundle
+        if K is not None and source in ("worker", "follow_up", "decline", "safe_fallback"):
+            timing["sanity"] = _sanity_and_remember(K, ctx, q, body, facts, legacy, plan, st.get("verdict"), st.get("result"), source, art if source == "worker" else None)
+            if timing["sanity"].get("accepted") and facts.get("status") in ("ok", "multi"):
+                delta["last_plan"] = st["sp"]
+            if art is not None and timing["sanity"].get("turn_id"):
+                art["turn_id"] = timing["sanity"]["turn_id"]
+        if art is not None:
+            delta["last_artifact"] = art                                   # what "why / evidence / which tools" refers to in this session
+        for r in w_log:
+            yield _llm_event(self.name, r, t_start)
         delta["timing"] = timing
         yield Event(author=self.name, content=types.Content(role="model", parts=[types.Part(text=(
             f"[timing] total {total} s = supervisor {parts['supervisor_s']} s + worker/evaluator {parts['worker_evaluator_s']} s (of which MCP calls {parts['mcp_s']} s, summed over parallel calls) "
             f"+ writer {parts['writer_s']} s (LLM inference {parts['writer_llm_s']} s)"))]), custom_metadata={"kind": "timing", **parts})
         final = _text_event(self.name, answer, delta)
-        final.custom_metadata = {"kind": "answer", "source": source, **parts, "model": info.get("model"), "tok_in": info.get("tok_in"), "tok_out": info.get("tok_out"), "guard": info.get("guard")}
+        final.custom_metadata = {"kind": "answer", "source": source, "answer_mode": mode if source in ("worker", "follow_up") else None, "answer_words": len(answer.split()),
+                                 "artifact_turn_id": (art or {}).get("turn_id"), **parts, "model": info.get("model"), "tok_in": info.get("tok_in"), "tok_out": info.get("tok_out"), "guard": info.get("guard")}
         if info.get("tok_in") or info.get("tok_out"):
             final.usage_metadata = types.GenerateContentResponseUsageMetadata(prompt_token_count=info.get("tok_in") or 0, candidates_token_count=info.get("tok_out") or 0,
                                                                               total_token_count=(info.get("tok_in") or 0) + (info.get("tok_out") or 0))
         yield final
 
 
-def _sanity_and_remember(K, ctx, question: str, answer: str, facts: dict, legacy: dict, plan: SupervisorPlan, verdict: dict | None, result: dict | None, source: str) -> dict:
+def _index_report(ctx, question: str, art: dict) -> None:
+    """A full report was generated for the first time: put it on the knowledge-graph Artifact node and in the memory agent (background, never blocks the answer)."""
+    try:
+        if art.get("problem_key") and supervisor.HISTORY_ON():
+            from kgraph import kg
+            kg().record_artifact(art["problem_key"], art)
+    except Exception:
+        pass
+    from knowledge import cognee
+    if cognee().available:
+        import threading
+        threading.Thread(target=cognee().remember_qa, args=(ctx.session.id, question, art["report"][:6000], artifacts.memory_summary(art)), daemon=True, name="cognee-report").start()
+
+
+def _sanity_and_remember(K, ctx, question: str, answer: str, facts: dict, legacy: dict, plan: SupervisorPlan, verdict: dict | None, result: dict | None, source: str, art: dict | None = None) -> dict:
     """Cross-check the delivered answer against the knowledge base (ms, deterministic), store the turn locally (with the verdict, so the supervisor's history lookup only
     reuses ACCEPTED answers), add accepted cases to the knowledge graph, and mirror the turn to Cognee in a background thread — none of it delays or changes the answer."""
     with span("kb.sanity") as sp:
@@ -319,10 +399,17 @@ def _sanity_and_remember(K, ctx, question: str, answer: str, facts: dict, legacy
         set_attr(sp, "tmt.sanity_fails", [c["id"] for c in res.get("checks", []) if not c["ok"]])
     accepted = bool(facts.get("status") in ("ok", "multi") and (verdict or {}).get("verdict") == "accept" and res.get("ok") is not False and source == "worker")
     conf = (result or {}).get("confidence")
+    tid = None
+    if art is not None:
+        from kgraph import _h, _norm
+        art["problem_key"] = _h(_norm(question), 12)
+        art["sanity"] = {"ok": res.get("ok"), "fails": [c["id"] for c in res.get("checks", []) if not c["ok"]]}
     try:
         from supervisor import plan_key
-        K.remember_turn(ctx.session.id, ctx.session.user_id, question, plan.category, answer, facts, res, verdict=(verdict or {}).get("verdict"), confidence=conf,
-                        plan_key=plan_key(plan.category, plan.entities), data_end=(K.by_id["B-COV"]["value"]["end"][:16] if "B-COV" in K.by_id else None), accepted=accepted, plan=plan.model_dump(mode="json"))
+        tid = K.remember_turn(ctx.session.id, ctx.session.user_id, question, plan.category, answer, facts, res, verdict=(verdict or {}).get("verdict"), confidence=conf,
+                        plan_key=plan_key(plan.category, plan.entities), data_end=(K.by_id["B-COV"]["value"]["end"][:16] if "B-COV" in K.by_id else None), accepted=accepted, plan=plan.model_dump(mode="json"), artifact=art)
+        if art is not None:
+            art["turn_id"] = tid
     except Exception:
         pass
     if accepted and supervisor.HISTORY_ON():          # evaluation runs (TMT_HISTORY=off) must not train the graph
@@ -331,14 +418,16 @@ def _sanity_and_remember(K, ctx, question: str, answer: str, facts: dict, legacy
             acts, opts = actions_from_facts(facts) if facts.get("status") == "ok" else ([], [])
             with span("kg.record_case", **{"tmt.category": plan.category, "tmt.actions": acts, "tmt.options": opts, "tmt.neo4j_mirror": kg().neo4j_configured()}):
                 kg().record_case(GraphCase(question=question, category=plan.category, entities=plan.entities, answer=answer, confidence=conf, verdict="accept", actions=acts, options=opts))
+                if art is not None:
+                    kg().record_artifact(art["problem_key"], art)              # operator knowledge base in the graph: Problem -> Artifact -> tools / datasets / model / KB entries
         except Exception:
             pass
     from knowledge import cognee
     if cognee().available and facts.get("status") in ("ok", "need"):
         import threading
-        ctxt = json.dumps({k: facts.get(k) for k in ("cat", "cl", "top", "found", "worst", "date", "assumed") if facts.get(k)}, ensure_ascii=False, default=str)
+        ctxt = (artifacts.memory_summary(art) + "\n" if art is not None else "") + json.dumps({k: facts.get(k) for k in ("cat", "cl", "top", "found", "worst", "date", "assumed") if facts.get(k)}, ensure_ascii=False, default=str)
         threading.Thread(target=cognee().remember_qa, args=(ctx.session.id, question, answer, ctxt), daemon=True, name="cognee-remember").start()
-    return {"ok": res.get("ok"), "score": res.get("score"), "fails": [c["id"] for c in res.get("checks", []) if not c["ok"]], "n": len(res.get("checks", [])), "accepted": accepted}
+    return {"turn_id": tid, "ok": res.get("ok"), "score": res.get("score"), "fails": [c["id"] for c in res.get("checks", []) if not c["ok"]], "n": len(res.get("checks", [])), "accepted": accepted}
 
 
 def build_fast_agent() -> SequentialAgent:

@@ -92,14 +92,15 @@ def check_route(category: str, specialist_status: str | None) -> GuardrailResult
     return GuardrailResult(stage="route", check="supported_category", passed=True, detail=f"specialist status: {specialist_status}")
 
 
-def check_output(text: str, facts: dict, question: str) -> list[GuardrailResult]:
+def check_output(text: str, facts: dict, question: str, brief: bool = False) -> list[GuardrailResult]:
     import writer
 
     out = []
     banned, bad = writer.find_banned(text), writer.find_ungrounded(text, facts, question)
     words = len(text.split())
+    cap = min(LIMITS.max_answer_words, int(os.environ.get("WRITER_BRIEF_MAX_WORDS", "70")) + 25) if brief else LIMITS.max_answer_words     # the operator's brief has its own, much lower cap
     out.append(GuardrailResult(stage="output", check="no_unsupported_claims", passed=not banned, action="allow" if not banned else "fallback", detail=", ".join(banned)))
     out.append(GuardrailResult(stage="output", check="numbers_grounded", passed=not bad, action="allow" if not bad else "fallback", detail=f"ungrounded: {bad[:4]}" if bad else ""))
-    out.append(GuardrailResult(stage="output", check="length", passed=words <= LIMITS.max_answer_words, action="allow" if words <= LIMITS.max_answer_words else "escalate",
-                               detail=f"{words} words (cap {LIMITS.max_answer_words})"))
+    out.append(GuardrailResult(stage="output", check="length", passed=words <= cap, action="allow" if words <= cap else "escalate",
+                               detail=f"{words} words (cap {cap}{', brief' if brief else ''})"))
     return out

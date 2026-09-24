@@ -156,6 +156,30 @@ class KnowledgeGraph:
             self.edge(prob, "INVOLVES", self.node("Event", case.entities.event))
         return pk
 
+    def record_artifact(self, problem_key: str, art: dict) -> None:
+        """Operator knowledge base: link the artifact bundle of an accepted answer to its Problem —
+        Problem -HAS_ARTIFACT-> Artifact -USED_TOOL-> Tool, -USED_DATASET-> Dataset, -USED_MODEL-> Model, -CITES-> KBEntry. The graph keeps the brief and the (once generated) full
+        report on the Artifact node, so 'what did we do the last time this happened, with which tools, and how sure were we' is a graph query."""
+        v = art.get("verdict") or {}
+        prob = self.node("Problem", problem_key)
+        aid = self.node("Artifact", str(art.get("turn_id") or _h(art.get("question", ""), 12)), question=art.get("question"), category=art.get("category"), brief=(art.get("brief") or "")[:900],
+                        report=(art.get("report") or "")[:4000] or None, confidence=art.get("confidence"), verdict=v.get("verdict"), created_at=art.get("created_at"),
+                        tools=[t["tool"] for t in art.get("tools", [])], data_window=art.get("data_window"))
+        self.edge(prob, "HAS_ARTIFACT", aid)
+        for t in dict.fromkeys(x["tool"] for x in art.get("tools", [])):
+            self.edge(aid, "USED_TOOL", self.node("Tool", t, server=next((x.get("server") for x in art["tools"] if x["tool"] == t), None)))
+        for d in art.get("datasets") or []:
+            self.edge(aid, "USED_DATASET", self.node("Dataset", d))
+        if art.get("ml_engine") and art["ml_engine"] != "none":
+            self.edge(aid, "USED_MODEL", self.node("Model", {"tabpfn": "TabPFN quantile regression", "empirical": "empirical baseline"}.get(art["ml_engine"], art["ml_engine"])))
+        for i in dict.fromkeys((v.get("ground_truth_ids") or []) + (v.get("boundary_ids") or [])):
+            self.edge(aid, "CITES", self.node("KBEntry", i))
+
+    def artifact_for(self, turn_id: int) -> dict | None:
+        with self._conn() as c:
+            row = c.execute("SELECT props FROM kg_nodes WHERE label='Artifact' AND key=?", (str(turn_id),)).fetchone()
+        return json.loads(row[0]) if row else None
+
     # -- reads
     def stats(self) -> dict:
         with self._conn() as c:
