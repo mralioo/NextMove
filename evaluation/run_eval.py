@@ -9,7 +9,7 @@ questions x repeats unless you pass --allow-many; --cheap uses the small worker 
 LLM JUDGE (small model by default; --judge-model main uses the shared model, doubling the main-model calls; --no-judge = regex fallback).
 
 Suites   limit     ONE complex message with six sub-asks (default) — see dataset.LIMIT_QUESTION
-         training  the 11 TRAINING questions of `evaluation/team_answers_template v1.xlsx`
+         training  the 11 TRAINING questions of `evaluation/team_answers_template v2.xlsx`
          challenge the 3 example questions of the problem statement (verbatim) + 3 date-grounded variants, scored on ideal-answer criteria
          final    the FINAL_TEST rows once they are filled in (Sept 25)
          stress   Edge + Trap + cross-cutting robustness questions from docs/test_questions.md

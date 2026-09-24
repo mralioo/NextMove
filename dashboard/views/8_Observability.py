@@ -219,7 +219,28 @@ else:
 
 timing = json.loads(run["timing_json"]) if run.get("timing_json") else {}
 hand = timing.get("handover", {})
-t_steps, t_mcp, t_hand, t_plan, t_facts, t_ev = st.tabs(["Steps & payloads", "MCP calls", "Hand-overs (route → result → verdict → writer)", "Plan", "Facts", "ADK events"])
+t_time, t_steps, t_mcp, t_hand, t_plan, t_facts, t_ev = st.tabs(["Timing & LLM inference", "Steps & payloads", "MCP calls", "Hand-overs (route → result → verdict → writer)", "Plan", "Facts", "ADK events"])
+with t_time:
+    stg = timing.get("stages")
+    if not stg:
+        st.info("No stage timings stored for this run (recorded before this feature).")
+    else:
+        explain("Where the time of this question went, stage by stage, and every LLM inference (router, evaluator, writer) with its model, time and tokens.",
+                "Stages run one after the other; the MCP calls inside the worker run in parallel, so their sum can exceed the worker time. LLM time is network + generation.")
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("Total", f"{stg.get('total_s')} s")
+        c2.metric("Supervisor", f"{stg.get('supervisor_s')} s")
+        c3.metric("Worker ⇄ evaluator", f"{stg.get('worker_evaluator_s')} s")
+        c4.metric("Writer", f"{stg.get('writer_s')} s")
+        c5.metric("MCP calls (summed)", f"{stg.get('mcp_s')} s")
+    llms = timing.get("llm") or []
+    if llms:
+        st.markdown("**LLM inferences**")
+        st.dataframe(pd.DataFrame([{"role": r["role"], "model": r["model"], "inference (s)": r["seconds"], "tokens in": r.get("tok_in"), "tokens out": r.get("tok_out"),
+                                    "tokens/s out": round(r["tok_out"] / r["seconds"], 1) if r.get("tok_out") and r["seconds"] else None, "error": r.get("error"),
+                                    "prompt (start)": (r.get("prompt") or "")[:160], "response (start)": (r.get("response") or "")[:160]} for r in llms]), use_container_width=True, hide_index=True)
+    elif stg:
+        st.caption("No LLM was called for this question (deterministic route, deterministic evaluator, template or fixed-text answer).")
 with t_steps:
     if spans.empty:
         st.info("No spans stored for this run.")

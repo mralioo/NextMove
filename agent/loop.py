@@ -35,8 +35,12 @@ async def worker_evaluator_loop(plan: SupervisorPlan, last_facts: dict | None, m
     guards: list[GuardrailResult] = []
     result = verdict = None
     all_calls: list = []
+    from observability import LLM_LOG
+    llm_log = LLM_LOG.get()
     for i in range(1, LIMITS.max_iterations + 1):
         task = wk.task_from_plan(plan, i, overrides)
+        n_llm = len(llm_log) if llm_log is not None else 0
+        r_start = time.time()
         with span("worker_evaluator.round", **{"tmt.round": i, "tmt.of": LIMITS.max_iterations, "tmt.overrides": overrides}) as rsp:
             try:
                 result = await wk.run_worker(task, last_facts, mcp, kb)
@@ -50,7 +54,8 @@ async def worker_evaluator_loop(plan: SupervisorPlan, last_facts: dict | None, m
         all_calls += [(i, c) for c in result.tools_called]
         its.append({"i": i, "worker_s": result.seconds, "confidence": result.confidence, "status": result.status, "tools": [c.tool for c in result.tools_called],
                     "engine": result.ml_engine_used, "verdict": verdict.verdict, "score": verdict.score, "issues": verdict.issues[:4], "model": verdict.model,
-                    "evaluator_s": verdict.seconds, "adjustments": verdict.adjustments.model_dump(exclude_none=True) if verdict.adjustments else None, "overrides": dict(overrides)})
+                    "evaluator_s": verdict.seconds, "adjustments": verdict.adjustments.model_dump(exclude_none=True) if verdict.adjustments else None, "overrides": dict(overrides),
+                    "llm": list(llm_log[n_llm:]) if llm_log is not None else [], "started": r_start, "worker_started": r_start})
         if verdict.verdict == "accept" or verdict.verdict == "reject":
             break
         if i == LIMITS.max_iterations:

@@ -32,7 +32,7 @@ import router  # noqa: E402
 import writer  # noqa: E402
 from config import CONFIG  # noqa: E402
 from mcp_runtime import get_runtime  # noqa: E402
-from observability import init_tracing, payload, set_attr, span  # noqa: E402
+from observability import LLM_LOG, init_tracing, payload, set_attr, span  # noqa: E402
 import specialists  # noqa: E402
 import supervisor  # noqa: E402
 from guardrails import BOUNCE_MESSAGE, SAFE_FALLBACK, check_output  # noqa: E402
@@ -45,6 +45,20 @@ ROUTER_CONF_MIN = float(os.environ.get("ROUTER_CONF_MIN", "0.55"))
 def _text_event(author: str, text: str, delta: dict) -> Event:
     return Event(author=author, content=types.Content(role="model", parts=[types.Part(text=text)]),
                  actions=EventActions(state_delta=delta))
+
+
+def _ms(t: float | None, t_start: float | None) -> int | None:
+    return None if t is None or t_start is None else round((t - t_start) * 1000)
+
+
+def _llm_event(author: str, r: dict, t_start: float | None) -> Event:
+    """One LLM inference as an ADK event: model, inference time, tokens (usage_metadata), prompt and response previews."""
+    tin, tout = r.get("tok_in"), r.get("tok_out")
+    text = (f"[llm {r['role']}] {r['model']} · inference {r['seconds']} s · tokens {tin}→{tout}" + (f" · FAILED {r['error']}" if r.get("error") else ""))
+    usage = types.GenerateContentResponseUsageMetadata(prompt_token_count=tin or 0, candidates_token_count=tout or 0, total_token_count=(tin or 0) + (tout or 0)) if (tin or tout) else None
+    return Event(author=author, content=types.Content(role="model", parts=[types.Part(text=text)]), usage_metadata=usage,
+                 custom_metadata={"kind": "llm", "role": r["role"], "model": r["model"], "inference_s": r["seconds"], "tok_in": tin, "tok_out": tout,
+                                  "started_at_ms": _ms(r.get("start"), t_start), "prompt": r.get("prompt"), "response": r.get("response"), "error": r.get("error")})
 
 
 def _question(ctx: InvocationContext) -> str:
@@ -77,6 +91,8 @@ class SupervisorAgent(BaseAgent):
 
     async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
         t0 = time.time()
+        llm_log: list = []
+        LLM_LOG.set(llm_log)                                       # every LLM inference of this question is recorded (router, evaluator, writer) and shown as an event
         get_runtime()                                              # start/warm the MCP server in the background
         q = _question(ctx)
         st = ctx.session.state
@@ -105,13 +121,18 @@ class SupervisorAgent(BaseAgent):
         legacy.update(plan_id=plan.plan_id, decision=plan.decision, objective=plan.objective.model_dump(), route=plan.route.model_dump(),
                       guardrails=[g.model_dump() for g in plan.guardrails], history=plan.history.model_dump() if plan.history else None,
                       follow_up=plan.follow_up.model_dump() if plan.follow_up else None, llm_router_error=plan.llm_router_error)
-        timing = {"route_ms": round((time.time() - t0) * 1000), "tier": plan.tier, "cfg": asdict(CONFIG), "decision": plan.decision,
+        timing = {"llm": list(llm_log), "route_ms": round((time.time() - t0) * 1000), "tier": plan.tier, "cfg": asdict(CONFIG), "decision": plan.decision,
                   "guardrails": [g.model_dump() for g in plan.guardrails if not g.passed or g.action != "allow"],
                   "handover": {"plan": {**plan.model_dump(mode="json", exclude={"parts", "guardrails"}), "guardrail_results": [g.model_dump() for g in plan.guardrails]}}}
         sp_dump = plan.model_dump(mode="json")
-        st["plan"], st["sp"], st["timing"] = legacy, sp_dump, timing
-        yield _text_event(self.name, f"[plan] {plan.decision} · {plan.category} · {plan.route.specialist} · objective: {plan.objective.statement}",
-                          {"plan": legacy, "sp": sp_dump, "timing": timing})
+        st["plan"], st["sp"], st["timing"], st["t_start"] = legacy, sp_dump, timing, t0
+        for r in llm_log:
+            yield _llm_event(self.name, r, t0)
+        ev = _text_event(self.name, f"[plan · {timing['route_ms']} ms] {plan.decision} · {plan.category} · {plan.route.specialist} · engine {plan.route.ml_engine} · "
+                                    f"tools {plan.route.tools} · objective: {plan.objective.statement}", {"plan": legacy, "sp": sp_dump, "timing": timing, "t_start": t0})
+        ev.custom_metadata = {"kind": "supervisor", "seconds": round(time.time() - t0, 3), "route_ms": timing["route_ms"], "llm_route_s": round(sum(r["seconds"] for r in llm_log), 3),
+                              "decision": plan.decision, "category": plan.category, "tier": plan.tier, "route": plan.route.model_dump(mode="json")}
+        yield ev
 
 
 class WorkerAgent(BaseAgent):
@@ -124,12 +145,14 @@ class WorkerAgent(BaseAgent):
     async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
         t0 = time.time()
         st = ctx.session.state
+        t_start = st.get("t_start")
+        LLM_LOG.set([])
         plan = SupervisorPlan.model_validate(st["sp"])            # hard failsafe: a malformed hand-over raises, it is never guessed around
         timing = {**st.get("timing", {})}
         if plan.decision in ("bounce", "answer_from_history"):
             timing.update(tools_s=0.0, calls=[], loop=[])
             st["timing"] = timing
-            yield _text_event(self.name, f"[skipped: {plan.decision}]", {"timing": timing, "facts": {"status": plan.decision}})
+            yield _text_event(self.name, f"[skipped: {plan.decision} · nothing to compute]", {"timing": timing, "facts": {"status": plan.decision}})
             return
         K = _kb()
         if plan.decision == "follow_up":
@@ -151,6 +174,7 @@ class WorkerAgent(BaseAgent):
                 facts["kb"] = [{"id": e["id"], "t": e["text"][:230]} for e in extra][:3]
         calls = [{"tool": c.tool, "s": c.seconds, "round": r, "server": c.server, "args": c.args, "result_preview": c.result_preview, "bytes": c.result_bytes, "ok": c.ok,
                   "wait_ready_ms": c.wait_ready_ms, "error": c.error} for r, c in out.calls] or [{"tool": c.tool, "s": c.seconds} for c in out.result.tools_called]
+        timing["llm"] = timing.get("llm", []) + [r for it in out.iterations for r in it.get("llm", [])]
         timing.update(tools_s=round(time.time() - t0, 2), calls=calls, loop=out.iterations, confidence=out.result.confidence, verdict=out.verdict.verdict,
                       evaluator_llm_calls=sum(1 for i in out.iterations if not str(i.get("model", "")).startswith("deterministic")),
                       guardrails=timing.get("guardrails", []) + [g.model_dump() for g in out.guardrails])
@@ -173,17 +197,26 @@ class WorkerAgent(BaseAgent):
             for n, c in enumerate(by_round.get(it["i"], [])):
                 cid = f"mcp-{it['i']}-{n}"
                 yield Event(author=author, content=types.Content(role="model", parts=[types.Part(function_call=types.FunctionCall(id=cid, name=c.tool, args=c.args or {}))]),
-                            custom_metadata={"round": it["i"], "server": c.server, "kind": "mcp_call"})
+                            custom_metadata={"round": it["i"], "server": c.server, "kind": "mcp_call", "started_at_ms": _ms(c.started_at, t_start)})
                 yield Event(author=author, content=types.Content(role="user", parts=[types.Part(function_response=types.FunctionResponse(
                     id=cid, name=c.tool, response={"ok": c.ok, "seconds": c.seconds, "server": c.server, "wait_ready_ms": c.wait_ready_ms, "result_bytes": c.result_bytes,
                                                    "result_preview": c.result_preview, **({"error": c.error} if c.error else {})}))]),
-                            custom_metadata={"round": it["i"], "server": c.server, "kind": "mcp_result", "seconds": c.seconds})
+                            custom_metadata={"round": it["i"], "server": c.server, "kind": "mcp_result", "seconds": c.seconds, "started_at_ms": _ms(c.started_at, t_start),
+                                             "ended_at_ms": _ms(c.started_at + c.seconds, t_start) if c.started_at else None, "wait_ready_ms": c.wait_ready_ms})
+            for r in it.get("llm", []):
+                yield _llm_event("evaluator", r, t_start)
+            yield Event(author=author, content=types.Content(role="model", parts=[types.Part(text=(
+                f"[worker round {it['i']} · {it['worker_s']} s] {name} · engine {it['engine']} · tools {it['tools']} · status {it['status']} · confidence {it['confidence']}"))]),
+                custom_metadata={"round": it["i"], "kind": "worker_round", "seconds": it["worker_s"], "started_at_ms": _ms(it.get("started"), t_start), "tools": it["tools"],
+                                 "engine": it["engine"], "confidence": it["confidence"], "overrides": it.get("overrides")})
             yield Event(author="evaluator", content=types.Content(role="model", parts=[types.Part(text=(
-                f"[evaluator round {it['i']}] {it['verdict']} · score {it['score']} · confidence {it['confidence']} · model {it['model']} · {it['evaluator_s']} s"
+                f"[evaluator round {it['i']} · {it['evaluator_s']} s] {it['verdict']} · score {it['score']} · confidence {it['confidence']} · model {it['model']}"
                 + (f" · issues: {'; '.join(it['issues'])}" if it.get("issues") else "") + (f" · adjustments: {it['adjustments']}" if it.get("adjustments") else "")))]),
-                custom_metadata={"round": it["i"], "kind": "evaluator"})
+                custom_metadata={"round": it["i"], "kind": "evaluator", "seconds": it["evaluator_s"], "model": it["model"], "verdict": it["verdict"], "score": it["score"],
+                                 "issues": it.get("issues"), "adjustments": it.get("adjustments"), "llm_calls": len(it.get("llm", []))})
         yield Event(author=author, content=types.Content(role="model", parts=[types.Part(
-            text=f"[facts] confidence {out.result.confidence} · verdict {out.verdict.verdict} · {json.dumps(facts, ensure_ascii=False, separators=(',', ':'))[:1800]}")]),
+            text=f"[facts · worker+evaluator {timing['tools_s']} s] confidence {out.result.confidence} · verdict {out.verdict.verdict} · {json.dumps(facts, ensure_ascii=False, separators=(',', ':'))[:1800]}")]),
+            custom_metadata={"kind": "facts", "seconds": timing["tools_s"], "mcp_s": round(sum(c.seconds for _, c in out.calls), 3), "rounds": len(out.iterations)},
             actions=EventActions(state_delta={"facts": facts, "timing": timing, "result": out.result.model_dump(exclude={"facts"}, mode="json"), "verdict": out.verdict.model_dump(mode="json")}))
 
 
@@ -197,6 +230,9 @@ class WriterAgent(BaseAgent):
     async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
         t0 = time.time()
         st = ctx.session.state
+        t_start = st.get("t_start")
+        w_log: list = []
+        LLM_LOG.set(w_log)
         q = _question(ctx)
         plan = SupervisorPlan.model_validate(st["sp"])
         facts = st.get("facts") or {}
@@ -248,7 +284,25 @@ class WriterAgent(BaseAgent):
             timing["sanity"] = _sanity_and_remember(K, ctx, q, body, facts, legacy, plan, st.get("verdict"), st.get("result"), source)
             if timing["sanity"].get("accepted") and facts.get("status") in ("ok", "multi"):
                 delta["last_plan"] = st["sp"]
-        yield _text_event(self.name, answer, delta)
+        now = time.time()
+        for r in w_log:
+            yield _llm_event(self.name, r, t_start)
+        prev = st.get("timing", {})
+        total = round(now - t_start, 2) if t_start else None
+        parts = {"supervisor_s": round(prev.get("route_ms", 0) / 1000, 3), "worker_evaluator_s": prev.get("tools_s"), "mcp_s": round(sum(c.get("s", 0) for c in prev.get("calls", [])), 2),
+                 "writer_s": timing["write_s"], "writer_llm_s": round(sum(r["seconds"] for r in w_log), 2), "total_s": total}
+        timing["stages"] = parts
+        timing["llm"] = timing.get("llm", []) + w_log
+        delta["timing"] = timing
+        yield Event(author=self.name, content=types.Content(role="model", parts=[types.Part(text=(
+            f"[timing] total {total} s = supervisor {parts['supervisor_s']} s + worker/evaluator {parts['worker_evaluator_s']} s (of which MCP calls {parts['mcp_s']} s, summed over parallel calls) "
+            f"+ writer {parts['writer_s']} s (LLM inference {parts['writer_llm_s']} s)"))]), custom_metadata={"kind": "timing", **parts})
+        final = _text_event(self.name, answer, delta)
+        final.custom_metadata = {"kind": "answer", "source": source, **parts, "model": info.get("model"), "tok_in": info.get("tok_in"), "tok_out": info.get("tok_out"), "guard": info.get("guard")}
+        if info.get("tok_in") or info.get("tok_out"):
+            final.usage_metadata = types.GenerateContentResponseUsageMetadata(prompt_token_count=info.get("tok_in") or 0, candidates_token_count=info.get("tok_out") or 0,
+                                                                              total_token_count=(info.get("tok_in") or 0) + (info.get("tok_out") or 0))
+        yield final
 
 
 def _sanity_and_remember(K, ctx, question: str, answer: str, facts: dict, legacy: dict, plan: SupervisorPlan, verdict: dict | None, result: dict | None, source: str) -> dict:

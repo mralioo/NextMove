@@ -200,6 +200,7 @@ class ToolCall(_M):
     ok: bool = True
     wait_ready_ms: int = 0
     error: str | None = None
+    started_at: float | None = None      # epoch seconds: lets the traces show when each (parallel) call started
 
 
 class WorkerResult(_M):

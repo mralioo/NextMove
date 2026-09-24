@@ -104,7 +104,7 @@ def _tool_calls(calls: list, trace: list, t0: float) -> list[ToolCall]:
     """MCP call records (with arguments and result previews) when the runtime logged them, else the executor's plain (tool, seconds) trace."""
     if calls:
         return [ToolCall(tool=c["tool"], server=c.get("server", "ubahn-flow-data"), seconds=float(c.get("seconds", 0.0)), args=c.get("args", {}), result_preview=c.get("result_preview", ""),
-                         result_bytes=int(c.get("result_bytes", 0)), ok=bool(c.get("ok", True)), wait_ready_ms=int(c.get("wait_ready_ms", 0)), error=c.get("error"))
+                         result_bytes=int(c.get("result_bytes", 0)), ok=bool(c.get("ok", True)), wait_ready_ms=int(c.get("wait_ready_ms", 0)), error=c.get("error"), started_at=c.get("start"))
                 for c in sorted(calls, key=lambda c: c.get("start", 0))]
     return [ToolCall(tool=str(c.get("tool")), seconds=float(c.get("s", 0.0))) for c in trace]
 

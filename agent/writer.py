@@ -16,6 +16,7 @@ import asyncio
 import json
 import os
 import re
+import time
 
 import litellm   # imported at start-up: the lazy import costs ~2-3 s on the first question
 
@@ -320,6 +321,9 @@ async def write(question: str, facts: dict, wi=None) -> tuple[str, dict]:
     budget = float(os.environ.get("WRITER_TIMEOUT_S", "10"))
     with span("llm.write", **{"gen_ai.request.model": model, "tmt.budget_s": budget, "tmt.facts_status": facts.get("status"), "tmt.system_chars": len(WRITER_SYSTEM),
                               "tmt.prompt": payload(user, 5000), "tmt.wants_argument": bool(wi.wants_argument) if wi is not None else None}) as sp:
+        from observability import log_llm
+
+        t_llm = time.time()
         try:
             resp = await asyncio.wait_for(litellm.acompletion(
                 model=model, messages=[{"role": "system", "content": WRITER_SYSTEM}, {"role": "user", "content": user}],
@@ -327,9 +331,12 @@ async def write(question: str, facts: dict, wi=None) -> tuple[str, dict]:
         except (asyncio.TimeoutError, Exception) as e:      # slow/failed LLM: ship the deterministic answer, never block
             set_attr(sp, "tmt.error", f"{type(e).__name__}")
             set_attr(sp, "tmt.fallback", "template (LLM slow or failed)")
+            log_llm("writer", model, time.time() - t_llm, prompt=user, error=type(e).__name__, started=t_llm)
             return render_fallback(facts), {"model": model, "guard": f"template ({type(e).__name__}: LLM over {budget:.0f}s budget or failed)"}
         text = (resp.choices[0].message.content or "").strip()
         u = getattr(resp, "usage", None)
+        log_llm("writer", model, time.time() - t_llm, u, user, text, started=t_llm)
+        set_attr(sp, "tmt.seconds", round(time.time() - t_llm, 3))
         info = {"model": model, "tok_in": getattr(u, "prompt_tokens", None), "tok_out": getattr(u, "completion_tokens", None), "prompt": payload(user, 5000)}
         set_attr(sp, "tmt.response", payload(text, 4000))
         set_attr(sp, "gen_ai.usage.input_tokens", info["tok_in"])

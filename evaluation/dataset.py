@@ -1,4 +1,4 @@
-"""Evaluation dataset = the organiser's answer workbook (`evaluation/team_answers_template v1.xlsx`).
+"""Evaluation dataset = the organiser's answer workbook (`evaluation/team_answers_template v2.xlsx`).
 
 Sheet TEAM_ANSWERS has three stages:
   TRAINING       the 11 known questions (9 core + 2 bonus)            -> ids T01..T11
@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-WORKBOOK = REPO / "evaluation" / "team_answers_template v1.xlsx"
+WORKBOOK = REPO / "evaluation" / "team_answers_template v2.xlsx"
 BANK = REPO / "docs" / "test_questions.md"
 
 

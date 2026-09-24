@@ -56,3 +56,17 @@ def test_tool_calls_conversion():
 def test_tool_calls_fallback_to_plain_trace():
     calls = _tool_calls([], [{"tool": "t", "s": 0.4}], 0.0)
     assert calls[0].tool == "t" and calls[0].seconds == 0.4 and calls[0].args == {}
+
+
+def test_log_llm_records_time_tokens_and_truncates():
+    class U:
+        prompt_tokens, completion_tokens = 100, 20
+
+    log: list = []
+    tok = obs.LLM_LOG.set(log)
+    try:
+        rec = obs.log_llm("writer", "m", 1.23456, U(), "p" * 5000, "ok")
+    finally:
+        obs.LLM_LOG.reset(tok)
+    assert log == [rec] and rec["seconds"] == 1.235 and rec["tok_in"] == 100 and rec["tok_out"] == 20 and len(rec["prompt"]) < 1600
+    assert obs.log_llm("router", "m", 0.1)["tok_in"] is None      # no log set: still returns the record

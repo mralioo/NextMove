@@ -173,7 +173,9 @@ Each question produces one OpenTelemetry trace (ADK UI → Traces tab, or dashbo
 | `evaluator.check`, `evaluator.llm` | verdict, score, issues, checks, adjustments, model, prompt size, tokens |
 | `llm.write`, `guard.check`, `writer.references`, `kb.sanity`, `kg.record_case` | prompt, response, model, tokens, number guard result, sources line, sanity checks, graph actions |
 
-Payloads are compact JSON, cut at 3–6 k characters (`observability.payload`). The same data is stored per run: `runs.timing_json["calls"]` (per MCP call, with round, args, result preview) and `["handover"]` (plan → rounds → result → verdict → writer). In the ADK Events tab each MCP call is a function_call (args) / function_response (seconds, bytes, preview) pair, followed by the evaluator verdict per round.
+Payloads are compact JSON, cut at 3–6 k characters (`observability.payload`). The same data is stored per run: `runs.timing_json["calls"]` (per MCP call, with round, args, result preview) and `["handover"]` (plan → rounds → result → verdict → writer). **Times in the ADK Events tab.** Every event carries `custom_metadata` with its time: `[plan · N ms]`; each MCP call as a function_call/function_response pair (`started_at_ms`, `ended_at_ms`, `seconds`, `wait_ready_ms`, measured from the start of the question); `[worker round i · s]`; `[llm router|evaluator|writer]` events with model, **inference seconds** and tokens (also as ADK `usage_metadata`, with prompt/response previews in `custom_metadata`); `[evaluator round i · s]`; `[facts · worker+evaluator s]`; and a `[timing]` event before the answer: total = supervisor + worker/evaluator (MCP summed) + writer (LLM inference). The same numbers are stored in `runs.timing_json["stages"]` and `["llm"]` and shown in Observability → "Timing & LLM inference". Restart only the ADK UI (after code changes) with `./.venv/bin/python scripts/services.py restart adk-web`.
+
+In the ADK Events tab each MCP call is a function_call (args) / function_response (seconds, bytes, preview) pair, followed by the evaluator verdict per round.
 
 ## 10. Cleanup (2026-09-24)
 

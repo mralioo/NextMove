@@ -1,5 +1,6 @@
 """Start / stop / inspect every service of the system with one command (used by `make up`, `make down`, `./.venv/bin/python scripts/tasks.py status`, `./.venv/bin/python scripts/tasks.py logs`).
 
+    services.py restart [service]                    stop one service (default adk-web) and start it again
     services.py up [--with-data-mcp] [--no-adk]     prepare (knowledge base, graph) and start everything in the background
     services.py down                                stop everything this script started
     services.py status                              what is running, on which port, healthy or not
@@ -186,6 +187,23 @@ def down() -> None:
     save({})
 
 
+def restart(name: str) -> None:
+    """Stop one service (e.g. adk-web, so it reloads the agent code and starts with a clean in-memory trace store) and start it again."""
+    st = state()
+    v = st.pop(name, None)
+    if v and not v.get("docker") and alive(v["pid"]):
+        try:
+            os.killpg(os.getpgid(v["pid"]), signal.SIGTERM)
+        except OSError:
+            pass
+        for _ in range(30):
+            if not alive(v["pid"]):
+                break
+            time.sleep(0.3)
+    save(st)
+    up("--with-data-mcp" in sys.argv, True, True)
+
+
 def logs(name: str | None) -> None:
     files = [LOGS / f"{name}.log"] if name else sorted(LOGS.glob("*.log"))
     if not files or not all(f.exists() for f in files):
@@ -200,6 +218,8 @@ if __name__ == "__main__":
         up("--with-data-mcp" in sys.argv, "--no-adk" not in sys.argv, "--no-neo4j" not in sys.argv)
     elif cmd == "down":
         down()
+    elif cmd == "restart":
+        restart(sys.argv[2] if len(sys.argv) > 2 else "adk-web")
     elif cmd == "status":
         status()
     elif cmd == "logs":

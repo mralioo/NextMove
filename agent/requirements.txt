@@ -1,4 +1,4 @@
-google-adk[eval]   # [eval] = the ADK UI "Evals" tab and `adk eval` (rouge, pandas)
+google-adk[eval]==2.9.2   # [eval] = the ADK UI "Evals" tab and `adk eval` (rouge, pandas); 1.x has no `google.adk.apps` and breaks the agent
 mcp
 python-dotenv
 litellm

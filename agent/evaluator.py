@@ -159,17 +159,23 @@ async def _llm(question: str, plan: SupervisorPlan, result: WorkerResult, checks
                                                                                                   "confidence_reasons": result.confidence_reasons, "assumptions": result.assumptions},
                        "CHECKS": [c.model_dump() for c in checks], "KNOWLEDGE": know, "SIMILAR_CASES": [c.model_dump(exclude={"problem_id"}) for c in cases]}, ensure_ascii=False, default=str)[:9000]
     with span("evaluator.llm", **{"gen_ai.request.model": model, "tmt.prompt_chars": len(user), "tmt.prompt": payload(user, 5000)}) as sp:
+        from observability import log_llm
+
+        t0 = time.time()
         try:
             resp = await litellm.acompletion(model=model, messages=[{"role": "system", "content": SYSTEM}, {"role": "user", "content": user}], max_tokens=1200, timeout=30,
                                              response_format={"type": "json_object"}, **sampling_params(model, 0), **kw)
             text = resp.choices[0].message.content or ""
             u = getattr(resp, "usage", None)
+            log_llm("evaluator", model, time.time() - t0, u, user, text, started=t0)
+            set_attr(sp, "tmt.seconds", round(time.time() - t0, 3))
             set_attr(sp, "gen_ai.usage.input_tokens", getattr(u, "prompt_tokens", None))
             set_attr(sp, "gen_ai.usage.output_tokens", getattr(u, "completion_tokens", None))
             set_attr(sp, "tmt.response", payload(text, 3000))
             return json.loads(text[text.index("{"): text.rindex("}") + 1]), model
         except Exception as e:                                                # an unreachable evaluator must not block the answer: deterministic verdict
             set_attr(sp, "tmt.error", f"{type(e).__name__}")
+            log_llm("evaluator", model, time.time() - t0, prompt=user, error=type(e).__name__, started=t0)
             return None, f"{type(e).__name__}"
 
 

@@ -161,6 +161,20 @@ CALL_LOG: contextvars.ContextVar = contextvars.ContextVar("tmt_call_log", defaul
 """When set to a list, every MCP call made in this context (and in tasks created from it) appends one record: tool, server, args, result preview, timings."""
 
 
+LLM_LOG: contextvars.ContextVar = contextvars.ContextVar("tmt_llm_log", default=None)
+"""When set to a list, every LLM call (router, evaluator, writer) made in this context appends one record: role, model, inference seconds, tokens, prompt / response."""
+
+
+def log_llm(role: str, model: str, seconds: float, usage=None, prompt: str = "", response: str = "", error: str | None = None, started: float | None = None) -> dict:
+    """Record one LLM inference (the time is the whole call: network + generation). Returned so callers can also put it on their span."""
+    rec = {"role": role, "model": model, "seconds": round(seconds, 3), "tok_in": getattr(usage, "prompt_tokens", None), "tok_out": getattr(usage, "completion_tokens", None),
+           "prompt": payload(prompt, 1500), "response": payload(response, 1500), "error": error, "start": started}
+    log = LLM_LOG.get()
+    if log is not None:
+        log.append(rec)
+    return rec
+
+
 def set_attr(sp, key: str, value) -> None:
     if sp is None or value is None:
         return

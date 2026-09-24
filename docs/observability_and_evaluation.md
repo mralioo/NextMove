@@ -20,7 +20,7 @@ see its span waterfall, the router's plan JSON, the executor's facts JSON and th
 
 ## 2. Evaluation dataset
 
-`evaluation/team_answers_template v1.xlsx` (sheet `TEAM_ANSWERS`) is the dataset: **TRAINING** (11 questions, ids
+`evaluation/team_answers_template v2.xlsx` (sheet `TEAM_ANSWERS`) is the dataset: **TRAINING** (11 questions, ids
 T01–T11), **FINAL_TEST** (5 blank slots, loaded automatically once filled, ids F01–F05) and **TEAM_EVIDENCE**
 (team-level prompts, not run). `--export-xlsx` writes the agent's answers into a *copy* of the workbook
 (`evaluation/output/team_answers_filled.xlsx`); the original is never modified.

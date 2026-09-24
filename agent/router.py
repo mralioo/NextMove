@@ -25,6 +25,7 @@ import glob
 import json
 import os
 import re
+import time
 from functools import lru_cache
 from pathlib import Path
 
@@ -277,6 +278,7 @@ def _events_frame() -> pd.DataFrame:
     base = os.environ.get("DATA_DIR", "data")
     repo = Path(__file__).resolve().parent.parent
     hits = sorted(glob.glob(str(Path(base) / "**" / "berlin_events*.csv"), recursive=True)) or sorted(glob.glob(str(repo / "data" / "**" / "berlin_events*.csv"), recursive=True))
+    hits = [h for h in hits if "testing dataset" not in h and not h.endswith("_rest.csv")]      # the organisers' test split (headerless, evaluation period) is not part of the training data the agent knows
     return pd.concat([pd.read_csv(h, usecols=["event_name", "venue_name", "began_local"]) for h in hits], ignore_index=True) if hits else pd.DataFrame(columns=["event_name", "venue_name", "began_local"])
 
 
@@ -433,10 +435,18 @@ async def llm_route(question: str, base_plan: dict, has_history: bool = False) -
     if cfg is None:
         return base_plan
     model, kw = cfg
-    resp = await litellm.acompletion(
-        model=model, messages=[{"role": "system", "content": ROUTER_SYSTEM},
-                            {"role": "user", "content": f"HISTORY={'yes' if has_history else 'no'}\n{question}"}],
-        max_tokens=160, **sampling_params(model, 0), response_format={"type": "json_object"}, timeout=12, **kw)
+    from observability import log_llm
+
+    t0 = time.time()
+    user = f"HISTORY={'yes' if has_history else 'no'}\n{question}"
+    try:
+        resp = await litellm.acompletion(
+            model=model, messages=[{"role": "system", "content": ROUTER_SYSTEM}, {"role": "user", "content": user}],
+            max_tokens=160, **sampling_params(model, 0), response_format={"type": "json_object"}, timeout=12, **kw)
+    except Exception as e:
+        log_llm("router", model, time.time() - t0, prompt=user, error=type(e).__name__, started=t0)
+        raise
+    log_llm("router", model, time.time() - t0, getattr(resp, "usage", None), user, resp.choices[0].message.content or "", started=t0)
     try:
         j = json.loads(resp.choices[0].message.content)
     except (json.JSONDecodeError, TypeError):
