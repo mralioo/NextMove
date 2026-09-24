@@ -28,4 +28,4 @@
 | [`latency_optimization.md`](latency_optimization.md) | How ~60 s became ~4 s | still valid for the writer / symbolic hand-off |
 | [`disruption_case_study.md`](disruption_case_study.md) | Category C ML case study (TabPFN vs baseline) | current |
 | [`agentic_system_design.md`](agentic_system_design.md), [`Talk_To_My_Train_Engineering_Blueprint.md`](Talk_To_My_Train_Engineering_Blueprint.md) | Early analysis and blueprint | historical |
-| [`agents.md`](agents.md), [`system_design.md`](system_design.md), [`../SESSION_SUMMARY.md`](../SESSION_SUMMARY.md) | Description of the first LLM-supervisor design | **superseded** |
+| [`agents.md`](agents.md), [`system_design.md`](system_design.md), [`SESSION_SUMMARY.md`](SESSION_SUMMARY.md) | Description of the first LLM-supervisor design | **superseded** |
