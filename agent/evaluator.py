@@ -132,6 +132,15 @@ async def _quality_checks(category: str, result: WorkerResult, checks: list[Chec
                 checks.append(CheckResult(id=c["id"], ok=bool(c["ok"]), detail=c["detail"][:200]))
             elif not c["ok"]:
                 flags.append("quality flag: " + c["detail"][:170])
+        if category == "A" and (result.facts.get("ev") or {}).get("name"):       # the event of the answer must exist in the golden episodes table (data/normalized/episodes*.csv)
+            ev = result.facts["ev"]
+            eps = await quality_mcp.golden("golden_episodes", date=str(ev.get("date") or ""), kind="event", limit=40)
+            key = re.sub(r"\W+", " ", str(ev["name"]).lower()).strip()
+            hit = next((e for e in (eps or []) if key[:18] and key[:18] in re.sub(r"\W+", " ", str(e.get("name", "")).lower())), None)
+            if hit:
+                checks.append(CheckResult(id="Q-EPISODE", ok=True, detail=f"event '{ev['name'][:40]}' is in the golden episodes table ({hit['id']}, anchor {hit['anchors']}, attendance {hit['attendance']:.0f})"))
+            elif eps is not None:
+                flags.append(f"quality flag: event '{ev['name'][:40]}' on {ev.get('date')} is not in the golden episodes table (events below 2 000 visitors or without a station are not mapped)")
         for b in res.get("boundaries", []):
             if b["id"] not in bnd and len(bnd) < 12:
                 bnd.append(b["id"])

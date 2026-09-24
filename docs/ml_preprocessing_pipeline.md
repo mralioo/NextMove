@@ -66,6 +66,8 @@ Outputs in `data/normalized/` (gitignored, 41 MB): `normalized_flows / _weather 
 | `quality_weather_effects(station)`, `quality_network_bounds`, `quality_data_issues` | weather coefficients, network ranges, data issues |
 | **`quality_check_facts(category, facts_json)`** | **the Inspector's check** (§5) |
 
+**Golden-data tools (added):** the same server also reads the pre-processed files themselves (`data/normalized`, `data/processed`; schema in [`data/data_schema_high_quality.md`](../data/data_schema_high_quality.md)): `golden_datasets` (catalog — start here), `golden_describe`, `golden_series(station, start, end)`, `golden_slice(at, table)`, `golden_episodes`, `golden_coefficients`, `golden_normal_flow(station, at)` (the fitted model for **any** timestamp, also outside the data window), `golden_model_info`, `golden_venue_station(venue, address)`, `golden_geocode_cache`. 22 tools in total (12 `quality_*` + 10 `golden_*`). The Inspector calls them in-process (`quality_mcp.golden(...)`; e.g. the `Q-EPISODE` check that an event of an answer exists in the episodes table); external agents connect over HTTP.
+
 Any MCP client can use it (`tasks.py mcp-quality` for stdio; the Resources page lists the HTTP endpoint).
 
 ## 5. How the Inspector (evaluator agent) uses it

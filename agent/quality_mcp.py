@@ -25,6 +25,14 @@ def available() -> bool:
     return os.environ.get("QUALITY_MCP", "on") != "off" and (REPO / "data" / "quality" / "quality.db").exists()
 
 
+async def golden(tool: str, **args):
+    """The same in-process client for the `golden_*` tools (the pre-processed files in data/normalized and data/processed): `await quality_mcp.golden("golden_series", station=..., start=..., end=...)`.
+    Available whenever the normalized tables exist, even without the quality database."""
+    if os.environ.get("QUALITY_MCP", "on") == "off" or not (REPO / "data" / "normalized" / "normalized_rest.csv").exists():
+        return None
+    return await _call(tool, **args)
+
+
 def _server():
     sys.path[:0] = [str(REPO / "mcp_server"), str(REPO / "ml"), str(REPO)]
     import importlib
@@ -33,9 +41,13 @@ def _server():
 
 async def call(tool: str, **args):
     """Call a quality tool; returns the decoded result or None when the database is not available / the call failed."""
-    global _client
     if not available():
         return None
+    return await _call(tool, **args)
+
+
+async def _call(tool: str, **args):
+    global _client
     try:
         from fastmcp import Client
         with _lock:

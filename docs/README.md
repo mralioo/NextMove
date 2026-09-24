@@ -2,6 +2,7 @@
 
 | Document | What it is | Status |
 | --- | --- | --- |
+| [`../data/data_schema_high_quality.md`](../data/data_schema_high_quality.md) | Schema of the golden pre-processed data (`data/normalized`, `data/processed`, derived `data/quality`) and the MCP tools that read it | current |
 | [`ml_preprocessing_pipeline.md`](ml_preprocessing_pipeline.md) | Normalization pipeline (normal flow, weather, rest) integrated in `ml/`, the quality database with boundaries, the quality MCP server and how the Inspector uses it | current |
 | [`conversation_threads_and_graph.md`](conversation_threads_and_graph.md) | One conversation = one situation: topic-switch choice, chat history, resumed conversations; categorised knowledge graph (situations, domains, action types), audit / repair | current |
 | [`operator_desktop.md`](operator_desktop.md) | React operator desktop: city map with replay, Toby the floating assistant, operations column, feedback controls; the endpoints it added | current |

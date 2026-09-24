@@ -7,6 +7,9 @@ The database (data/quality/, built by `./.venv/bin/python ml/quality_db.py build
 (what is normal for that time of day and day type, typical weather; fitted on clean cells), the weather part and the rest (events, closures, anomalies) — plus boundaries per station /
 day type / hour, station ceilings, network bounds, episodes (events, closures) with their measured effect, unexplained spikes, outages and the data-quality issues found while building it.
 
+Two groups of tools: `quality_*` (the derived database: boundaries and checks) and `golden_*` (the pre-processed files themselves — data/normalized and data/processed; catalog with `golden_datasets`, schema in
+data/data_schema_high_quality.md).
+
 Who uses it: the **Inspector** (the evaluator agent) calls `quality_check_facts` before an answer is shown — every passenger figure of the facts is checked against the boundaries;
 `quality_check_value` / `quality_boundaries` / `quality_normal_flow` answer single questions ("is 2 600 plausible at Kurfürstendamm on a Thursday 09:15?"); any other MCP client can too.
 All answers are deterministic and cite the database numbers they used.
@@ -113,6 +116,80 @@ def quality_check_facts(category: str, facts_json: str) -> dict:
     except json.JSONDecodeError as e:
         return {"available": True, "checks": [], "boundaries": [], "error": f"facts_json is not valid JSON: {e}", "summary": {"n_checks": 0, "n_hard_failed": 0, "n_soft_flags": 0}}
     return _db().check_facts(category, facts)
+
+
+# ==================================================================================================== golden data: the pre-processed files themselves
+# data/normalized/* (normalization pipeline tables + fitted model) and data/processed/* (geocode cache). Schema: data/data_schema_high_quality.md
+import golden_data  # noqa: E402
+
+
+def _g() -> golden_data.Golden:
+    return golden_data.Golden()
+
+
+@mcp.tool
+def golden_datasets() -> list[dict]:
+    """START HERE. Catalog of the pre-processed high-quality files: name, path, kind, split (train / test), size, unit and what each contains — normalized_flows (total), normalized_weather, normalized_rest,
+    normal_flow_passengers (each also `_test`), episodes, normal_flow_coefficients, normal_flow_model (fitted model), geocode_cache_pipeline. Full schema: data/data_schema_high_quality.md."""
+    return _g().catalog()
+
+
+@mcp.tool
+def golden_describe(name: str) -> dict:
+    """Schema and statistics of one golden dataset (rows, columns, time range, NaN share, min / p05 / median / p95 / max, unit, description; model: terms and window; cache: entries)."""
+    return _g().describe(name)
+
+
+@mcp.tool
+def golden_series(station: str, start: str, end: str, max_points: int = 200) -> dict:
+    """One station between `start` and `end` ('YYYY-MM-DD HH:MM') across all four normalized tables: actual (reconstructed from the tables: the raw reading within rounding), normal, total, weather, rest per 15-minute slot,
+    with the split (train / test). Use it to see what was normal, what the weather explains and what is left (event / closure / anomaly)."""
+    return _g().series(station, start, end, max_points)
+
+
+@mcp.tool
+def golden_slice(at: str, table: str = "normalized_rest", top_n: int = 10, order: str = "desc") -> dict:
+    """All stations at one 15-minute slot from one table (normalized_flows | normalized_weather | normalized_rest | normal_flow_passengers), largest first (`order` desc) or smallest (asc):
+    'which stations deviated most from normal at 09:15?'."""
+    return _g().slice(at, table, top_n, order)
+
+
+@mcp.tool
+def golden_episodes(date: str = "", station: str = "", kind: str = "", limit: int = 30) -> list[dict]:
+    """The episodes table (events >= 2 000 visitors mapped to a station, closures with EVERY station on the closed section): id, kind, type, name, start, end, anchor stations, attendance, how the
+    stations were found, split. Filter by date (YYYY-MM-DD), station and kind (event | closure)."""
+    return _g().episodes(date, station, kind, limit)
+
+
+@mcp.tool
+def golden_coefficients(station: str = "") -> dict:
+    """Weather / holiday effects in % from the normal-flow model (rain now, rain in the previous hour, both, +5 degC, school holiday weekend / weekday): one station, or the network median and extremes."""
+    return _g().coefficients(station)
+
+
+@mcp.tool
+def golden_normal_flow(station: str, at: str, periods: int = 1) -> dict:
+    """The MODEL's normal flow (typical weather) in passengers per 15 minutes for `periods` consecutive slots from `at` — for ANY timestamp, also outside the data window (e.g. a date after 2026-10-01;
+    the trend term is clipped there, `outside_training_window` says so). Use it as the reference when no measurement exists."""
+    return _g().normal_flow(station, at, periods)
+
+
+@mcp.tool
+def golden_model_info() -> dict:
+    """The fitted normal-flow model: grid, number of stations, design-matrix terms, training window, mean temperature."""
+    return _g().model_info()
+
+
+@mcp.tool
+def golden_venue_station(venue: str = "", address: str = "", k: int = 3) -> dict:
+    """Which U-Bahn station serves a venue / address? Manual override (domain knowledge) first, then the geocode cache + nearest stations (offline: never a network request), then a station name in the text."""
+    return _g().venue_station(venue, address, k)
+
+
+@mcp.tool
+def golden_geocode_cache(query: str = "", limit: int = 20) -> list[dict]:
+    """Entries of the geocode cache (data/processed): 'venue|address' key, lat, lon, source (nominatim | not_found), the query used. Filter by text."""
+    return _g().geocode_cache(query, limit)
 
 
 if __name__ == "__main__":

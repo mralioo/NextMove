@@ -108,3 +108,37 @@ def test_quality_mcp_server_and_the_inspector_use_it():
         await evaluator._quality_checks("D", good, c2, [])
         assert all(c.ok for c in c2)
     asyncio.run(go())
+
+
+# ------------------------------------------------------------------------------------------------ golden data (the pre-processed files) through the MCP server
+HAVE_NORM = (REPO / "data" / "normalized" / "normalized_rest.csv").exists()
+
+
+@pytest.mark.skipif(not HAVE_NORM, reason="normalized tables not built")
+def test_golden_data_reads_the_normalized_files_and_the_model():
+    import golden_data
+    g = golden_data.Golden()
+    cat = {c["name"]: c for c in g.catalog()}
+    assert {"normalized_flows", "normalized_rest_test", "episodes", "normal_flow_model", "geocode_cache_pipeline"} <= set(cat) and all(c["exists"] for c in cat.values())
+    d = g.describe("normalized_rest")
+    assert d["rows"] == 8320 and d["columns"] == 167 and d["nan_share"] == 0.0 and g.describe("normalized_rest_test")["rows"] == 720
+    row = g.series("Rudow", "2026-07-14 17:00", "2026-07-14 17:00")["rows"][0]
+    assert abs(row["total"] - (row["weather"] + row["rest"])) < 2e-3                                            # total = weather + rest
+    assert abs(row["normal"] - g.normal_flow("Rudow", "2026-07-14 17:00")["rows"][0]["normal"]) < 0.2          # the model reproduces the stored normal
+    assert g.normal_flow("Rudow", "2026-10-15 18:00")["outside_training_window"] is True
+    assert any(e["kind"] == "closure" for e in g.episodes(date="2026-09-25")) and g.coefficients("Rudow")["rain_both_pct"] is not None
+    assert g.venue_station("Uber Arena", "Uber-Platz 1")["stations"][0]["station_name"].startswith("S+U Warschauer")
+    assert g.venue_station("", "Skalitzer Straße 85-86")["stations"][0]["station_name"].startswith("U Schlesisches Tor")
+
+
+@pytest.mark.skipif(not HAVE_NORM, reason="normalized tables not built")
+def test_golden_tools_are_served_by_the_quality_mcp_server():
+    import quality_mcp
+
+    async def go():
+        cat = await quality_mcp.golden("golden_datasets")
+        assert any(c["name"] == "normal_flow_model" for c in cat)
+        s = await quality_mcp.golden("golden_slice", at="2026-07-23 09:15", table="normalized_rest", top_n=3)
+        assert len(s["values"]) == 3
+        assert (await quality_mcp.golden("golden_geocode_cache", query="berghain"))[0]["source"] == "nominatim"
+    asyncio.run(go())
