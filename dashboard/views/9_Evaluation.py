@@ -61,7 +61,7 @@ if ev.empty:
 with st.expander("📖 The dataset and the criteria", expanded=False):
     st.markdown(
         """
-**Dataset.** `evaluation/team_answers_template v1.xlsx` (sheet `TEAM_ANSWERS`): **TRAINING** = the 11 known questions (9 core + 2 bonus),
+**Dataset.** `evaluation/team_answers_template v2.xlsx` (sheet `TEAM_ANSWERS`): **TRAINING** = the 11 known questions (9 core + 2 bonus),
 **FINAL_TEST** = 5 slots that are filled on the final day (loaded automatically once they contain questions), **TEAM_EVIDENCE** = team-level
 prompts (not run through the agent). The **stress** suite adds Edge / Trap / typo / German / cross-cutting questions from `docs/test_questions.md`.
 
