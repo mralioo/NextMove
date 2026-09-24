@@ -1,0 +1,168 @@
+station,rain_now_pct,rain_last_hour_pct,rain_both_pct,temp_plus5C_vs_mean_pct,school_holiday_weekend_pct,school_holiday_weekday_pct
+S+U Westhafen (Berlin),12.64,7.12,20.66,-6.06,-1.64,2.99
+U Birkenstr. (Berlin),32.37,-7.48,22.47,-8.15,-2.16,-3.8
+U Hansaplatz (Berlin),3.67,8.86,12.86,-8.17,5.08,5.57
+U Turmstr. (Berlin),9.16,-1.85,7.14,-10.83,11.89,0.12
+S+U Berlin Hauptbahnhof,15.4,-0.91,14.35,-8.44,-5.22,0.27
+U Bundestag (Berlin),0.11,19.22,19.36,-8.04,4.48,-3.35
+U Kurfürstenstr. (Berlin),13.81,6.79,21.55,-6.97,4.9,2.42
+U Mendelssohn-Bartholdy-Park (Berlin),4.02,10.86,15.32,-1.89,-3.45,-2.58
+S+U Gesundbrunnen Bhf (Berlin),2.51,11.63,14.43,-8.09,10.09,3.79
+U Voltastr. (Berlin),5.65,6.89,12.92,-6.66,-2.64,1.74
+U Bernauer Str. (Berlin),6.39,-2.64,3.58,-13.01,-0.14,2.53
+U Reinickendorfer Str. (Berlin),21.62,-7.3,12.74,-9.46,7.24,5.6
+U Amrumer Str. (Berlin),12.22,3.06,15.66,-8.45,10.54,6.55
+U Leopoldplatz (Berlin),12.87,0.95,13.95,-11.43,0.62,-1.5
+U Seestr. (Berlin),10.17,2.17,12.56,-8.45,8.79,4.56
+S+U Wedding (Berlin),14.17,-4.59,8.93,-9.64,2.37,1.81
+U Nauener Platz (Berlin),9.06,-0.07,8.98,-11.05,5.24,2.82
+U Osloer Str. (Berlin),22.14,-2.28,19.36,-9.46,9.63,-1.83
+U Pankstr. (Berlin),11.69,3.28,15.36,-5.46,-6.56,-2.58
+U Rehberge (Berlin),6.69,4.31,11.29,-8.34,-6.69,-1.07
+U Afrikanische Str. (Berlin),7.94,14.19,23.26,-8.4,3.68,0.89
+U Kochstr. (Checkpoint Charlie) (Berlin),4.79,12.75,18.16,-6.82,-6.1,-0.17
+U Hallesches Tor (Berlin),11.0,1.75,12.93,-7.67,1.18,-5.44
+U Moritzplatz (Berlin),13.91,4.98,19.59,-8.27,0.94,1.45
+U Kottbusser Tor (Berlin),7.94,1.02,9.04,-7.35,3.5,-3.16
+U Prinzenstr. (Berlin),6.05,6.75,13.21,-8.8,-7.83,-8.78
+U Görlitzer Bahnhof (Berlin),2.48,11.47,14.23,-9.31,1.1,-0.61
+U Schlesisches Tor (Berlin),11.46,-1.15,10.18,-7.78,-3.69,-5.74
+U Gneisenaustr. (Berlin),13.65,3.06,17.13,-9.7,-6.1,-1.78
+U Schönleinstr. (Berlin),14.4,0.35,14.8,-10.48,2.73,2.91
+U Südstern (Berlin),19.02,-4.27,13.94,-10.5,-1.82,-0.96
+U Mehringdamm (Berlin),17.57,4.83,23.25,-9.15,-6.86,-3.43
+U Platz der Luftbrücke (Berlin),8.59,-1.86,6.58,-9.8,-0.87,0.22
+U Gleisdreieck (Berlin),13.09,-0.47,12.56,-6.46,-0.24,1.39
+U Möckernbrücke (Berlin),7.45,7.67,15.69,-11.36,-3.15,-1.62
+U Jakob-Kaiser-Platz (Berlin),8.47,14.6,24.31,-3.11,-6.24,-1.56
+U Halemweg (Berlin),9.32,4.31,14.03,-5.41,1.78,-0.49
+U Mierendorffplatz (Berlin),20.31,-6.03,13.05,-8.7,1.6,1.66
+S+U Jungfernheide Bhf (Berlin),16.16,2.47,19.04,-6.34,2.62,1.02
+U Sophie-Charlotte-Platz (Berlin),-3.54,9.23,5.36,-5.47,0.98,1.91
+U Deutsche Oper (Berlin),3.37,7.82,11.44,-8.44,-10.41,-8.0
+U Richard-Wagner-Platz (Berlin),14.48,11.4,27.54,-7.55,13.27,3.61
+U Ernst-Reuter-Platz (Berlin),12.09,3.19,15.67,-8.29,6.03,1.5
+S+U Zoologischer Garten Bhf (Berlin),8.12,2.53,10.85,-10.7,2.19,1.98
+U Augsburger Str. (Berlin),13.65,-5.21,7.73,-9.61,6.13,5.79
+U Kurfürstendamm (Berlin),8.5,2.19,10.87,-9.57,2.1,-1.67
+U Uhlandstr. (Berlin),13.28,0.69,14.05,-8.06,2.09,-2.16
+U Adenauerplatz (Berlin),10.27,7.92,19.01,-1.9,0.12,2.01
+U Bismarckstr. (Berlin),16.03,9.21,26.72,-5.45,0.46,1.94
+U Wilmersdorfer Str. (Berlin),7.81,8.74,17.24,-9.23,2.34,1.79
+U Ruhleben (Berlin),10.68,-7.4,2.49,-6.54,7.87,0.77
+U Olympia-Stadion (Berlin),8.74,3.75,12.82,-6.93,-1.48,-1.11
+U Neu-Westend (Berlin),22.52,-1.51,20.67,-6.54,-4.8,-2.82
+U Theodor-Heuss-Platz (Berlin),1.21,12.48,13.85,-8.1,5.43,-6.28
+U Kaiserdamm (Berlin),6.08,4.37,10.72,-6.79,12.01,-3.82
+U Altstadt Spandau (Berlin),19.6,-5.23,13.34,-9.72,17.2,3.9
+S+U Rathaus Spandau (Berlin),7.22,-1.56,5.55,-8.78,-9.31,2.89
+U Zitadelle (Berlin),10.03,-1.41,8.47,-12.01,5.57,-2.97
+U Paulsternstr. (Berlin),17.69,-0.88,16.66,-5.34,8.63,-1.03
+U Haselhorst (Berlin),5.19,2.54,7.86,-7.69,-4.72,-2.8
+U Siemensdamm (Berlin),11.7,1.68,13.58,-8.24,-6.28,-0.68
+U Rohrdamm (Berlin),13.76,-3.22,10.1,-12.75,-0.3,3.91
+U Fehrbelliner Platz (Berlin),10.16,4.16,14.74,-8.95,5.88,1.87
+U Blissestr. (Berlin),-6.6,11.5,4.15,-7.53,-6.77,-3.11
+U Konstanzer Str. (Berlin),21.61,0.2,21.86,-6.86,7.22,2.2
+U Spichernstr. (Berlin),13.93,2.46,16.74,-7.8,4.67,-1.25
+U Hohenzollernplatz (Berlin),11.05,13.28,25.79,-8.3,-3.58,1.26
+U Güntzelstr. (Berlin),17.67,4.21,22.62,-11.14,3.36,-0.89
+U Berliner Str. (Berlin),20.42,-6.58,12.5,-10.67,-0.53,0.74
+S+U Bundesplatz (Berlin),3.58,6.36,10.16,-9.09,-0.09,1.86
+U Rüdesheimer Platz (Berlin),6.83,5.85,13.08,-9.76,-9.62,-4.31
+S+U Heidelberger Platz (Berlin),13.48,5.54,19.77,-3.98,-4.14,-2.95
+U Krumme Lanke (Berlin),20.1,-3.48,15.92,-8.29,1.83,4.68
+U Onkel Toms Hütte (Berlin),2.33,18.19,20.94,-9.2,7.24,-1.75
+U Freie Universität (Thielplatz) (Berlin),13.46,8.99,23.66,-8.57,3.78,-0.35
+U Breitenbachplatz (Berlin),17.57,-2.25,14.92,-7.89,0.7,-0.19
+U Oskar-Helene-Heim (Berlin),27.47,-12.16,11.97,-10.3,3.06,0.04
+U Podbielskiallee (Berlin),14.64,7.74,23.51,-4.98,-9.88,-1.94
+U Dahlem-Dorf (Berlin),30.17,5.95,37.91,-5.73,-0.85,-0.6
+U Kleistpark (Berlin),13.99,-3.77,9.69,-12.55,-1.96,-3.3
+U Eisenacher Str. (Berlin),10.58,-1.49,8.94,-9.88,-5.6,-2.36
+U Bayerischer Platz (Berlin),2.37,10.91,13.54,-9.71,0.03,-0.15
+U Wittenbergplatz (Berlin),9.69,3.55,13.58,-8.44,3.48,4.07
+U Nollendorfplatz (Berlin),15.6,5.93,22.45,-9.87,4.41,-6.96
+U Bülowstr. (Berlin),7.16,11.13,19.09,-6.75,-6.29,-1.94
+S+U Yorckstr. (Berlin),7.5,-1.8,5.56,-9.14,12.0,-3.19
+U Walther-Schreiber-Platz (Berlin),15.87,-1.74,13.85,-7.44,-0.56,3.74
+U Friedrich-Wilhelm-Platz (Berlin),16.0,-1.68,14.06,-9.74,7.14,4.49
+S+U Rathaus Steglitz (Berlin),8.25,5.38,14.08,-6.3,6.54,-3.4
+U Schloßstr. (Berlin),17.33,-3.78,12.89,-12.53,-1.76,-1.4
+U Paradestr. (Berlin),4.62,8.84,13.87,-6.0,-4.02,-3.41
+S+U Tempelhof (Berlin),9.67,1.27,11.06,-9.58,1.46,-0.29
+U Alt-Tempelhof (Berlin),13.28,-0.78,12.39,-8.75,0.06,1.52
+U Kaiserin-Augusta-Str. (Berlin),24.77,0.37,25.23,-7.71,-1.92,1.58
+U Ullsteinstr. (Berlin),18.64,-4.01,13.88,-8.74,9.68,5.64
+U Westphalweg (Berlin),15.95,1.17,17.31,-5.41,9.45,-3.15
+U Alt-Mariendorf (Berlin),12.08,3.9,16.45,-8.44,5.47,0.71
+U Hermannplatz (Berlin),10.09,4.74,15.31,-5.58,-3.36,0.46
+U Rathaus Neukölln (Berlin),18.89,-1.5,17.1,-7.77,13.35,-2.88
+U Karl-Marx-Str. (Berlin),15.55,3.96,20.12,-10.06,11.6,-2.54
+S+U Neukölln (Berlin),13.04,-0.07,12.96,-8.29,-8.35,-0.02
+U Leinestr. (Berlin),20.06,-1.41,18.36,-7.98,-1.88,-5.42
+U Boddinstr. (Berlin),18.24,-1.81,16.11,-8.18,-5.75,-0.71
+S+U Hermannstr. (Berlin),13.76,3.11,17.29,-7.15,4.73,-1.3
+U Blaschkoallee (Berlin),23.64,-4.37,18.24,-6.76,-0.45,-3.36
+U Grenzallee (Berlin),15.57,-0.8,14.64,-9.54,-0.07,-2.72
+U Parchimer Allee (Berlin),10.08,9.67,20.72,-3.37,9.51,-3.08
+U Britz-Süd (Berlin),2.47,12.95,15.74,-7.2,-2.44,9.26
+U Lipschitzallee (Berlin),27.14,2.32,30.09,-7.33,0.38,-3.76
+U Johannisthaler Chaussee (Berlin),14.69,-3.45,10.73,-11.64,2.39,2.65
+U Zwickauer Damm (Berlin),13.41,8.85,23.45,-5.48,-1.38,0.84
+U Wutzkyallee (Berlin),1.36,7.55,9.01,-11.16,-2.04,2.37
+U Rudow (Berlin),29.05,-8.03,18.69,-10.06,5.12,0.51
+U Paracelsus-Bad (Berlin),41.35,-11.82,24.64,-8.94,2.13,-1.32
+U Franz-Neumann-Platz (Berlin),11.15,-0.04,11.11,-7.02,2.61,4.67
+U Residenzstr. (Berlin),22.34,-8.32,12.16,-8.79,-0.96,-0.52
+U Kurt-Schumacher-Platz (Berlin),11.54,12.56,25.56,-6.44,4.54,-7.1
+U Lindauer Allee (Berlin),10.96,4.71,16.19,-4.84,-13.5,-9.23
+S+U Wittenau (Berlin),27.73,-8.15,17.33,-5.95,-1.2,-3.37
+U Rathaus Reinickendorf (Berlin),11.97,4.95,17.51,-8.53,-0.41,-6.8
+S+U Karl-Bonhoeffer-Nervenklinik (Berlin),21.96,-2.96,18.36,-7.21,-4.76,-1.37
+S+U Friedrichstr. Bhf (Berlin),35.46,-10.13,21.73,-9.43,3.41,4.16
+S+U Alexanderplatz Bhf (Berlin),4.69,12.71,17.99,-3.82,-2.91,3.71
+S+U Jannowitzbrücke (Berlin),-0.97,-1.93,-2.89,-7.75,-0.81,3.4
+U Heinrich-Heine-Str. (Berlin),12.56,3.67,16.69,-8.36,-0.85,2.32
+U Naturkundemuseum (Berlin),16.6,6.05,23.65,-8.15,8.71,0.89
+U Anton-Wilhelm-Amo-Str. (Berlin),12.35,8.74,22.17,-6.69,-0.29,-1.5
+U Stadtmitte (Berlin),17.67,-0.04,17.62,-6.17,2.22,-1.22
+U Hausvogteiplatz (Berlin),10.85,14.5,26.92,-6.53,-18.06,1.82
+U Spittelmarkt (Berlin),6.51,0.55,7.09,-6.39,1.52,-0.37
+U Märkisches Museum (Berlin),8.68,7.25,16.56,-6.69,-0.17,2.97
+U Klosterstr. (Berlin),8.13,6.31,14.95,-6.48,-2.39,-1.12
+U Rosa-Luxemburg-Platz (Berlin),16.14,-1.0,14.97,-5.15,-4.27,-2.21
+U Schillingstr. (Berlin),3.98,2.05,6.11,-9.6,-0.09,1.79
+U Oranienburger Tor (Berlin),3.48,5.48,9.15,-7.34,-5.96,-3.2
+S+U Potsdamer Platz Bhf (Berlin),3.63,10.76,14.78,-1.81,-2.46,1.39
+U Rosenthaler Platz (Berlin),15.96,6.21,23.16,-5.36,0.18,1.25
+S+U Brandenburger Tor (Berlin),15.54,4.56,20.81,-7.28,-0.98,-0.01
+U Rotes Rathaus (Berlin),10.58,9.52,21.1,-7.37,-1.46,2.65
+U Weinmeisterstr. (Berlin),15.6,4.87,21.23,-7.05,7.22,-4.81
+U Schwartzkopffstr. (Berlin),10.64,1.52,12.32,-5.28,6.17,0.41
+U Unter den Linden (Berlin),2.03,3.98,6.09,-9.66,13.74,7.68
+U Museumsinsel (Berlin),8.66,5.68,14.83,-3.47,8.27,-0.21
+S+U Schönhauser Allee (Berlin),16.11,-5.17,10.1,-8.45,1.35,-1.85
+U Senefelderplatz (Berlin),13.25,3.22,16.89,-6.77,-4.54,-5.7
+U Eberswalder Str. (Berlin),8.78,-0.4,8.35,-6.17,2.04,-6.89
+S+U Frankfurter Allee (Berlin),-1.63,10.35,8.55,-12.27,9.92,2.62
+S+U Warschauer Str. (Berlin),18.22,-6.77,10.22,-8.08,-8.99,-4.52
+U Strausberger Platz (Berlin),11.13,-1.5,9.47,-12.52,2.33,-2.13
+U Frankfurter Tor (Berlin),1.97,1.21,3.21,-12.43,-5.43,3.13
+U Samariterstr. (Berlin),20.41,2.34,23.23,-8.24,-5.63,-0.12
+U Weberwiese (Berlin),19.85,-3.9,15.17,-9.78,1.5,5.61
+S+U Pankow (Berlin),9.29,7.11,17.06,-6.96,1.48,-2.41
+U Vinetastr. (Berlin),10.93,-0.21,10.7,-9.98,-7.42,2.91
+S+U Lichtenberg Bhf (Berlin),9.07,5.62,15.19,-8.38,0.67,2.72
+U Magdalenenstr. (Berlin),8.73,6.76,16.08,-10.17,3.53,-3.38
+U Tierpark (Berlin),11.89,-3.58,7.89,-5.47,10.95,6.73
+U Friedrichsfelde (Berlin),21.2,-2.14,18.61,-7.22,5.73,-4.71
+U Biesdorf-Süd (Berlin),9.14,7.92,17.79,-4.92,11.0,-2.23
+U Elsterwerdaer Platz (Berlin),15.54,8.35,25.18,-4.67,1.95,-6.61
+S+U Wuhletal (Berlin),7.33,6.49,14.3,-5.65,-7.44,4.09
+U Kaulsdorf-Nord (Berlin),9.46,-0.28,9.15,-7.56,5.56,-0.14
+U Kienberg (Gärten der Welt) (Berlin),14.12,-0.64,13.4,-4.99,-5.59,-4.15
+U Cottbusser Platz (Berlin),0.47,12.71,13.24,-11.64,7.14,6.64
+U Hellersdorf (Berlin),15.9,2.56,18.87,-8.93,11.84,0.11
+U Hönow (Berlin),7.96,4.9,13.25,-8.48,-6.65,2.29
+U Louis-Lewin-Str. (Berlin),12.07,4.99,17.66,-7.67,1.27,2.61

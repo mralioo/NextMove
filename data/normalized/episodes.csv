@@ -1,0 +1,58 @@
+id,kind,type,name,start,end,anchors,attendance,how
+ev_13,event,Music,Helene Fischer - 360° Stadion Tour 2026,2026-06-13 19:30:00,2026-06-13 22:30:00,U Olympia-Stadion (Berlin),2231.0,override
+ev_15,event,Music,Helene Fischer - 360° Stadion Tour 2026 |  Business Seat Package,2026-06-13 19:30:00,2026-06-13 22:30:00,U Olympia-Stadion (Berlin),2108.0,override
+ev_25,event,Music,Good Dye Young Presents: Hayley Williams At A Bachelorette Party,2026-06-15 20:00:00,2026-06-15 23:00:00,U Möckernbrücke (Berlin),2195.0,override
+ev_27,event,Music,Chezile - Wish You Were Here EU/UK Tour,2026-06-16 20:00:00,2026-06-16 23:00:00,U Schlesisches Tor (Berlin),2343.0,geocode
+ev_30,event,Music,Doja Cat - Tour Ma Vie World Tour | Premium Packages,2026-06-17 20:00:00,2026-06-17 23:00:00,S+U Warschauer Str. (Berlin),2025.0,override
+ev_32,event,Music,Doja Cat - Tour Ma Vie World Tour,2026-06-17 20:00:00,2026-06-17 23:00:00,S+U Warschauer Str. (Berlin),2381.0,override
+ev_58,event,Music,OXIS - Live in Europe,2026-06-24 20:00:00,2026-06-24 23:00:00,U Weberwiese (Berlin),2056.0,geocode
+ev_59,event,Music,Guns N’ Roses - World Tour 2026 | Box seat,2026-06-25 18:30:00,2026-06-25 21:30:00,S+U Warschauer Str. (Berlin),2119.0,override
+ev_65,event,Music,Bruno Mars,2026-06-26 18:00:00,2026-06-26 21:00:00,U Olympia-Stadion (Berlin),2035.0,override
+ev_71,event,Music,Omar76 - Tour 2026 - Tour 2026 | Premium Upgrade (no Ticket included),2026-06-27 00:00:00,2026-06-27 03:00:00,S+U Hermannstr. (Berlin),2145.0,geocode
+ev_82,event,Music,Bruno Mars,2026-06-28 18:00:00,2026-06-28 21:00:00,U Olympia-Stadion (Berlin),2207.0,override
+ev_84,event,Music,Bruno Mars – The Romantic Tour,2026-06-29 18:00:00,2026-06-29 21:00:00,U Olympia-Stadion (Berlin),2063.0,override
+ev_110,event,Music,DIKKA - BOAH IST DAS KRASS TOUR 2 | Box seat,2026-07-05 17:00:00,2026-07-05 20:00:00,S+U Warschauer Str. (Berlin),2321.0,override
+ev_114,event,Music,The Swingin' Hermlins,2026-07-07 19:00:00,2026-07-07 22:00:00,U Mierendorffplatz (Berlin),2347.0,geocode
+ev_118,event,Music,System Of A Down,2026-07-08 18:00:00,2026-07-08 21:00:00,U Olympia-Stadion (Berlin),2149.0,override
+ev_122,event,Music,Mumford & Sons - Prizefighter Tour,2026-07-09 18:45:00,2026-07-09 21:45:00,U Olympia-Stadion (Berlin),2091.0,override
+ev_163,event,Music,Lollapalooza Berlin 2026 presented by essence I Sonntag,2026-07-19 11:00:00,2026-07-19 14:00:00,U Olympia-Stadion (Berlin),2165.0,override
+ev_168,event,Music,The Swingin' Hermlins,2026-07-21 19:00:00,2026-07-21 22:00:00,U Mierendorffplatz (Berlin),2270.0,geocode
+ev_252,event,Music,The Swingin' Hermlins,2026-08-11 19:00:00,2026-08-11 22:00:00,U Mierendorffplatz (Berlin),2033.0,geocode
+ev_291,event,Music,ZARNA GARG: MILLION DOLLAR EXCUSES,2026-08-21 20:00:00,2026-08-21 23:00:00,S+U Potsdamer Platz Bhf (Berlin),2147.0,geocode
+ev_294,event,Music,TFELD 2026,2026-08-22 13:00:00,2026-08-22 16:00:00,U Platz der Luftbrücke (Berlin),2090.0,geocode
+ev_308,event,Music,Kels - Across The Pond Tour,2026-08-26 20:00:00,2026-08-26 23:00:00,U Nollendorfplatz (Berlin),2359.0,geocode
+ev_332,event,Music,Eartheater,2026-08-31 20:00:00,2026-08-31 23:00:00,S+U Zoologischer Garten Bhf (Berlin),2047.0,geocode
+ev_359,event,Music,Foy Vance - The Wake World Tour,2026-09-06 19:00:00,2026-09-06 22:00:00,U Karl-Marx-Str. (Berlin),2203.0,geocode
+ev_360,event,Music,Kalimba: Íntimo Tour Deluxe | Berlín,2026-09-06 20:00:00,2026-09-06 23:00:00,U Eberswalder Str. (Berlin),2135.0,geocode
+ev_366,event,Music,Jacob Collier,2026-09-10 19:00:00,2026-09-10 22:00:00,S+U Friedrichstr. Bhf (Berlin),2237.0,override
+ev_370,event,Music,zeyne - AWDA EU Tour 2026,2026-09-11 20:00:00,2026-09-11 23:00:00,U Heinrich-Heine-Str. (Berlin),2285.0,geocode
+ev_378,event,Music,Ásgeir - EU Tour 2026,2026-09-12 20:00:00,2026-09-12 23:00:00,S+U Hermannstr. (Berlin),2072.0,geocode
+ev_384,event,Music,10 Years of 6LACK Tour,2026-09-13 20:00:00,2026-09-13 23:00:00,U Hermannplatz (Berlin),2223.0,geocode
+ev_387,event,Music,Apache 207 | Box seat in the Ticketmaster Suite,2026-09-15 20:00:00,2026-09-15 23:00:00,S+U Warschauer Str. (Berlin),2136.0,override
+ev_406,event,Music,Zackavelli - MASI 2 TOUR,2026-09-19 20:00:00,2026-09-19 23:00:00,S+U Warschauer Str. (Berlin),2101.0,geocode
+cl_0,closure,closure,Line U3 suspended on a section between Oskar-Helene-Heim and Krumme Lanke due to track maintenance.,2026-06-15 08:00:00,2026-06-15 10:30:00,U Oskar-Helene-Heim (Berlin); U Onkel Toms Hütte (Berlin); U Krumme Lanke (Berlin),0.0,section U3 (3 stations)
+cl_1,closure,closure,Station Schillingstr. closed due to track maintenance.,2026-06-15 12:30:00,2026-06-15 13:30:00,U Schillingstr. (Berlin),0.0,single station
+cl_2,closure,closure,Line U3 suspended on a section between Spichernstr. and Oskar-Helene-Heim due to switch replacement.,2026-06-23 21:00:00,2026-06-24 00:00:00,U Spichernstr. (Berlin); U Hohenzollernplatz (Berlin); U Fehrbelliner Platz (Berlin); S+U Heidelberger Platz (Berlin); U Rüdesheimer Platz (Berlin); U Breitenbachplatz (Berlin); U Podbielskiallee (Berlin); U Dahlem-Dorf (Berlin); U Freie Universität (Thielplatz) (Berlin); U Oskar-Helene-Heim (Berlin),0.0,section U3 (10 stations)
+cl_3,closure,closure,Station Zitadelle closed due to signal upgrades.,2026-06-27 06:10:00,2026-06-27 09:10:00,U Zitadelle (Berlin),0.0,single station
+cl_4,closure,closure,Station Neukölln closed due to switch replacement.,2026-06-30 17:50:00,2026-06-30 21:20:00,S+U Neukölln (Berlin),0.0,single station
+cl_5,closure,closure,Station Cottbusser Platz closed due to safety inspection.,2026-06-30 20:00:00,2026-06-30 23:00:00,U Cottbusser Platz (Berlin),0.0,single station
+cl_6,closure,closure,Station Walther-Schreiber-Platz closed due to track maintenance.,2026-07-02 08:10:00,2026-07-02 12:40:00,U Walther-Schreiber-Platz (Berlin),0.0,single station
+cl_7,closure,closure,Line U8 suspended on a section between Leinestr. and Hermannplatz due to signal upgrades.,2026-07-11 08:20:00,2026-07-11 09:20:00,U Leinestr. (Berlin); U Boddinstr. (Berlin); U Hermannplatz (Berlin),0.0,section U8 (3 stations)
+cl_8,closure,closure,Line U6 suspended on a section between Hallesches Tor and Kaiserin-Augusta-Str. due to safety inspection.,2026-07-13 13:50:00,2026-07-13 15:20:00,U Hallesches Tor (Berlin); U Mehringdamm (Berlin); U Platz der Luftbrücke (Berlin); U Paradestr. (Berlin); S+U Tempelhof (Berlin); U Alt-Tempelhof (Berlin); U Kaiserin-Augusta-Str. (Berlin),0.0,section U6 (7 stations)
+cl_9,closure,closure,Station Theodor-Heuss-Platz closed due to switch replacement.,2026-07-14 16:30:00,2026-07-14 18:30:00,U Theodor-Heuss-Platz (Berlin),0.0,single station
+cl_10,closure,closure,Station Krumme Lanke closed due to switch replacement.,2026-07-16 11:20:00,2026-07-16 12:50:00,U Krumme Lanke (Berlin),0.0,single station
+cl_11,closure,closure,Station Turmstr. closed due to switch replacement.,2026-08-05 06:15:00,2026-08-05 09:15:00,U Turmstr. (Berlin),0.0,single station
+cl_12,closure,closure,Line U5 suspended on a section between Kaulsdorf-Nord and Hönow due to safety inspection.,2026-08-05 21:00:00,2026-08-06 00:30:00,U Kaulsdorf-Nord (Berlin); U Kienberg (Gärten der Welt) (Berlin); U Cottbusser Platz (Berlin); U Hellersdorf (Berlin); U Louis-Lewin-Str. (Berlin); U Hönow (Berlin),0.0,section U5 (6 stations)
+cl_13,closure,closure,Line U7 suspended on a section between Paulsternstr. and Zitadelle due to safety inspection.,2026-08-08 20:10:00,2026-08-08 21:10:00,U Paulsternstr. (Berlin); U Haselhorst (Berlin); U Zitadelle (Berlin),0.0,section U7 (3 stations)
+cl_14,closure,closure,Line U9 suspended on a section between Walther-Schreiber-Platz and Spichernstr. due to power system maintenance.,2026-08-15 11:30:00,2026-08-15 15:00:00,U Walther-Schreiber-Platz (Berlin); U Friedrich-Wilhelm-Platz (Berlin); S+U Bundesplatz (Berlin); U Berliner Str. (Berlin); U Spichernstr. (Berlin),0.0,section U9 (5 stations)
+cl_15,closure,closure,Line U7 suspended between Kleistpark and Bayerischer Platz due to safety inspection.,2026-08-17 15:40:00,2026-08-17 19:40:00,U Kleistpark (Berlin); U Eisenacher Str. (Berlin); U Bayerischer Platz (Berlin),0.0,section U7 (3 stations)
+cl_16,closure,closure,Line U9 suspended on a section between Berliner Str. and Rathaus Steglitz due to safety inspection.,2026-08-19 12:30:00,2026-08-19 13:30:00,U Berliner Str. (Berlin); S+U Bundesplatz (Berlin); U Friedrich-Wilhelm-Platz (Berlin); U Walther-Schreiber-Platz (Berlin); U Schloßstr. (Berlin); S+U Rathaus Steglitz (Berlin),0.0,section U9 (6 stations)
+cl_17,closure,closure,Line U9 suspended on a section between Walther-Schreiber-Platz and Bundesplatz due to safety inspection.,2026-08-27 12:40:00,2026-08-27 16:40:00,U Walther-Schreiber-Platz (Berlin); U Friedrich-Wilhelm-Platz (Berlin); S+U Bundesplatz (Berlin),0.0,section U9 (3 stations)
+cl_18,closure,closure,Line U7 suspended on a section between Blaschkoallee and Rudow due to power system maintenance.,2026-08-30 18:10:00,2026-08-30 20:40:00,U Blaschkoallee (Berlin); U Parchimer Allee (Berlin); U Britz-Süd (Berlin); U Johannisthaler Chaussee (Berlin); U Lipschitzallee (Berlin); U Wutzkyallee (Berlin); U Zwickauer Damm (Berlin); U Rudow (Berlin),0.0,section U7 (8 stations)
+cl_19,closure,closure,Station Lichtenberg Bhf closed due to signal upgrades.,2026-09-07 13:50:00,2026-09-07 17:20:00,S+U Lichtenberg Bhf (Berlin),0.0,single station
+cl_20,closure,closure,Station Bismarckstr. closed due to safety inspection.,2026-09-07 20:20:00,2026-09-07 21:20:00,U Bismarckstr. (Berlin),0.0,single station
+cl_21,closure,closure,Line U6 suspended on a section between Kaiserin-Augusta-Str. and Platz der Luftbrücke due to track maintenance.,2026-09-14 10:45:00,2026-09-14 15:15:00,U Kaiserin-Augusta-Str. (Berlin); U Alt-Tempelhof (Berlin); S+U Tempelhof (Berlin); U Paradestr. (Berlin); U Platz der Luftbrücke (Berlin),0.0,section U6 (5 stations)
+cl_22,closure,closure,Line U7 suspended on a section between Siemensdamm and Altstadt Spandau due to power system maintenance.,2026-09-14 23:15:00,2026-09-15 00:45:00,U Siemensdamm (Berlin); U Rohrdamm (Berlin); U Paulsternstr. (Berlin); U Haselhorst (Berlin); U Zitadelle (Berlin); U Altstadt Spandau (Berlin),0.0,section U7 (6 stations)
+cl_23,closure,closure,Line U3 suspended on a section between Oskar-Helene-Heim and Krumme Lanke due to safety inspection.,2026-09-18 11:00:00,2026-09-18 15:00:00,U Oskar-Helene-Heim (Berlin); U Onkel Toms Hütte (Berlin); U Krumme Lanke (Berlin),0.0,section U3 (3 stations)
+cl_24,closure,closure,Station Turmstr. closed due to signal upgrades.,2026-09-20 05:10:00,2026-09-20 09:10:00,U Turmstr. (Berlin),0.0,single station
+cl_25,closure,closure,Line U1 suspended on a section between Hallesches Tor and Schlesisches Tor due to switch replacement.,2026-09-21 18:00:00,2026-09-21 20:30:00,U Hallesches Tor (Berlin); U Prinzenstr. (Berlin); U Kottbusser Tor (Berlin); U Görlitzer Bahnhof (Berlin); U Schlesisches Tor (Berlin),0.0,section U1 (5 stations)

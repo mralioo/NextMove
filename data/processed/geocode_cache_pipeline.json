@@ -1,0 +1,326 @@
+{
+  "|marlene-dietrich-platz 1": {
+    "lat": 52.5072208,
+    "lon": 13.3721193,
+    "source": "nominatim",
+    "query": "Marlene-Dietrich-Platz 1, Berlin, Germany"
+  },
+  "tati goes underground|metzer straße 2": {
+    "lat": 52.532053,
+    "lon": 13.413919,
+    "source": "nominatim",
+    "query": "Tati Goes Underground, Metzer Straße 2, Berlin, Germany"
+  },
+  "|skalitzer straße 85-86": {
+    "lat": 52.500335,
+    "lon": 13.4359387,
+    "source": "nominatim",
+    "query": "Skalitzer Straße 85-86, Berlin, Germany"
+  },
+  "|paul-heyse-straße 26": {
+    "lat": 52.5291907,
+    "lon": 13.4526523,
+    "source": "nominatim",
+    "query": "Paul-Heyse-Straße 26, Berlin, Germany"
+  },
+  "|schönhauser allee 36": {
+    "lat": 52.5382108,
+    "lon": 13.4126884,
+    "source": "nominatim",
+    "query": "Schönhauser Allee 36, Berlin, Germany"
+  },
+  "|columbiadamm 13 - 21": {
+    "lat": 52.4847383,
+    "lon": 13.392546,
+    "source": "nominatim",
+    "query": "Columbiadamm 13 - 21, Berlin, Germany"
+  },
+  "|olympischer platz 3": {
+    "lat": 52.5145846,
+    "lon": 13.2398144,
+    "source": "nominatim",
+    "query": "Olympischer Platz 3, Berlin, Germany"
+  },
+  "oblomov kreuzkoelln|lenaustraße 7": {
+    "lat": 52.4900273,
+    "lon": 13.4262039,
+    "source": "nominatim",
+    "query": "Lenaustraße 7, Berlin, Germany"
+  },
+  "|hermannstraße 146": {
+    "lat": 52.4643376,
+    "lon": 13.4333186,
+    "source": "nominatim",
+    "query": "Hermannstraße 146, Berlin, Germany"
+  },
+  "|hasenheide 107 - 113": {
+    "lat": 52.4864896,
+    "lon": 13.4217418,
+    "source": "nominatim",
+    "query": "Hasenheide 107 - 113, Berlin, Germany"
+  },
+  "|am juliusturm": {
+    "lat": 52.5376257,
+    "lon": 13.2258792,
+    "source": "nominatim",
+    "query": "Am Juliusturm, Berlin, Germany"
+  },
+  "punch l!ne club berlin|marlene-dietrich-platz 1": {
+    "lat": 52.5072208,
+    "lon": 13.3721193,
+    "source": "nominatim",
+    "query": "Marlene-Dietrich-Platz 1, Berlin, Germany"
+  },
+  "|holzmarktstraße 15": {
+    "lat": 52.5137509,
+    "lon": 13.4227591,
+    "source": "nominatim",
+    "query": "Holzmarktstraße 15, Berlin, Germany"
+  },
+  "zirkus mond|lilli-henoch-straße 10": {
+    "lat": 52.5408686,
+    "lon": 13.4363653,
+    "source": "nominatim",
+    "query": "Lilli-Henoch-Straße 10, Berlin, Germany"
+  },
+  "luftschloss tempelhofer feld|tempelhofer damm 85": {
+    "lat": 52.4712753,
+    "lon": 13.389399,
+    "source": "nominatim",
+    "query": "Tempelhofer Damm 85, Berlin, Germany"
+  },
+  "kantine am berghain|am wriezener bahnhof": {
+    "lat": 52.5114484,
+    "lon": 13.4407738,
+    "source": "nominatim",
+    "query": "Am Wriezener Bahnhof, Berlin, Germany"
+  },
+  "mikropol|nollendorfplatz 5": {
+    "lat": 52.4989787,
+    "lon": 13.352977,
+    "source": "nominatim",
+    "query": "Mikropol, Nollendorfplatz 5, Berlin, Germany"
+  },
+  "haus der visionäre|eichenstraße 4a": {
+    "lat": 52.4834778,
+    "lon": 13.5800458,
+    "source": "nominatim",
+    "query": "Eichenstraße 4A, Berlin, Germany"
+  },
+  "vagabund brauerei kesselhaus|oudenarder str. 16-20": {
+    "lat": 52.5530317,
+    "lon": 13.3594121,
+    "source": "nominatim",
+    "query": "Oudenarder Str. 16-20, Berlin, Germany"
+  },
+  "|budapester straße 45": {
+    "lat": 52.5049196,
+    "lon": 13.3388488,
+    "source": "nominatim",
+    "query": "Budapester Straße 45, Berlin, Germany"
+  },
+  "|skalitzer str. 134": {
+    "lat": 52.4994272,
+    "lon": 13.4187092,
+    "source": "nominatim",
+    "query": "Skalitzer Str. 134, Berlin, Germany"
+  },
+  "|obentrautstraße 19-21": {
+    "lat": 52.4955636,
+    "lon": 13.3879213,
+    "source": "nominatim",
+    "query": "Obentrautstraße 19-21, Berlin, Germany"
+  },
+  "rso valley|schnellerstraße 137": {
+    "lat": 52.4606246,
+    "lon": 13.508975,
+    "source": "nominatim",
+    "query": "Schnellerstraße 137, Berlin, Germany"
+  },
+  "engelnest coworking space and ev|wilhelm-kabus-straße 24": {
+    "lat": 52.4827854,
+    "lon": 13.3674293,
+    "source": "nominatim",
+    "query": "Wilhelm-Kabus-Straße 24, Berlin, Germany"
+  },
+  "|sömmeringstraße 15": {
+    "lat": 52.5225889,
+    "lon": 13.3049841,
+    "source": "nominatim",
+    "query": "Sömmeringstraße 15, Berlin, Germany"
+  },
+  "uber eats music hall|uber-platz 2": {
+    "lat": 52.5055537,
+    "lon": 13.4434752,
+    "source": "nominatim",
+    "query": "Uber-Platz 2, Berlin, Germany"
+  },
+  "classic open air|gendarmenmarkt": {
+    "lat": 52.5135698,
+    "lon": 13.392297,
+    "source": "nominatim",
+    "query": "Gendarmenmarkt, Berlin, Germany"
+  },
+  "olympiapark berlin|friedrich-friesen-allee": {
+    "lat": 52.5172164,
+    "lon": 13.2366045,
+    "source": "nominatim",
+    "query": "Olympiapark Berlin, Friedrich-Friesen-Allee, Berlin, Germany"
+  },
+  "columbia theater|columbiadamm 9-11": {
+    "lat": 52.4847302,
+    "lon": 13.3914367,
+    "source": "nominatim",
+    "query": "Columbiadamm 9-11, Berlin, Germany"
+  },
+  "|gendarmenmarkt 2": {
+    "lat": 52.5127046,
+    "lon": 13.3920639,
+    "source": "nominatim",
+    "query": "Gendarmenmarkt 2, Berlin, Germany"
+  },
+  "|straße am fez 4": {
+    "lat": null,
+    "lon": null,
+    "source": "cache",
+    "query": null
+  },
+  "|gendarmenmarkt": {
+    "lat": 52.5135698,
+    "lon": 13.392297,
+    "source": "nominatim",
+    "query": "Gendarmenmarkt, Berlin, Germany"
+  },
+  "rso.berlin|schnellerstraße 137": {
+    "lat": 52.459911,
+    "lon": 13.5053346,
+    "source": "nominatim",
+    "query": "RSO.BERLIN, Schnellerstraße 137, Berlin, Germany"
+  },
+  "beach neukölln|treptower str. 39": {
+    "lat": 52.4848891,
+    "lon": 13.4580488,
+    "source": "nominatim",
+    "query": "Treptower Str. 39, Berlin, Germany"
+  },
+  "|invalidenstraße": {
+    "lat": 52.5281056,
+    "lon": 13.3745797,
+    "source": "nominatim",
+    "query": "Invalidenstraße, Berlin, Germany"
+  },
+  "|platz der luftbrücke": {
+    "lat": 52.4860843,
+    "lon": 13.3859508,
+    "source": "nominatim",
+    "query": "Platz der Luftbrücke, Berlin, Germany"
+  },
+  "schiffsanlegestelle|märkisches ufer 48": {
+    "lat": 52.5140712,
+    "lon": 13.4157584,
+    "source": "nominatim",
+    "query": "Märkisches Ufer 48, Berlin, Germany"
+  },
+  "|kurt-schumacher-damm 207": {
+    "lat": 52.5502175,
+    "lon": 13.3096589,
+    "source": "nominatim",
+    "query": "Kurt-Schumacher-Damm 207, Berlin, Germany"
+  },
+  "theater des westens|kantstraße 12": {
+    "lat": 52.5059047,
+    "lon": 13.3290059,
+    "source": "nominatim",
+    "query": "Theater des Westens, Kantstraße 12, Berlin, Germany"
+  },
+  "|karl-marx-straße 141": {
+    "lat": 52.4770235,
+    "lon": 13.4399161,
+    "source": "nominatim",
+    "query": "Karl-Marx-Straße 141, Berlin, Germany"
+  },
+  "|nollendorfplatz 5": {
+    "lat": 52.4989399,
+    "lon": 13.3527048,
+    "source": "nominatim",
+    "query": "Nollendorfplatz 5, Berlin, Germany"
+  },
+  "|friedrichstraße 101": {
+    "lat": 52.5207714,
+    "lon": 13.3889021,
+    "source": "nominatim",
+    "query": "Friedrichstraße 101, Berlin, Germany"
+  },
+  "|holzmarktstraße 25": {
+    "lat": 52.5117838,
+    "lon": 13.4255086,
+    "source": "nominatim",
+    "query": "Holzmarktstraße 25, Berlin, Germany"
+  },
+  "|cuvrystraße 7": {
+    "lat": 52.4991046,
+    "lon": 13.4451096,
+    "source": "nominatim",
+    "query": "Cuvrystraße 7, Berlin, Germany"
+  },
+  "|revaler straße 99": {
+    "lat": 52.5064417,
+    "lon": 13.4572149,
+    "source": "nominatim",
+    "query": "Revaler Straße 99, Berlin, Germany"
+  },
+  "|im u-bhf. schlesisches tor": {
+    "lat": null,
+    "lon": null,
+    "source": "cache",
+    "query": null
+  },
+  "uber arena|uber-platz 1": {
+    "lat": 52.5049039,
+    "lon": 13.4431471,
+    "source": "nominatim",
+    "query": "Uber-Platz 1, Berlin, Germany"
+  },
+  "tempodrom berlin|mockernstrasse 10": {
+    "lat": 52.5016063,
+    "lon": 13.3811909,
+    "source": "nominatim",
+    "query": "Mockernstrasse 10, Berlin, Germany"
+  },
+  "tempodrom|möckernstraße 10": {
+    "lat": 52.5016063,
+    "lon": 13.3811909,
+    "source": "nominatim",
+    "query": "Tempodrom, Möckernstraße 10, Berlin, Germany"
+  },
+  "olympiastadion - berlin|olympischer platz 3": {
+    "lat": 52.5145846,
+    "lon": 13.2398144,
+    "source": "nominatim",
+    "query": "Olympiastadion - Berlin, Olympischer Platz 3, Berlin, Germany"
+  },
+  "waldbühne|am glockenturm 1": {
+    "lat": 52.5155473,
+    "lon": 13.2295249,
+    "source": "nominatim",
+    "query": "Waldbühne, Am Glockenturm 1, Berlin, Germany"
+  },
+  "admiralspalast|friedrichstrasse 101": {
+    "lat": 52.5207714,
+    "lon": 13.3889021,
+    "source": "nominatim",
+    "query": "Admiralspalast, Friedrichstrasse 101, Berlin, Germany"
+  },
+  "tempodrom kleine arena|möckernstraße 10": {
+    "lat": 52.5016063,
+    "lon": 13.3811909,
+    "source": "nominatim",
+    "query": "Möckernstraße 10, Berlin, Germany"
+  },
+  "|alexanderplatz 1": {
+    "lat": 52.5215058,
+    "lon": 13.4123809,
+    "source": "nominatim",
+    "query": "Alexanderplatz 1, Berlin, Germany"
+  }
+}
