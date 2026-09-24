@@ -2,6 +2,10 @@
 
 **An AI team for the control room** — InnoTrans 2026 hackathon, Berlin U-Bahn. An operator asks in plain words ("Line U7 is suspended between Hermannplatz and Karl-Marx-Straße tonight — how do we reroute, who gets overloaded, where should staff go?"); a small team of agents pulls the numbers through MCP tools, **recomputes the key figures before anything is shown**, and answers with a one-screen brief. The operator rates the answer and reports what they actually did; that becomes a precedent for the next similar situation. *Advisory only — the operator decides.*
 
+> ### ▶ See the system design in motion
+> **[Open the animated walkthrough](https://htmlpreview.github.io/?https://github.com/mralioo/NextMove/blob/main/docs/presentation/nextmove_agentic_system.html)** — the agent team, its roles and hierarchy, one question step by step, memory and the knowledge graph, and why it works.
+> Locally (offline, full screen with **F**): open [`docs/presentation/nextmove_agentic_system.html`](docs/presentation/nextmove_agentic_system.html) in a browser. *(GitHub shows HTML files as source; the link above renders it through htmlpreview.github.io, which needs the repository to be public.)*
+
 | Role (pitch name) | What it does | Code |
 | --- | --- | --- |
 | **Dispatcher** | understands the question, routes it, rejects off-topic or manipulative requests | `agent/supervisor.py`, `router.py`, `guardrails.py` |
@@ -40,6 +44,8 @@ The first question after a cold start can take ~30 s (TabPFN warm-up); later one
 ---
 
 ## 2. System design
+
+> Animated version: **[open the walkthrough](https://htmlpreview.github.io/?https://github.com/mralioo/NextMove/blob/main/docs/presentation/nextmove_agentic_system.html)** ([local file](docs/presentation/nextmove_agentic_system.html)).
 
 ```mermaid
 flowchart LR
