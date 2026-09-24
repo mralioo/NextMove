@@ -26,7 +26,7 @@ def stress(held: list[dict], run_id: str, window: str) -> str:
              f"`evaluation/submissions/{run_id}.json`, dashboard page *Submission runs*).",
              f"**{len(held)} operator questions on the held-out period**, each in a fresh session through the real ADK app: median {statistics.median(lat):.1f} s, p95 {_pct(lat, 0.95):.1f} s, max {max(lat):.1f} s "
              f"(decisions: {', '.join(f'{v}× {k}' for k, v in sorted(by.items()))}).",
-             "", "**How an operator uses it under pressure:** type the question in plain words (no syntax). The answer is always *Verdict → Evidence → Do now → Caveat → Sources*; the Verdict line is what to act on. "
+             "", "**How an operator uses it under pressure:** type the question in plain words (no syntax). The default answer is a short brief (Verdict, up to three actions, one watch-out, confidence); asking why / evidence / which tools returns the full report (Verdict → Evidence → Do now → Caveat → Sources) — the answers in this workbook are full reports. The Verdict line is what to act on. "
              "If something needed is missing (a date, the second station of a closure) the agent asks for exactly that one item instead of guessing.",
              "", "**How failures and uncertainty are handled (each observed in this run):**"]
     for h in held:
