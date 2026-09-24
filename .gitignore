@@ -30,3 +30,7 @@ experiments/output/
 observability/backup/
 
 .run/
+
+# React operator desktop
+frontend/node_modules/
+frontend/dist/

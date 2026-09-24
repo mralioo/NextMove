@@ -30,6 +30,8 @@ Two kinds of feedback:
 
 Verified live with scratch databases: answer → `POST …/action` (score 5, `worked`) → graph had `Feedback 1, OperatorAction 1` → a similar question from another operator returned the brief with the precedent line.
 
+> The React operator desktop that uses this API, and the added `POST /api/v1/chat` and `/api/v1/ops/*` endpoints, are described in [`operator_desktop.md`](operator_desktop.md).
+
 ## 2. Services and addresses
 
 | Service | Address | Started by |

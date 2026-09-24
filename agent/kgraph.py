@@ -222,7 +222,14 @@ class KnowledgeGraph:
         """What operators did in SIMILAR past situations and how it went: per similar problem the reported actions (with followed / outcome / score), the mean score of the answer,
         ranked by similarity. Only problems with at least one operator report are returned."""
         out = []
-        for case in self.similar(question, category, entities, k=12, min_sim=min_sim):
+        if entities is None:                                                       # entities from the operator's own words (stations / lines), so a different line or place never matches
+            try:
+                import router
+                from schemas import Entities
+                entities = Entities(stations=router.find_stations(question), lines=[l.upper() for l in re.findall(r"\b[uU][1-9]\b", question)])
+            except Exception:
+                entities = None
+        for case in self.similar(question, category, entities, k=12, min_sim=min_sim, require_entity=True):
             if exclude_key and case.problem_id == exclude_key:
                 continue
             with self._conn() as c:
@@ -279,7 +286,7 @@ class KnowledgeGraph:
         return KGCase(problem_id=key, problem=props.get("text", "")[:300], category=props.get("category", "?"), similarity=round(similarity, 2),
                       answer=(json.loads(ans[1]).get("text", "")[:400] if ans else ""), actions=acts, options=opts, times_accepted=int(ans[2]) if ans else 0)
 
-    def similar(self, question: str, category: str = "", entities=None, k: int = 3, min_sim: float = 0.2) -> list:
+    def similar(self, question: str, category: str = "", entities=None, k: int = 3, min_sim: float = 0.2, require_entity: bool = False) -> list:
         """The `k` most similar past problems (token overlap + category + shared stations/lines) with their answer, actions and options."""
         q = _tokens(question)
         ents = {_short(s).lower() for s in (entities.stations if entities else [])} | {x.lower() for x in (entities.lines if entities else [])}
@@ -290,6 +297,8 @@ class KnowledgeGraph:
             pe = {_short(s).lower() for s in (props.get("params", {}).get("stations") or [])} | {x.lower() for x in (props.get("params", {}).get("lines") or [])}
             ov = len(ents & pe) / len(ents | pe) if ents | pe else 0.0
             sim = 0.6 * jac + 0.15 * (1.0 if category and props.get("category") == category else 0.0) + 0.25 * ov
+            if require_entity and ents and pe and not (ents & pe):              # a closure on U2 is no precedent for a closure on U7, whatever words the questions share
+                continue
             if sim >= min_sim:
                 scored.append((sim, pid, key, props))
         return [self.case(pid, key, props, sim) for sim, pid, key, props in sorted(scored, key=lambda x: -x[0])[:k]]

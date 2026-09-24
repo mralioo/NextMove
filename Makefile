@@ -30,6 +30,7 @@ install:
 	python3 -m venv $(VENV)
 	$(PY) -m pip install --upgrade pip
 	$(PY) -m pip install -r dashboard/requirements.txt -r ml/requirements.txt -r mcp_server/requirements.txt -r agent/requirements.txt
+	@command -v npm >/dev/null && (cd frontend && npm install --no-audit --no-fund && npm run build) || echo 'npm not found: skipping the React operator desktop (frontend/)'
 
 up:
 	@test -x $(PY) || { echo "No $(VENV) found — run 'make install' first."; exit 1; }

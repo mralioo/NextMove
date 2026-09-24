@@ -212,6 +212,11 @@ def shorten(text: str, max_words: int = 55) -> str:
     return render()
 
 
+def tidy(text: str) -> str:
+    """One blank line before every **Section:** so Markdown renders a list and the next section as separate blocks (models often glue them together)."""
+    return re.sub(r"\n{3,}", "\n\n", re.sub(r"(?<!\n)\n(?=\*\*[A-Za-z][A-Za-z '/-]{1,30}:\*\*)", "\n\n", text)).strip()
+
+
 def confidence_footer(confidence: float | None, mode: str = "brief") -> str:
     """One deterministic line under the brief: how sure, and how to get the full report."""
     if confidence is None:
@@ -439,6 +444,7 @@ async def write(question: str, facts: dict, wi=None, mode: str = "brief") -> tup
     if brief and len(text.split()) > BRIEF_MAX_WORDS:      # the model wrote too much for a stressed operator: cut it to the brief, deterministically
         text = shorten(text)
         info["guard"] = "pass (shortened)"
+    text = tidy(text)
     miss = missing_disclosures(text, facts) if facts.get("status") == "ok" else []
     if miss:
         text += "\n**Assumed:** " + "; ".join(m.rstrip(".") for m in miss) + "."

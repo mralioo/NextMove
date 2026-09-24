@@ -255,6 +255,7 @@ class WriterAgent(BaseAgent):
         legacy = st.get("plan") or {}
         info: dict = {}
         source, refs = "worker", []
+        hist_meta: dict = {}                               # a reused answer: feedback and "why?" refer to the turn it came from
         narr: str | None = None                            # the writer's own text, before the deterministic method section / sources / footer are added
         art: dict | None = None                            # the artifact bundle of this turn (see artifacts.py)
         line = ""
@@ -285,6 +286,7 @@ class WriterAgent(BaseAgent):
             h = plan.history
             K1 = _kb()
             art_h = K1.get_artifact(h.turn_id) if K1 is not None else None
+            hist_meta = {"artifact_turn_id": h.turn_id, "requires_action": bool(art_h and art_h.get("requires_action"))}
             # a stored answer from before the brief format is shortened; a stored bundle gives its brief and the confidence line
             answer = ((art_h["brief"] + writer.confidence_footer(art_h.get("confidence"))) if art_h and art_h.get("brief") else writer.shorten(h.answer)) \
                 + f"\n_(From the accepted analysis {h.age_s / 60:.0f} min ago on the same data window; nothing was recomputed.)_"
@@ -359,9 +361,9 @@ class WriterAgent(BaseAgent):
             delta["last_artifact"] = st.get("last_artifact")                   # "why / evidence" after a reused answer refers to ITS bundle
         if K is not None and source in ("worker", "follow_up", "decline", "safe_fallback"):
             timing["sanity"] = _sanity_and_remember(K, ctx, q, body, facts, legacy, plan, st.get("verdict"), st.get("result"), source, art if source == "worker" else None)
-            if timing["sanity"].get("accepted") and facts.get("status") in ("ok", "multi"):
-                delta["last_plan"] = st["sp"]
-            if art is not None and timing["sanity"].get("turn_id"):
+            if source == "worker" and facts.get("status") in ("ok", "multi"):        # what the operator was SHOWN is what "why? / evidence / what about 22:30" refers to
+                delta["last_plan"] = st["sp"]                                        # (only accepted answers are reused from history or added to the graph — that is separate)
+            if art is not None and source == "worker" and timing["sanity"].get("turn_id"):
                 art["turn_id"] = timing["sanity"]["turn_id"]
         if art is not None:
             delta["last_artifact"] = art                                   # what "why / evidence / which tools" refers to in this session
@@ -373,7 +375,7 @@ class WriterAgent(BaseAgent):
             f"+ writer {parts['writer_s']} s (LLM inference {parts['writer_llm_s']} s)"))]), custom_metadata={"kind": "timing", **parts})
         final = _text_event(self.name, answer, delta)
         final.custom_metadata = {"kind": "answer", "source": source, "answer_mode": mode if source in ("worker", "follow_up") else None, "answer_words": len(answer.split()),
-                                 "artifact_turn_id": (art or {}).get("turn_id"), "turn_id": timing.get("sanity", {}).get("turn_id"), "requires_action": (art or {}).get("requires_action"),
+                                 "artifact_turn_id": (art or {}).get("turn_id") or hist_meta.get("artifact_turn_id"), "turn_id": timing.get("sanity", {}).get("turn_id"), "requires_action": (art or {}).get("requires_action") or hist_meta.get("requires_action"),
                                  "precedent": (art or {}).get("precedent"), **parts, "model": info.get("model"), "tok_in": info.get("tok_in"), "tok_out": info.get("tok_out"), "guard": info.get("guard")}
         if info.get("tok_in") or info.get("tok_out"):
             final.usage_metadata = types.GenerateContentResponseUsageMetadata(prompt_token_count=info.get("tok_in") or 0, candidates_token_count=info.get("tok_out") or 0,

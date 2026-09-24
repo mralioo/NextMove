@@ -9,7 +9,7 @@
 Services
     dashboard       Streamlit dashboard incl. the Agent Workflow page          http://localhost:8501 (next free port if taken)
     adk-web         ADK dev UI: chat with the agent, see every event / tool    http://localhost:8000
-    operator-api    Feedback loop + operator knowledge base API for the UI      http://127.0.0.1:8770  (docs at /docs; docs/operator_feedback_api.md)
+    operator-api    Feedback loop + operator knowledge base API for the UI      http://127.0.0.1:8770/app/  (React operator desktop; API docs at /docs; docs/operator_feedback_api.md)
     mcp-knowledge   MCP server: ground truth, sanity check, history, graph     http://127.0.0.1:8766/mcp   (streamable HTTP)
     neo4j           Neo4j (Docker container nextmove-neo4j, made by `./.venv/bin/python scripts/tasks.py neo4j-up`)   bolt://localhost:7687, browser :7474
     mcp-data        MCP server: datasets, analytics, TabPFN tools (optional)    http://127.0.0.1:8765/mcp   (--with-data-mcp; the agent itself
@@ -101,6 +101,14 @@ def prepare() -> None:
     if not kg.exists():
         print("· seeding the knowledge graph without the LLM step (./.venv/bin/python scripts/tasks.py kg-seed --no-llm) ...")
         subprocess.run([PY, "agent/kgraph_build.py", "--no-llm"], cwd=REPO, env=env, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    fe = REPO / "frontend"
+    if not (fe / "dist" / "index.html").exists() and (fe / "package.json").exists():
+        import shutil
+        if shutil.which("npm"):
+            print("· building the operator desktop (React) once: frontend/ npm install + build ...")
+            subprocess.run("npm install --no-audit --no-fund && npm run build", cwd=fe, shell=True, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        else:
+            print("! npm not found: the operator desktop (frontend/) is not built; the API and the Streamlit dashboard still work.")
     if not (REPO / ".env").exists():
         print("! no .env found: the agent needs TABPFN_API_TOKEN and LLM keys (see README); the dashboard and MCP servers still start.")
 
@@ -158,7 +166,7 @@ def status() -> None:
         print("no services started by `make up`.")
         return
     urls = {"dashboard": "http://localhost:{p}   (page: Agent Workflow)", "adk-web": "http://localhost:{p}   (select the app 'agent')",
-            "neo4j": "bolt://localhost:{p}   browser http://localhost:7474 (user neo4j)", "operator-api": "http://127.0.0.1:{p}   (docs: /docs)", "mcp-knowledge": "http://127.0.0.1:{p}/mcp   (MCP, streamable HTTP)", "mcp-data": "http://127.0.0.1:{p}/mcp   (MCP, streamable HTTP)"}
+            "neo4j": "bolt://localhost:{p}   browser http://localhost:7474 (user neo4j)", "operator-api": "http://127.0.0.1:{p}/app/   (operator desktop · API docs: /docs)", "mcp-knowledge": "http://127.0.0.1:{p}/mcp   (MCP, streamable HTTP)", "mcp-data": "http://127.0.0.1:{p}/mcp   (MCP, streamable HTTP)"}
     print(f"\n  {'service':15s} {'pid':>7s}  {'state':9s} address")
     for n, v in st.items():
         ok = True if v.get("docker") else alive(v["pid"])

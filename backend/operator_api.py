@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Literal
 
 REPO = Path(__file__).resolve().parent.parent
-sys.path[:0] = [str(REPO), str(REPO / "agent")]
+sys.path[:0] = [str(REPO), str(REPO / "agent"), str(REPO / "backend")]
 from env_loader import load_all_dotenvs  # noqa: E402
 
 load_all_dotenvs()
@@ -81,6 +81,60 @@ def _run(fn, *a, **kw):
 
 
 # ------------------------------------------------------------------------------------------------ meta
+# ------------------------------------------------------------------------------------------------ operator desktop: chat, topology, replay snapshot
+class ChatBody(BaseModel):
+    message: str = Field(..., min_length=1, max_length=1500)
+    operator_id: str = Field("operator", description="becomes the ADK user_id")
+    session_id: str | None = Field(None, description="omit to start a new conversation; send the returned session_id to continue it (follow-ups, 'why?')")
+
+
+@app.post("/api/v1/chat", tags=["chat"])
+def chat(body: ChatBody) -> dict:
+    """Ask the agent. Returns the answer (Markdown) plus everything the desktop shows next to it: `turn_id` / `artifact_turn_id` / `requires_action` / `precedent` (for feedback),
+    `steps` (operations log: dispatcher route, tool calls with arguments and seconds, analyst / inspector rounds, LLM calls, writer), `tools`, `llm`, `tokens` {in,out,total,estimated},
+    `timing` {supervisor_s, worker_evaluator_s, mcp_s, writer_s, total_s}, `counts`."""
+    import time as _t
+
+    import chat_bridge
+    sid = body.session_id or f"ui-{int(_t.time() * 1000)}"
+    try:
+        return chat_bridge.ask(body.operator_id, sid, body.message)
+    except chat_bridge.AgentUnavailable as e:
+        raise HTTPException(503, str(e))
+
+
+@app.get("/api/v1/ops/topology", tags=["desktop"])
+def ops_topology() -> dict:
+    """Stations (id, short name, lon/lat, lines), edges (with the lines that serve them) and line colours — enough to draw the network map."""
+    import ops_data
+    return ops_data.topology()
+
+
+@app.get("/api/v1/ops/timeline", tags=["desktop"])
+def ops_timeline() -> dict:
+    """The replay window (start, end, 15-minute step), a default time with an active closure, and all closures (for markers on the time bar). There is no live feed: the desktop replays recorded data."""
+    import ops_data
+    return ops_data.timeline()
+
+
+@app.get("/api/v1/ops/snapshot", tags=["desktop"])
+def ops_snapshot(at: str) -> dict:
+    """The network at one 15-minute slot (ISO time): passengers per station vs the typical value for that weekday and slot, line loads, network total, busiest stations, closures active
+    then (with the blocked edges and unserved stations), events around then, weather, and alerts."""
+    import ops_data
+    try:
+        return ops_data.snapshot(at)
+    except Exception as e:
+        raise HTTPException(422, f"cannot build a snapshot for {at!r}: {type(e).__name__}: {str(e)[:120]}")
+
+
+@app.get("/api/v1/ops/series", tags=["desktop"])
+def ops_series(date: str) -> list[dict]:
+    """Network passengers per 15 minutes for one day (`YYYY-MM-DD`) with the typical value — the sparkline under the map."""
+    import ops_data
+    return ops_data.series(date)
+
+
 @app.get("/api/v1/health", tags=["meta"])
 def health() -> dict:
     """Is the API up, and how much is stored."""
@@ -214,6 +268,19 @@ def graph_stats() -> dict:
     """Size of the knowledge graph by node / relationship type (Feedback, OperatorAction, Artifact … included)."""
     import kgraph
     return kgraph.kg().stats()
+
+
+# the built React desktop (frontend/dist) is served at /app  — `./.venv/bin/python scripts/tasks.py ui-build`
+_DIST = REPO / "frontend" / "dist"
+if _DIST.exists():
+    from fastapi.responses import RedirectResponse
+    from fastapi.staticfiles import StaticFiles
+
+    app.mount("/app", StaticFiles(directory=_DIST, html=True), name="desktop")
+
+    @app.get("/", include_in_schema=False)
+    def _root():
+        return RedirectResponse("/app/")
 
 
 if __name__ == "__main__":

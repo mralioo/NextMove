@@ -119,3 +119,62 @@ def test_http_api_round_trip(tmp_path, monkeypatch):
     assert c.get("/api/v1/operator-actions").json()[0]["action"].startswith("Sent staff")
     assert c.get("/api/v1/precedents", params={"question": Q, "category": "C"}).json()["precedents"] is not None
     assert c.delete(f"/api/v1/feedback/{fid}").json() == {"deleted": fid} and c.delete(f"/api/v1/feedback/{fid}").status_code == 404
+
+
+# ------------------------------------------------------------------------------------------------ operator desktop
+def test_chat_bridge_turns_adk_events_into_answer_steps_tools_and_tokens():
+    from backend import chat_bridge as cb
+    ev = [
+        {"author": "supervisor", "content": {"parts": [{"text": "[plan]"}]}, "customMetadata": {"kind": "supervisor", "seconds": 0.02, "decision": "proceed", "category": "C",
+                                                                                                   "route": {"specialist": "disruption", "ml_engine": "tabpfn", "tools": ["apply_closure"]}}},
+        {"author": "worker:disruption", "content": {"parts": [{"functionCall": {"id": "mcp-1-0", "name": "apply_closure", "args": {"closure_id": 1}}}]}, "customMetadata": {"kind": "mcp_call", "round": 1, "server": "s"}},
+        {"author": "worker:disruption", "content": {"parts": [{"functionResponse": {"id": "mcp-1-0", "name": "apply_closure", "response": {"ok": True, "seconds": 0.3, "result_bytes": 1800, "server": "s"}}}]},
+         "customMetadata": {"kind": "mcp_result"}},
+        {"author": "writer", "content": {"parts": [{"text": "[llm writer]"}]}, "customMetadata": {"kind": "llm", "role": "writer", "model": "m", "inference_s": 2.5, "tok_in": 100, "tok_out": 20, "prompt": "p" * 40, "response": "r" * 8}},
+        {"author": "writer", "content": {"parts": [{"text": "[timing]"}]}, "customMetadata": {"kind": "timing", "supervisor_s": 0.02, "worker_evaluator_s": 0.5, "mcp_s": 0.3, "writer_s": 2.6, "total_s": 3.2}},
+        {"author": "writer", "content": {"parts": [{"text": "**Verdict:** x"}]}, "customMetadata": {"kind": "answer", "turn_id": 5, "artifact_turn_id": 5, "requires_action": True, "answer_mode": "brief", "source": "worker"}},
+    ]
+    r = cb.parse_events(ev)
+    assert r["answer"] == "**Verdict:** x" and r["artifact_turn_id"] == 5 and r["requires_action"] is True
+    assert r["counts"] == {"tool_calls": 1, "distinct_tools": 1, "llm_calls": 1, "events": 6} and r["tools"][0]["args"] == {"closure_id": 1} and r["tools"][0]["seconds"] == 0.3
+    assert r["tokens"] == {"in": 100, "out": 20, "total": 120, "estimated": False} and r["timing"]["total_s"] == 3.2
+    assert [s["kind"] for s in r["steps"]] == ["route", "tool", "llm", "writer"]
+    est = cb.parse_events([{"author": "writer", "content": {"parts": [{"text": "x"}]}, "customMetadata": {"kind": "llm", "role": "writer", "model": "m", "inference_s": 1, "prompt": "p" * 400, "response": "r" * 80}}])
+    assert est["tokens"]["estimated"] is True and est["tokens"]["in"] == 100
+
+
+def test_desktop_endpoints_topology_snapshot_series_and_chat(monkeypatch):
+    from fastapi.testclient import TestClient
+    from backend import operator_api as api
+    import chat_bridge                      # the module the API itself uses (backend/ is on sys.path once operator_api is imported)
+    c = TestClient(api.app)
+    topo = c.get("/api/v1/ops/topology").json()
+    assert len(topo["stations"]) > 100 and topo["edges"] and {l["line"] for l in topo["lines"]} >= {"U1", "U9"}
+    tl = c.get("/api/v1/ops/timeline").json()
+    assert tl["default_at"] and tl["closures"]
+    snap = c.get("/api/v1/ops/snapshot", params={"at": tl["default_at"]}).json()
+    assert snap["network"]["total"] > 0 and snap["lines"] and snap["closures"] and snap["closures"][0]["blocked_edges"] is not None
+    assert len(c.get("/api/v1/ops/series", params={"date": tl["default_at"][:10]}).json()) > 50
+    monkeypatch.setattr(chat_bridge, "ask", lambda op, sid, msg: {"answer": "ok", "session_id": sid, "operator_id": op})
+    assert c.post("/api/v1/chat", json={"message": "hi", "operator_id": "o", "session_id": "s"}).json()["session_id"] == "s"
+    def down(*a):
+        raise chat_bridge.AgentUnavailable("not reachable")
+    monkeypatch.setattr(chat_bridge, "ask", down)
+    assert c.post("/api/v1/chat", json={"message": "hi"}).status_code == 503
+
+
+def test_a_precedent_needs_the_same_line_or_station(env):
+    kb, g, tid = env
+    feedback.submit(tid, score=5, action_text="Sent two staff to Neukölln", followed="as_recommended", outcome="worked", kb=kb, graph=g, mirror=False)
+    u2 = "Line U2 is suspended between Bismarckstr. and Neu-Westend on 2026-09-27 from 08:30 for 4 hours. Where should we deploy staff?"
+    assert feedback.precedents(u2, "C", None, graph=g) == []                                  # same words, other line and stations: no precedent
+    assert feedback.precedents(Q.replace("2026-09-25", "2026-09-26"), "C", None, graph=g)      # same line and stations: precedent
+
+
+def test_tidy_puts_a_blank_line_before_each_section():
+    assert writer_tidy("**Verdict:** a\n**Do now:**\n- x\n**Watch out:** z") == "**Verdict:** a\n\n**Do now:**\n- x\n\n**Watch out:** z"
+
+
+def writer_tidy(t):
+    import writer
+    return writer.tidy(t)
