@@ -27,8 +27,8 @@
   "target": "passengers (per station per 15 min)",
   "description": "Expected-flow regressor behind predict_expected_flow",
   "name": "expected_flow_regressor",
-  "saved_at": "2026-09-24T16:39:50+00:00",
+  "saved_at": "2026-09-24T17:56:41+00:00",
   "tabpfn_client_version": "0.6.0",
-  "model_id": "01a0d449-9a26-75b3-9668-d648d0d7270e",
+  "model_id": "01a0d48f-eddf-7d61-8f69-e4fd282ce392",
   "n_train_rows": 8000
 }

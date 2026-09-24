@@ -28,8 +28,8 @@
   "train_days_before": "2026-09-09",
   "metrics": null,
   "name": "demand_baseline",
-  "saved_at": "2026-09-24T16:39:44+00:00",
+  "saved_at": "2026-09-24T17:56:32+00:00",
   "tabpfn_client_version": "0.6.0",
-  "model_id": "01a0d449-8335-7600-9f18-b4dd52cff63b",
+  "model_id": "01a0d48f-cac1-7053-be47-5b5c64954625",
   "n_train_rows": 10000
 }
