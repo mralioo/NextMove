@@ -54,6 +54,7 @@ def parse_args():
     ap.add_argument("--env", action="append", default=[], metavar="KEY=VALUE", help="environment override, recorded in the run's configuration (repeatable)")
     ap.add_argument("--config", default="", help="TMT_CONFIG JSON, e.g. '{\"engine\":\"empirical\",\"writer\":\"template\"}'")
     ap.add_argument("--no-xlsx", action="store_true")
+    ap.add_argument("--xlsx-name", default="", help="also write the filled workbook as evaluation/<NAME>.xlsx (plain text, wrapped cells) — the file to submit")
     ap.add_argument("--no-warm", action="store_true")
     return ap.parse_args()
 
@@ -290,6 +291,21 @@ async def main() -> None:
                 ws.cell(r, 4).value = by_q[str(q).strip()]
         ws.cell(2, 1).value = args.team
         wb.save(out / f"team_answers_{run_id}.xlsx")
+        if args.xlsx_name:                                             # the submission copy: markdown marks removed, cells wrapped
+            from openpyxl.styles import Alignment
+            import re as _re
+            def plain(t: str) -> str:            # narrative + Sources only: the method section ("How this was worked out") stays in the database / dashboard, not in the graders' cell
+                t = _re.sub(r"(?s)\n*\**How this was worked out\**.*?(?=\n\**Sources:|\Z)", "\n", t)
+                return _re.sub(r"\n{3,}", "\n\n", _re.sub(r"(?m)^_+|_+$", "", _re.sub(r"\*\*", "", t))).replace("_(From", "(From").strip()
+            for r in range(2, ws.max_row + 1):
+                c = ws.cell(r, 4)
+                if c.value:
+                    c.value = plain(str(c.value))
+                    c.alignment = Alignment(wrap_text=True, vertical="top")
+                ws.cell(r, 3).alignment = Alignment(wrap_text=True, vertical="top")
+            ws.column_dimensions["C"].width = 60
+            ws.column_dimensions["D"].width = 110
+            wb.save(REPO / "evaluation" / f"{args.xlsx_name}.xlsx")
     print(f"\nrun {run_id}: {metrics['n_agent_answers']} agent answers · median {metrics['latency_s']['median']} s · p95 {metrics['latency_s']['p95']} s · "
           f"tokens {metrics['tokens']['in']}+{metrics['tokens']['out']} · {metrics['tokens']['llm_calls']} LLM calls · {metrics['mcp_calls']} MCP calls\n"
           f"saved: {db.DB_PATH} · evaluation/submissions/{run_id}.json" + ("" if args.no_xlsx else f" · evaluation/submissions/team_answers_{run_id}.xlsx"))
