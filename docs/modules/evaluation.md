@@ -11,7 +11,7 @@
 | `run_eval.py` | Run the workflow over the dataset and score it (default: one brutal multi-part question; more only with `--allow-many`) |
 | `guardrail_suite.py` | 46 labelled scope / guardrail / routing / follow-up decisions — no LLM, ~1 s |
 | `conversation_demo.py` | Scripted 6-turn conversation (bounce, follow-up, explanation, history hit, decline) |
-| `submission_run.py`, `submission_db.py`, `team_evidence.py` | Answer the organiser workbook with the current configuration, store the run with its full configuration (`observability/submissions.db`, `evaluation/submissions/<run>.json`); write TEAM_EVIDENCE from measured numbers; fills `evaluation/Nextmove_team_(A1).xlsx` (the filled organiser workbook) |
+| `submission_run.py`, `submission_db.py`, `team_evidence.py` | Answer the organiser workbook with the current configuration, store the run with its full configuration (`observability/submissions.db`, `evaluation/submissions/<run>.json`); write TEAM_EVIDENCE from measured numbers; fills `results/Nextmove_team_(A1).xlsx` (the filled organiser workbook) |
 | `validate_pressure.py` | Skill of the pressure ranking on replay days (`knowledge/validation.json`) |
 | `langsmith_eval.py`, `langsmith_run.py` | LangSmith-style offline evaluation and optional live experiments (needs `LANGSMITH_API_KEY`) |
 | `make_adk_evalset.py` | Writes the ADK UI eval set `eval_set_1` |
