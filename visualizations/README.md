@@ -26,7 +26,7 @@ All scripts also accept `--data` (raw CSVs), `--normalized` (pipeline output) an
 
 | folder | data used | figures |
 |---|---|---|
-| `raw_flow/` | raw `flows*.csv` | network total per day · average day by day type · busiest stations · one station for one week (`--station`) |
+| `raw_flow/` | raw `flows*.csv` | network total per day · average day by day type · busiest stations · weekday × hour heatmap · one station for one week (`--station`) |
 | `weather_effect/` | `normalized_flows.csv` (+ `normalized_weather.csv`, `normal_flow_coefficients.csv`) | flow vs. rain intensity · flow vs. temperature (dry hours) · daily rain and deviation over time · rain sensitivity per station |
 | `event_effect/` | `normalized_flows.csv` (or `--table rest`), `episodes.csv`, `normal_flow_passengers.csv` | profile around events (aligned to start and end, by distance) · peak per event · attendance vs. peak · profile around closures · one event in detail (`--event`) |
 | `common.py` | – | shared paths, loading, colors, chart style |

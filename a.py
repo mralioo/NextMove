@@ -1,3 +1,4 @@
+
 """
 check_normalized.py - prueft die Tabellen aus normalize_flows.py
 
@@ -11,6 +12,7 @@ Checks
   4) Wetter: bei Regen Wetteranteil > 0, bei Hitze < 0, bei trockenem Normalwetter ~0
   5) Events/Sperrungen: Rest am Bahnhof nach Eventende > 0, waehrend Sperrung < 0
 """
+
 import argparse
 import os
 import sys

@@ -8,7 +8,8 @@ Figures (in visualizations/raw_flow/output/)
     01_network_total_over_time.png   passengers per day in the whole network over the period
     02_daily_profile_by_daytype.png  average passengers per hour of day: weekday / Saturday / Sunday
     03_top_stations.png              busiest 15 stations (mean passengers per day)
-    04_station_week_<name>.png       one station, one week, hour by hour (with --station)
+    04_weekday_hour_heatmap.png      average passengers per hour, for each weekday x hour of day
+    05_station_week_<name>.png       one station, one week, hour by hour (with --station)
 """
 from pathlib import Path
 
@@ -82,6 +83,38 @@ def plot_top_stations(flows, out, n=15):
     c.save(fig, out, "03_top_stations")
 
 
+def plot_weekday_hour_heatmap(flows, out):
+    """Mean network flow for every weekday x hour of the SERVICE day (5 am to 1 am).
+    Like the daily profile, the 0-1 am slot counts towards the previous day."""
+    from matplotlib.colors import LinearSegmentedColormap
+    total = flows.sum(axis=1, min_count=1)
+    service_hour = np.where(total.index.hour < 5, total.index.hour + 24, total.index.hour)
+    dow = (total.index - pd.to_timedelta((total.index.hour < 5) * 24, unit="h")).dayofweek
+    grid = (total.groupby([dow, service_hour]).mean() / 1000).unstack()
+    grid = grid.reindex(index=range(7), columns=range(5, 25))
+    cmap = LinearSegmentedColormap.from_list("blues", [c.SURFACE, c.BLUE_LIGHT, c.SERIES[0], "#0d3a73"])
+    fig, ax = plt.subplots(figsize=(12, 4.2))
+    im = ax.imshow(grid.values, cmap=cmap, aspect="auto", vmin=0)
+    vmax = np.nanmax(grid.values)
+    for (y, x), v in np.ndenumerate(grid.values):
+        if np.isfinite(v):
+            ax.text(x, y, f"{v:.0f}", ha="center", va="center", fontsize=7.5,
+                    color="white" if v > 0.55 * vmax else c.TEXT)
+    ax.set_xticks(range(grid.shape[1]), [f"{h % 24:02d}" for h in grid.columns])
+    ax.set_yticks(range(7), ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])
+    ax.grid(False)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(length=0)
+    ax.set_xlabel("hour of day (start of slot)")
+    ax.set_title("Passengers per hour, by weekday and hour")
+    c.subtitle(ax, "Mean over all weeks, whole network, in thousands. 00:00 counts towards the previous day.")
+    cb = fig.colorbar(im, ax=ax, pad=0.01, fraction=0.03)
+    cb.outline.set_visible(False)
+    cb.set_label("passengers per hour (thousands)")
+    c.save(fig, out, "04_weekday_hour_heatmap")
+
+
 def plot_station_week(flows, station_query, out):
     """One station, the first full Monday-Sunday week, hour by hour."""
     matches = [s for s in flows.columns if station_query.lower() in s.lower()]
@@ -99,7 +132,7 @@ def plot_station_week(flows, station_query, out):
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%a %d"))
     ax.set_ylim(bottom=0)
     safe = "".join(ch if ch.isalnum() else "_" for ch in c.short_station(s)).strip("_")
-    c.save(fig, out, f"04_station_week_{safe}")
+    c.save(fig, out, f"05_station_week_{safe}")
 
 
 def main():
@@ -113,6 +146,7 @@ def main():
     plot_network_total(flows, out)
     plot_daily_profile(flows, out)
     plot_top_stations(flows, out)
+    plot_weekday_hour_heatmap(flows, out)
     if a.station:
         plot_station_week(flows, a.station, out)
 
