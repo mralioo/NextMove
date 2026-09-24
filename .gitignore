@@ -34,3 +34,7 @@ observability/backup/
 # React operator desktop
 frontend/node_modules/
 frontend/dist/
+
+# quality database + normalization pipeline outputs (regenerable: ./.venv/bin/python ml/quality_db.py build --offline)
+data/normalized/
+data/quality/

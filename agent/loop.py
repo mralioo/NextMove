@@ -41,7 +41,7 @@ async def worker_evaluator_loop(plan: SupervisorPlan, last_facts: dict | None, m
         task = wk.task_from_plan(plan, i, overrides)
         n_llm = len(llm_log) if llm_log is not None else 0
         r_start = time.time()
-        with span("worker_evaluator.round", **{"tmt.round": i, "tmt.of": LIMITS.max_iterations, "tmt.overrides": overrides}) as rsp:
+        with span("analyst_inspector.round", **{"tmt.round": i, "tmt.of": LIMITS.max_iterations, "tmt.overrides": overrides}) as rsp:
             try:
                 result = await wk.run_worker(task, last_facts, mcp, kb)
             except Exception as e:                                            # schema / programming error: fail closed, never guess

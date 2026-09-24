@@ -212,6 +212,35 @@ def build(folder: str | None = None) -> list[dict]:
             add("I-ML", "insight", ["C", "P", "D"],
                 f"TabPFN demand model on held-out days: MAE {ml['mae_tabpfn']} vs {ml['mae_baseline']} for the naive station-slot mean, RMSE {ml['rmse_tabpfn']} vs {ml['rmse_baseline']}; pinball-loss skill "
                 f"{ml['pinball_skill']:+.1%}. It adds context-conditioned probabilities more than a different decision.", ml, "ml/output/disruption_baseline_report.json")
+    # ------------------------------------------------------------------ boundaries and ground truth from the QUALITY DATABASE (normalized data, see ml/quality_db.py)
+    try:
+        sys.path.insert(0, str(REPO / "ml"))
+        import quality_db
+        qdb = quality_db.QualityDB()
+        if qdb.available:
+            sb = qdb.sql("SELECT station, max_all, hard_ceiling FROM station_bounds ORDER BY max_all DESC")
+            top = sb.iloc[0]
+            eff = {e["group"]: e for e in qdb.event_effects()}
+            issues = {i["topic"]: i["detail"] for i in qdb.data_issues()}
+            wx_eff = qdb.weather_effects()["network_median_pct"]
+            stt = qdb.status()
+            add("Q-NORMAL", "boundary", ["A", "B", "C", "D", "P"],
+                f"'Normal' flow is defined by the quality database: for every station, time of day and day type the flow that remains after removing event / closure windows and the effect of weather (typical weather). "
+                f"Boundaries per station, day type and hour (p05-p95 of clean slots, highest value ever observed, hard ceiling = 1.5 x that maximum) are checked by the Inspector; a passenger figure above a station's "
+                f"hard ceiling is impossible in this dataset.", {"train": stt["train_range"], "test": stt["test_range"], "hard_ceiling_factor": stt["hard_ceiling_factor"]}, "data/quality (ml/quality_db.py)")
+            add("Q-CEILING", "boundary", ["A", "C", "P"],
+                f"The highest passenger flow ever observed at any station is {top.max_all:.0f} per 15 minutes ({_short(top.station)}); the median station maximum is {sb.max_all.median():.0f}. "
+                f"A predicted or claimed load above 1.5 x a station's own maximum is treated as impossible; above 1.15 x as extreme.", {"max": float(top.max_all), "station": top.station, "median_max": float(sb.max_all.median())}, "data/quality station_bounds")
+            add("Q-EVENTS", "ground_truth", ["A"],
+                "Measured peak uplift at the venue stations of the mapped events: " + "; ".join(f"{k}: median {v['median_ratio_peak']:.1f}x, p90 {v['p90_ratio_peak']:.1f}x (n={v['n']})" for k, v in eff.items() if k.startswith("event"))
+                + ". Uplifts are peak slots at the anchor station and are noisy at the 15-minute grain.", {k: v for k, v in eff.items() if k.startswith("event")}, "data/quality event_effects")
+            add("Q-WEATHER", "insight", ["B", "D", "P"],
+                f"Weather explains very little of the flow: {issues.get('weather', '')} Median station effects: rain now/prev. hour {wx_eff.get('rain_both_pct')} %, +5 degC {wx_eff.get('temp_plus5C_vs_mean_pct')} %, school holiday weekday {wx_eff.get('school_holiday_weekday_pct')} %.",
+                wx_eff, "data/quality coefficients")
+            add("Q-OUTAGE", "boundary", ["B", "C", "H"], issues.get("outages", "") + " " + issues.get("noise", ""), {}, "data/quality outages")
+            add("Q-TESTSHIFT", "boundary", ["A", "B", "C", "D", "P"], issues.get("test_shift", ""), {}, "data/quality meta")
+    except Exception as e:                                        # the knowledge base must build without the quality database
+        print(f"[warn] quality-database entries skipped: {type(e).__name__}: {e}")
     return E
 
 

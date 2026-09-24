@@ -38,6 +38,10 @@ TASKS: dict[str, tuple[str, list[str], dict]] = {
     "neo4j-sync": ("Bring Neo4j level with the local knowledge graph (--clear empties Neo4j first)", [PY, "agent/kgraph.py", "neo4j-sync"], {}),
     "neo4j-down": ("Stop the Neo4j container (data volume kept)", [PY, "scripts/neo4j.py", "down"], {}),
     # ---- knowledge
+    "quality-build": ("Normalization pipeline (fit on training, apply to test) + quality database with boundaries -> data/quality (--offline: no geocoding requests, --freq 15min)", [PY, "ml/quality_db.py", "build"], {}),
+    "quality-status": ("Quality database: built? coverage, tables, build info", [PY, "ml/quality_db.py", "status"], {}),
+    "quality-pipeline": ("The raw normalization pipeline only (data/normalized): --all | --data DIR --freq 1h | --model PKL --suffix X. Run from ml/ (nextmove_pipeline is a package there)", ["bash", "-c", "cd ml && ../.venv/bin/python -m nextmove_pipeline.pipeline \"$@\"", "_"], {}),
+    "mcp-quality": ("Quality MCP server (normalized data + boundaries) over stdio", [PY, "mcp_server/quality_server.py"], {}),
     "kb-build": ("Build the knowledge base (ground truth / boundaries / insights) from the raw CSVs", [PY, "agent/knowledge_build.py"], {}),
     "kb-sync": ("Push the knowledge base to Cognee (sends the curated knowledge to your tenant)", [PY, "agent/knowledge.py", "sync"], {}),
     "kg-seed": ("Seed the local knowledge graph (26 closures, accepted answers, question bank, LLM extraction; --no-llm skips it)", [PY, "agent/kgraph_build.py"], {}),

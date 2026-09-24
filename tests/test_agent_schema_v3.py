@@ -225,7 +225,7 @@ def test_argument_only_when_asked_why_and_sources_come_from_what_was_used():
     ver = S.EvaluatorVerdict(task_id=task.task_id, iteration=1, verdict="accept", objective_met=True, score=0.9, ground_truth_ids=["GT-A-UBER"], boundary_ids=["B-CAP"])
     refs = writer.build_references(plan.route, res, ver)
     line = writer.sources_line(refs, res.confidence, ver.verdict)
-    assert "rank_pressure" in line and "TabPFN" in line and "GT-A-UBER" in line and "confidence 0.72" in line and "evaluator: accept" in line
+    assert "rank_pressure" in line and "TabPFN" in line and "GT-A-UBER" in line and "confidence 0.72" in line and "Inspector: accept" in line
     assert {r.kind for r in refs} >= {"dataset", "tool", "model", "kb"}
 
 

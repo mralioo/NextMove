@@ -939,5 +939,119 @@
    "pinball_skill": 0.0051
   },
   "source": "ml/output/disruption_baseline_report.json"
+ },
+ {
+  "id": "Q-NORMAL",
+  "kind": "boundary",
+  "cats": [
+   "A",
+   "B",
+   "C",
+   "D",
+   "P"
+  ],
+  "text": "'Normal' flow is defined by the quality database: for every station, time of day and day type the flow that remains after removing event / closure windows and the effect of weather (typical weather). Boundaries per station, day type and hour (p05-p95 of clean slots, highest value ever observed, hard ceiling = 1.5 x that maximum) are checked by the Inspector; a passenger figure above a station's hard ceiling is impossible in this dataset.",
+  "value": {
+   "train": [
+    "2026-06-10 05:00:00",
+    "2026-09-22 00:45:00"
+   ],
+   "test": [
+    "2026-09-22 05:00:00",
+    "2026-10-01 00:45:00"
+   ],
+   "hard_ceiling_factor": 1.5
+  },
+  "source": "data/quality (ml/quality_db.py)"
+ },
+ {
+  "id": "Q-CEILING",
+  "kind": "boundary",
+  "cats": [
+   "A",
+   "C",
+   "P"
+  ],
+  "text": "The highest passenger flow ever observed at any station is 3000 per 15 minutes (Spichernstr.); the median station maximum is 502. A predicted or claimed load above 1.5 x a station's own maximum is treated as impossible; above 1.15 x as extreme.",
+  "value": {
+   "max": 3000.0,
+   "station": "U Spichernstr. (Berlin)",
+   "median_max": 502.0
+  },
+  "source": "data/quality station_bounds"
+ },
+ {
+  "id": "Q-EVENTS",
+  "kind": "ground_truth",
+  "cats": [
+   "A"
+  ],
+  "text": "Measured peak uplift at the venue stations of the mapped events: event <5000 visitors: median 8.7x, p90 48.8x (n=34); event >=5000 visitors: median 3.3x, p90 3.4x (n=3). Uplifts are peak slots at the anchor station and are noisy at the 15-minute grain.",
+  "value": {
+   "event <5000 visitors": {
+    "group": "event <5000 visitors",
+    "n": 34,
+    "median_ratio_peak": 8.736,
+    "p90_ratio_peak": 48.826,
+    "max_ratio_peak": 104.87,
+    "median_mean_rest": 0.443,
+    "min_mean_rest": -0.397
+   },
+   "event >=5000 visitors": {
+    "group": "event >=5000 visitors",
+    "n": 3,
+    "median_ratio_peak": 3.306,
+    "p90_ratio_peak": 3.437,
+    "max_ratio_peak": 3.47,
+    "median_mean_rest": -0.057,
+    "min_mean_rest": -0.068
+   }
+  },
+  "source": "data/quality event_effects"
+ },
+ {
+  "id": "Q-WEATHER",
+  "kind": "insight",
+  "cats": [
+   "B",
+   "D",
+   "P"
+  ],
+  "text": "Weather explains very little of the flow: weather explains 0.5% of the variance of the total: the flows are simulated with little weather signal Median station effects: rain now/prev. hour 16.38 %, +5 degC -8.14 %, school holiday weekday 0.0 %.",
+  "value": {
+   "rain_now_pct": 13.05,
+   "rain_prev_hour_pct": 2.77,
+   "rain_both_pct": 16.38,
+   "temp_plus5C_vs_mean_pct": -8.14,
+   "school_holiday_weekend_pct": 1.43,
+   "school_holiday_weekday_pct": 0.0
+  },
+  "source": "data/quality coefficients"
+ },
+ {
+  "id": "Q-OUTAGE",
+  "kind": "boundary",
+  "cats": [
+   "B",
+   "C",
+   "H"
+  ],
+  "text": "2061 readings (0.4% of the slots that normally carry >= 100) are exactly 0 outside any event or closure window: sensor gaps / outages; a claimed zero flow is not proof of a closure at the 15-minute grain the log residual has a standard deviation of 1.19: single slots are noisy, judge patterns over hours, not one slot",
+  "value": {},
+  "source": "data/quality outages"
+ },
+ {
+  "id": "Q-TESTSHIFT",
+  "kind": "boundary",
+  "cats": [
+   "A",
+   "B",
+   "C",
+   "D",
+   "P"
+  ],
+  "text": "the test split runs +0.10 (log) above the training-normal: the held-out days are busier than the training normal (InnoTrans week / trend), judge them against test-window boundaries too",
+  "value": {},
+  "source": "data/quality meta"
  }
 ]

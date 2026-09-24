@@ -97,7 +97,7 @@ def design_config(args, env_overrides: dict) -> dict:
         except Exception:
             return "?"
     return {
-        "pipeline": ["supervisor (rules router + guardrails + history + follow-up)", "worker (specialist playbook over MCP tools)", "evaluator (ground-truth checks + LLM in auto mode)",
+        "pipeline": ["Dispatcher [supervisor] (rules router + guardrails + history + follow-up)", "Analyst [worker] (specialist playbook over MCP tools + load forecast)", "Inspector [evaluator] (ground-truth checks + quality-database boundaries via MCP + LLM in auto mode)",
                      "writer (verdict/evidence/do-now/caveat/sources + number guard)"],
         "switches": {"router": CONFIG.router, "memory": CONFIG.memory, "mcp_transport": CONFIG.mcp, "engine": CONFIG.engine, "writer": CONFIG.writer,
                      "evaluator_mode": evaluator.MODE, "evaluator_llm_below_confidence": evaluator.LLM_CONF_BELOW, "history": os.environ.get("TMT_HISTORY", "on"), "answer_mode": os.environ.get("TMT_ANSWER_MODE", "brief"),

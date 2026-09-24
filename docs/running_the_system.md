@@ -21,6 +21,7 @@ All other tasks: `./.venv/bin/python scripts/tasks.py` lists them with descripti
 | **dashboard** | http://localhost:8501 | Streamlit: data pages, ML engine, Observability, Evaluation, Experiments, **Agent Workflow** (diagram, supervisor tester, guardrails, schemas, loop traces, knowledge graph) and **Resources** (every resource, its health and links to its UI) |
 | **adk-web** | http://localhost:8000 | ADK UI: **chat with the agent**, events, tool calls, and the **Evals** tab (`eval_set_1`) |
 | **operator-api** | http://127.0.0.1:8770/app/ (React operator desktop; API docs `/docs`) | Feedback loop + operator knowledge base API for the UI (score of a response, what the operator did, pending situations, precedents) — `docs/operator_feedback_api.md` |
+| **mcp-quality** | http://127.0.0.1:8768/mcp | MCP server: normalized data + boundaries (the Inspector's quality database, `docs/ml_preprocessing_pipeline.md`); built on first `make up` (~30 s) |
 | **mcp-knowledge** | http://127.0.0.1:8766/mcp | MCP server: ground truth, boundaries, `sanity_check`, history, Cognee recall, `kg_*` graph tools |
 | **neo4j** | bolt://localhost:7687 · browser http://localhost:7474 | The knowledge graph as a queryable copy (Docker `nextmove-neo4j`, user `neo4j`, password in `.env`; created once by `tasks.py neo4j-up`) |
 | mcp-data *(optional)* | http://127.0.0.1:8765/mcp | Data + analytics + TabPFN MCP server for external clients. The agent starts its own copy on the first question (~30 s warm-up) |

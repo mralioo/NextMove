@@ -10,6 +10,7 @@ Services
     dashboard       Streamlit dashboard incl. the Agent Workflow page          http://localhost:8501 (next free port if taken)
     adk-web         ADK dev UI: chat with the agent, see every event / tool    http://localhost:8000
     operator-api    Feedback loop + operator knowledge base API for the UI      http://127.0.0.1:8770/app/  (React operator desktop; API docs at /docs; docs/operator_feedback_api.md)
+    mcp-quality     MCP server: normalized data + boundaries (the Inspector's)   http://127.0.0.1:8768/mcp   (streamable HTTP)
     mcp-knowledge   MCP server: ground truth, sanity check, history, graph     http://127.0.0.1:8766/mcp   (streamable HTTP)
     neo4j           Neo4j (Docker container nextmove-neo4j, made by `./.venv/bin/python scripts/tasks.py neo4j-up`)   bolt://localhost:7687, browser :7474
     mcp-data        MCP server: datasets, analytics, TabPFN tools (optional)    http://127.0.0.1:8765/mcp   (--with-data-mcp; the agent itself
@@ -97,6 +98,9 @@ def prepare() -> None:
     if not (REPO / "knowledge" / "knowledge.json").exists():
         print("· building the knowledge base from the raw CSVs (./.venv/bin/python scripts/tasks.py kb-build) ...")
         subprocess.run([PY, "agent/knowledge_build.py"], cwd=REPO, env=env, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if not (REPO / "data" / "quality" / "quality.db").exists():
+        print("· building the quality database (normalization pipeline + boundaries, ~30 s; ./.venv/bin/python ml/quality_db.py build) ...")
+        subprocess.run([PY, "ml/quality_db.py", "build", "--offline"], cwd=REPO, env=env, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     kg = REPO / "observability" / "kgraph.db"
     if not kg.exists():
         print("· seeding the knowledge graph without the LLM step (./.venv/bin/python scripts/tasks.py kg-seed --no-llm) ...")
@@ -134,6 +138,9 @@ def up(with_data: bool, adk: bool, neo: bool = True) -> None:
     if "operator-api" not in running:
         port = free_port(int(os.environ.get("OPERATOR_API_PORT", "8770")))
         st["operator-api"] = spawn("operator-api", [PY, "backend/operator_api.py"], port, env_extra={"OPERATOR_API_PORT": str(port)})
+    if "mcp-quality" not in running:
+        port = free_port(int(os.environ.get("MCP_QUALITY_PORT", "8768")))
+        st["mcp-quality"] = spawn("mcp-quality", [PY, "mcp_server/quality_server.py"], port, env_extra={"MCP_TRANSPORT": "http", "MCP_PORT": str(port)})
     if "mcp-knowledge" not in running:
         port = free_port(int(os.environ.get("MCP_KNOWLEDGE_PORT", "8766")))
         st["mcp-knowledge"] = spawn("mcp-knowledge", [PY, "mcp_server/knowledge_server.py"], port, env_extra={"MCP_TRANSPORT": "http", "MCP_PORT": str(port)})
@@ -166,7 +173,7 @@ def status() -> None:
         print("no services started by `make up`.")
         return
     urls = {"dashboard": "http://localhost:{p}   (page: Agent Workflow)", "adk-web": "http://localhost:{p}   (select the app 'agent')",
-            "neo4j": "bolt://localhost:{p}   browser http://localhost:7474 (user neo4j)", "operator-api": "http://127.0.0.1:{p}/app/   (operator desktop · API docs: /docs)", "mcp-knowledge": "http://127.0.0.1:{p}/mcp   (MCP, streamable HTTP)", "mcp-data": "http://127.0.0.1:{p}/mcp   (MCP, streamable HTTP)"}
+            "neo4j": "bolt://localhost:{p}   browser http://localhost:7474 (user neo4j)", "operator-api": "http://127.0.0.1:{p}/app/   (operator desktop · API docs: /docs)", "mcp-knowledge": "http://127.0.0.1:{p}/mcp   (MCP, streamable HTTP)", "mcp-quality": "http://127.0.0.1:{p}/mcp   (MCP, streamable HTTP)", "mcp-data": "http://127.0.0.1:{p}/mcp   (MCP, streamable HTTP)"}
     print(f"\n  {'service':15s} {'pid':>7s}  {'state':9s} address")
     for n, v in st.items():
         ok = True if v.get("docker") else alive(v["pid"])

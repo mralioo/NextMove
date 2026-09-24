@@ -17,9 +17,9 @@ for p in (REPO / "agent", REPO):
 
 st.set_page_config(page_title="Agent Workflow", page_icon="🧭", layout="wide")
 page_header(
-    "Agent workflow — supervisor, worker ⇄ evaluator loop, writer, MCP tools, knowledge graph",
-    "How a question travels through the system: guardrails and routing in the supervisor, the worker that runs MCP tools and the ML engine, the evaluator that checks the result "
-    "against ground truth, the knowledge base and the knowledge graph (and sends the worker back if needed), and the writer. One typed schema carries every hand-over.",
+    "Agent workflow — Dispatcher, Analyst ⇄ Inspector loop, Writer, MCP tools, knowledge graph",
+    "How a question travels through the system: guardrails and routing in the Dispatcher, the Analyst that runs MCP tools and the ML engine, the Inspector that recomputes the key numbers and checks the result "
+    "against ground truth, the knowledge base and the knowledge graph (and sends the Analyst back if needed), and the Writer. One typed schema carries every hand-over.",
 )
 
 try:
@@ -44,10 +44,10 @@ def explain(what: str, read: str, verdict: tuple[str, str] | None = None) -> Non
 # =========================================================================================== 1 · workflow
 st.header("1 · The workflow")
 explain(
-    "The path of one operator question. The **supervisor** first applies the input guardrails (an unrelated question is bounced with a fixed reply — nothing else runs), "
+    "The path of one operator question. The **Dispatcher** understands the question, routes it and rejects off-topic or manipulative requests: it first applies the input guardrails (an unrelated question is bounced with a fixed reply — nothing else runs), "
     "extracts the parameters, continues an earlier question if it is a follow-up, reuses an already accepted answer if one exists, and assigns the objective, MCP servers, "
-    "datasets and ML engine. The **worker** (a function, not an LLM) runs the specialist's MCP playbook and returns facts with a confidence score. The **evaluator** (the powerful LLM, "
-    "behind deterministic ground-truth checks) accepts, asks the worker to redo the work with adjusted parameters, or rejects — a bounded loop. The **writer** states the verdict first, "
+    "datasets and ML engine. The **Analyst** (a function, not an LLM) pulls the data through MCP connectors, runs the specialist's playbook and the load forecast, and returns facts with a confidence score. The **Inspector** (the powerful LLM, "
+    "behind deterministic checks that recompute the key numbers from the raw data and check them against the boundaries of the quality database) accepts, asks the worker to redo the work with adjusted parameters, or rejects — a bounded loop. The **Writer** produces a one-screen brief: it states the verdict first, "
     "then evidence and sources. Accepted answers grow the **knowledge graph**.",
     "Green specialists have tools and verified ground truth, yellow ones answer with a stated proxy or limit, grey ones decline honestly; orange marks TabPFN users. "
     "Red is a stop (bounce or safe fallback); dashed lines are side channels (memory, checks), not the operator's critical path.",
@@ -58,21 +58,21 @@ def workflow_dot() -> str:
     L = ['digraph G {', 'rankdir=LR; bgcolor="transparent"; nodesep=0.2; ranksep=0.5;',
          'node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, color="#6b7280"];', 'edge [color="#6b7280", fontname="Helvetica", fontsize=9];',
          'Q [label="Operator question", shape=oval, fillcolor="#e5e7eb"];',
-         'SUP [label="SUPERVISOR\\n1 input guardrails (scope, injection)\\n2 category + parameters + objective\\n3 follow-up / history\\n4 route: MCP servers, datasets, ML engine", fillcolor="#dbeafe"];',
+         'SUP [label="DISPATCHER\\n1 input guardrails (scope, injection)\\n2 category + parameters + objective\\n3 follow-up / history\\n4 route: MCP servers, datasets, ML engine", fillcolor="#dbeafe"];',
          'BOUNCE [label="Fixed reply\\n(unrelated: conversation cut)", fillcolor="#fecaca"];',
          'HIST [label="Answer from history\\n(accepted, same data window)", fillcolor="#e0e7ff"];',
-         'subgraph cluster_w { label="WORKER (function) — specialist playbooks"; fontname="Helvetica"; fontsize=11; color="#9ca3af"; style="rounded";']
+         'subgraph cluster_w { label="ANALYST (function) — specialist playbooks"; fontname="Helvetica"; fontsize=11; color="#9ca3af"; style="rounded";']
     for cat, sp in SPECIALISTS.items():
         fill = ML if sp.ml and sp.status != "planned" else STATUS_FILL[sp.status]
         L.append(f'S{cat} [label="{cat} · {sp.title}\\n{sp.status}{" · TabPFN" if sp.ml else ""}", fillcolor="{fill}"];')
     L.append("}")
     L += ['subgraph cluster_mcp { label="MCP servers"; fontname="Helvetica"; fontsize=11; color="#9ca3af"; style="rounded";',
           'M1 [label="ubahn-flow-data\\ndatasets · analytics · ML tools", fillcolor="#ede9fe"];',
-          'M2 [label="nextmove-knowledge\\nground truth · sanity · graph · Cognee", fillcolor="#ede9fe"];', "}",
+          'M2 [label="nextmove-knowledge\\nground truth · sanity · graph · Cognee", fillcolor="#ede9fe"];', 'M3 [label="nextmove-quality\\nnormalized data · boundaries", fillcolor="#ede9fe"];', "}",
           'TAB [label="TabPFN engine\\n(quantile regression)", fillcolor="#fde68a"];',
-          'EVAL [label="EVALUATOR (powerful LLM)\\n1 deterministic checks vs ground truth\\n2 objective met? similar past cases\\naccept · revise(adjustments) · reject", fillcolor="#dcfce7"];',
+          'EVAL [label="INSPECTOR (powerful LLM)\\n1 recompute key numbers · ground truth · boundaries\\n2 objective met? similar past cases\\naccept · revise(adjustments) · reject", fillcolor="#dcfce7"];',
           'FB [label="SAFE FALLBACK\\n(result rejected)", fillcolor="#fecaca"];',
-          'W [label="WRITER\\nverdict → evidence → sources\\n(argument only if asked)\\nnumber guard, template fallback", fillcolor="#dbeafe"];',
+          'W [label="WRITER\\none-screen brief\\nverdict → evidence → sources\\n(argument only if asked)\\nnumber guard, template fallback", fillcolor="#dbeafe"];',
           'A [label="Answer + stored trace", shape=oval, fillcolor="#e5e7eb"];',
           'KG [label="KNOWLEDGE GRAPH\\nproblem → answer → actions / options\\ngrows with every accepted answer", fillcolor="#fce7f3"];',
           'KB [label="KNOWLEDGE BASE + HISTORY\\nground truth · boundaries · insights\\nlocal ⇄ Cognee", fillcolor="#fce7f3"];',
@@ -83,7 +83,7 @@ def workflow_dot() -> str:
             L.append(f"S{cat} -> M1;")
     L += ["M1 -> TAB [style=dashed, label=\"C, D, P\"];", 'M1 -> EVAL [label="facts + confidence"];', 'EVAL -> SUP [style=dashed, label="revise: new parameters", constraint=false, color="#16a34a"];',
           'EVAL -> W [label="accept"];', 'EVAL -> FB [label="reject", color="#ef4444"];', "FB -> A;", "W -> A;",
-          "EVAL -> KB [style=dashed, dir=both];", "EVAL -> KG [style=dashed, dir=both, label=\"similar cases\"];", "W -> KG [style=dashed, label=\"accepted case\"];", "KB -> M2 [style=dashed, dir=both];", "KG -> M2 [style=dashed, dir=both];", "SUP -> KB [style=dashed, label=\"boundaries, history\"];", "}"]
+          "EVAL -> KB [style=dashed, dir=both];", "EVAL -> M3 [style=dashed, dir=both, label=\"boundaries\"];", "EVAL -> KG [style=dashed, dir=both, label=\"similar cases\"];", "W -> KG [style=dashed, label=\"accepted case\"];", "KB -> M2 [style=dashed, dir=both];", "KG -> M2 [style=dashed, dir=both];", "SUP -> KB [style=dashed, label=\"boundaries, history\"];", "}"]
     return "\n".join(x for x in L if x)
 
 

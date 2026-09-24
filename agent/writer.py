@@ -237,8 +237,12 @@ def build_references(route, result, verdict) -> list:
             refs.append(Reference(kind="tool", id=c.tool, note=c.server))
     if result.ml_engine_used != "none":
         refs.append(Reference(kind="model", id="TabPFN quantile regression" if result.ml_engine_used == "tabpfn" else "empirical baseline (no ML)"))
-    for i in dict.fromkeys(verdict.ground_truth_ids + verdict.boundary_ids):
-        refs.append(Reference(kind="kb", id=i))
+    ids = list(dict.fromkeys(verdict.ground_truth_ids + verdict.boundary_ids))
+    for i in ids:
+        if not i.startswith("Q-BOUND:"):
+            refs.append(Reference(kind="kb", id=i))
+    if any(i.startswith("Q-BOUND:") for i in ids):                   # boundaries of the quality database (checked by the Inspector through the quality MCP server)
+        refs.append(Reference(kind="dataset", id="quality database (normal-flow boundaries)"))
     for c in verdict.similar_cases[:1]:
         refs.append(Reference(kind="kg", id=c.problem_id, note=f"similar past case ({c.similarity})"))
     return refs
@@ -251,7 +255,7 @@ def sources_line(refs, confidence: float | None, verdict: str | None) -> str:
     bits = [x for x in (f"data: {ds}" if ds else "", f"tools: {tools}" if tools else "", f"knowledge base: {kb}" if kb else "") if x]
     tail = f"confidence {confidence:.2f}" if confidence is not None else ""
     if verdict:
-        tail += f", evaluator: {verdict}"
+        tail += f", Inspector: {verdict}"
     return "**Sources:** " + "; ".join(bits) + (f" · {tail}" if tail else "")
 
 

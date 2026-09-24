@@ -1,0 +1,104 @@
+{
+  "|skalitzer straße 85-86": {
+    "lat": 52.500335,
+    "lon": 13.4359387,
+    "source": "nominatim",
+    "query": "Skalitzer Straße 85-86, Berlin, Germany"
+  },
+  "kantine am berghain|am wriezener bahnhof": {
+    "lat": 52.5114484,
+    "lon": 13.4407738,
+    "source": "nominatim",
+    "query": "Am Wriezener Bahnhof, Berlin, Germany"
+  },
+  "|hermannstraße 146": {
+    "lat": 52.4643376,
+    "lon": 13.4333186,
+    "source": "nominatim",
+    "query": "Hermannstraße 146, Berlin, Germany"
+  },
+  "|sömmeringstraße 15": {
+    "lat": 52.5225889,
+    "lon": 13.3049841,
+    "source": "nominatim",
+    "query": "Sömmeringstraße 15, Berlin, Germany"
+  },
+  "|straße am fez 4": {
+    "lat": null,
+    "lon": null,
+    "source": "not_found",
+    "query": null
+  },
+  "rso.berlin|schnellerstraße 137": {
+    "lat": 52.459911,
+    "lon": 13.5053346,
+    "source": "nominatim",
+    "query": "RSO.BERLIN, Schnellerstraße 137, Berlin, Germany"
+  },
+  "punch l!ne club berlin|marlene-dietrich-platz 1": {
+    "lat": 52.5072208,
+    "lon": 13.3721193,
+    "source": "nominatim",
+    "query": "Marlene-Dietrich-Platz 1, Berlin, Germany"
+  },
+  "|platz der luftbrücke": {
+    "lat": 52.4860843,
+    "lon": 13.3859508,
+    "source": "nominatim",
+    "query": "Platz der Luftbrücke, Berlin, Germany"
+  },
+  "mikropol|nollendorfplatz 5": {
+    "lat": 52.4989787,
+    "lon": 13.352977,
+    "source": "nominatim",
+    "query": "Mikropol, Nollendorfplatz 5, Berlin, Germany"
+  },
+  "theater des westens|kantstraße 12": {
+    "lat": 52.5059047,
+    "lon": 13.3290059,
+    "source": "nominatim",
+    "query": "Theater des Westens, Kantstraße 12, Berlin, Germany"
+  },
+  "|karl-marx-straße 141": {
+    "lat": 52.4770235,
+    "lon": 13.4399161,
+    "source": "nominatim",
+    "query": "Karl-Marx-Straße 141, Berlin, Germany"
+  },
+  "|schönhauser allee 36": {
+    "lat": 52.5394242,
+    "lon": 13.4136682,
+    "source": "nominatim",
+    "query": "Schönhauser Allee 36, Berlin, Germany"
+  },
+  "|holzmarktstraße 25": {
+    "lat": 52.5117838,
+    "lon": 13.4255086,
+    "source": "nominatim",
+    "query": "Holzmarktstraße 25, Berlin, Germany"
+  },
+  "|hasenheide 107 - 113": {
+    "lat": 52.4864896,
+    "lon": 13.4217418,
+    "source": "nominatim",
+    "query": "Hasenheide 107 - 113, Berlin, Germany"
+  },
+  "|revaler straße 99": {
+    "lat": 52.5064417,
+    "lon": 13.4572149,
+    "source": "nominatim",
+    "query": "Revaler Straße 99, Berlin, Germany"
+  },
+  "berlin fairground|messedamm 22": {
+    "lat": 52.5012426,
+    "lon": 13.2742108,
+    "source": "nominatim",
+    "query": "Messedamm 22, Berlin, Germany"
+  },
+  "|columbiadamm 13 - 21": {
+    "lat": 52.4847383,
+    "lon": 13.392546,
+    "source": "nominatim",
+    "query": "Columbiadamm 13 - 21, Berlin, Germany"
+  }
+}

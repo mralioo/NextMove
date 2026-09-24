@@ -41,7 +41,7 @@ They know: lines, headways, closures, event traffic, control rooms, what a bad d
 *Say:* "U7 is suspended between Hermannplatz and Karl-Marx-Straße. Where do the passengers go? Which stations overflow? Where do I send staff? Today that is six screens and a phone call. We wanted: **ask, and get the answer in seconds.**"
 
 **Slide 3 — What we built, in one picture (60 s).** The four-role flow (see A4): *Question → Dispatcher → Analyst → Inspector → Writer → Brief.*
-*Say:* "Not one chatbot. A small team of AI roles, like a control room shift: the **Dispatcher** decides who handles the question, the **Analyst** pulls the data and runs the forecast, the **Inspector** re-checks the numbers against the raw data, the **Writer** produces a one-screen brief."
+*Say:* "Not one chatbot. A small team of AI roles, like a control room shift. The **Dispatcher** understands the question, routes it and rejects off-topic or manipulative requests. The **Analyst** pulls the data through MCP connectors and runs the load forecast. The **Inspector** recomputes key numbers from the raw data before anything is shown. The **Writer** produces a one-screen brief: verdict, evidence, do-now, caveat, sources."
 
 **Slide 4 — The data (30 s).** 167 stations · 8 lines · 15-minute flows · weather · events · closures · energy. ~3.5 months + the held-out days 22 Sept–1 Oct.
 *Say:* "Six data sources, one question, one answer."
@@ -74,7 +74,7 @@ They know: lines, headways, closures, event traffic, control rooms, what a bad d
                  GUARDRAILS       KNOWLEDGE BASE + past cases (graph)
 ```
 
-Technical names: Supervisor · Worker · Evaluator · Writer.
+Code names: supervisor · worker · evaluator · writer. The Inspector also checks every figure against a **quality database** (normalized data with boundaries per station and hour) through its own MCP server.
 
 ## A5. Live demo script (3 minutes, with fallbacks)
 

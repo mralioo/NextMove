@@ -28,7 +28,7 @@ from schemas import Adjustments, CheckResult, EvaluatorVerdict, KGCase, Supervis
 MODE = os.environ.get("EVALUATOR_MODE", "auto")
 LLM_CONF_BELOW = float(os.environ.get("EVALUATOR_CONF_BELOW", "0.55"))
 
-SYSTEM = """You are the EVALUATOR in a Berlin U-Bahn operator assistant. A worker produced a result for a question; decide if it fulfils the objective.
+SYSTEM = """You are the INSPECTOR (evaluator) in a Berlin U-Bahn operator assistant. The Analyst produced a result for a question; decide if it fulfils the objective.
 You get: QUESTION, OBJECTIVE (statement + success criteria), RESULT (compact facts JSON + confidence + reasons), CHECKS (deterministic checks already run),
 KNOWLEDGE (verified ground truth, boundaries, insights) and SIMILAR CASES from the knowledge graph (past problem, accepted answer, actions taken, options).
 Reply with ONE JSON object and nothing else:
@@ -114,6 +114,32 @@ def deterministic(question: str, task: WorkerTask, result: WorkerResult, plan: S
     return checks, gt, bnd
 
 
+async def _quality_checks(category: str, result: WorkerResult, checks: list[CheckResult], bnd: list[str]) -> list[str]:
+    """The Inspector asks the QUALITY MCP server (agent/quality_mcp.py → mcp_server/quality_server.py) to verify the facts against the normalized data and its boundaries.
+    Hard findings (an impossible or contradicting figure) become failed `Q-H*` checks; soft findings (unusual, not impossible) are returned as issue texts; the boundaries used are added
+    to the verdict's boundary ids. No database / no answer: nothing is added and nothing is blocked."""
+    if result.facts.get("status") != "ok" or category not in ("A", "B", "C", "D", "F", "H", "P"):
+        return []
+    import quality_mcp
+    with span("inspector.quality_mcp", **{"tmt.category": category}) as sp:
+        res = await quality_mcp.call("quality_check_facts", category=category, facts_json=json.dumps(result.facts, default=str))
+        if not res or not res.get("available"):
+            set_attr(sp, "tmt.available", False)
+            return []
+        flags = []
+        for c in res.get("checks", []):
+            if c["hard"]:
+                checks.append(CheckResult(id=c["id"], ok=bool(c["ok"]), detail=c["detail"][:200]))
+            elif not c["ok"]:
+                flags.append("quality flag: " + c["detail"][:170])
+        for b in res.get("boundaries", []):
+            if b["id"] not in bnd and len(bnd) < 12:
+                bnd.append(b["id"])
+        set_attr(sp, "tmt.summary", res.get("summary"))
+        set_attr(sp, "tmt.checks", [{"id": c["id"], "ok": c["ok"], "hard": c["hard"], "detail": c["detail"][:120]} for c in res.get("checks", [])][:14])
+        return flags[:3]
+
+
 # ----------------------------------------------------------------------------------------------- stage 2
 def _valid_adjustments(raw, plan: SupervisorPlan) -> Adjustments | None:
     if not isinstance(raw, dict):
@@ -158,7 +184,7 @@ async def _llm(question: str, plan: SupervisorPlan, result: WorkerResult, checks
     user = json.dumps({"QUESTION": question, "OBJECTIVE": plan.objective.model_dump(), "RESULT": {"status": result.status, "facts": result.facts, "confidence": result.confidence,
                                                                                                   "confidence_reasons": result.confidence_reasons, "assumptions": result.assumptions},
                        "CHECKS": [c.model_dump() for c in checks], "KNOWLEDGE": know, "SIMILAR_CASES": [c.model_dump(exclude={"problem_id"}) for c in cases]}, ensure_ascii=False, default=str)[:9000]
-    with span("evaluator.llm", **{"gen_ai.request.model": model, "tmt.prompt_chars": len(user), "tmt.prompt": payload(user, 5000)}) as sp:
+    with span("inspector.llm", **{"gen_ai.request.model": model, "tmt.prompt_chars": len(user), "tmt.prompt": payload(user, 5000)}) as sp:
         from observability import log_llm
 
         t0 = time.time()
@@ -180,8 +206,8 @@ async def _llm(question: str, plan: SupervisorPlan, result: WorkerResult, checks
 
 
 async def evaluate(question: str, plan: SupervisorPlan, task: WorkerTask, result: WorkerResult, kb=None, graph=None, allow_llm: bool = True) -> EvaluatorVerdict:
-    """The verdict, recorded as an `evaluator.check` span: objective, checks, evidence used, verdict, model, issues and adjustments."""
-    with span("evaluator.check", **{"tmt.iteration": task.iteration, "tmt.objective": plan.objective.statement, "tmt.success_criteria": plan.objective.success_criteria,
+    """The verdict, recorded as an `inspector.check` span: objective, checks, evidence used, verdict, model, issues and adjustments."""
+    with span("inspector.check", **{"tmt.iteration": task.iteration, "tmt.objective": plan.objective.statement, "tmt.success_criteria": plan.objective.success_criteria,
                                      "tmt.worker_confidence": result.confidence, "tmt.worker_status": result.status}) as sp:
         v = await _evaluate(question, plan, task, result, kb, graph, allow_llm)
         set_attr(sp, "tmt.verdict", v.verdict)
@@ -202,6 +228,7 @@ async def evaluate(question: str, plan: SupervisorPlan, task: WorkerTask, result
 async def _evaluate(question: str, plan: SupervisorPlan, task: WorkerTask, result: WorkerResult, kb=None, graph=None, allow_llm: bool = True) -> EvaluatorVerdict:
     t0 = time.time()
     checks, gt, bnd = deterministic(question, task, result, plan, kb)
+    q_flags = await _quality_checks(plan.category, result, checks, bnd)
     cases: list[KGCase] = []
     if graph is not None and plan.category in ("A", "B", "C", "D", "E", "F", "G", "H", "P"):
         try:
@@ -209,13 +236,13 @@ async def _evaluate(question: str, plan: SupervisorPlan, task: WorkerTask, resul
         except Exception:
             cases = []
     failed = [c for c in checks if not c.ok]
-    hard = [c for c in failed if c.id.startswith(("S-", "F-TOOLS"))]
+    hard = [c for c in failed if c.id.startswith(("S-", "F-TOOLS", "Q-H"))]           # Q-H* = a quality-database boundary that is impossible / contradicts the raw data
     st = result.status
     if st in ("need", "unsupported", "oos", "follow"):                        # a decline / request for input: the decision is what is checked
         return EvaluatorVerdict(task_id=task.task_id, iteration=task.iteration, verdict="accept", objective_met=True, score=0.95, checks=checks, ground_truth_ids=gt, boundary_ids=bnd,
                                 similar_cases=cases, rationale=f"status '{st}' is a valid outcome for this question", seconds=round(time.time() - t0, 3))
     score = round(sum(c.ok for c in checks) / len(checks), 2) if checks else 0.9
-    verdict, met, issues, adj, rationale, model = "accept", True, [c.detail for c in failed], None, "all deterministic checks passed", "deterministic"
+    verdict, met, issues, adj, rationale, model = "accept", True, [c.detail for c in failed] + q_flags, None, "all deterministic checks passed", "deterministic"
     if hard:
         verdict, met, rationale = ("revise" if st == "error" else "reject"), False, "a hard check failed: " + "; ".join(c.id for c in hard)
     elif failed:

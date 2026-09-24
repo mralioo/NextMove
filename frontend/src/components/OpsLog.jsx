@@ -21,8 +21,8 @@ export default function OpsLog({ last, totals }) {
       {last && (
         <>
           <div className="split">
-            {[["supervisor_s", "Dispatcher"], ["worker_evaluator_s", "Analyst + Inspector"], ["writer_s", "Writer"]].map(([k, l]) => (
-              <div key={k}><span>{l}</span><i style={{ width: `${Math.min(100, ((t[k] || 0) / (t.total_s || 1)) * 100)}%` }} /><em>{fmt(t[k], 2)} s</em></div>
+            {[["supervisor_s", "Dispatcher", "Understands the question, routes it and rejects off-topic or manipulative requests"], ["worker_evaluator_s", "Analyst + Inspector", "Analyst: pulls the data through MCP connectors and runs the load forecast · Inspector: recomputes key numbers from the raw data before anything is shown"], ["writer_s", "Writer", "Produces a one-screen brief: verdict, evidence, do-now, caveat, sources"]].map(([k, l, tip]) => (
+              <div key={k} title={tip}><span>{l}</span><i style={{ width: `${Math.min(100, ((t[k] || 0) / (t.total_s || 1)) * 100)}%` }} /><em>{fmt(t[k], 2)} s</em></div>
             ))}
           </div>
           <div className="tokrow">in {last.tokens.in.toLocaleString()} · out {last.tokens.out.toLocaleString()} · {c.llm_calls} LLM call{c.llm_calls === 1 ? "" : "s"} · {c.distinct_tools} distinct tool{c.distinct_tools === 1 ? "" : "s"}</div>

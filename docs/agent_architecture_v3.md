@@ -6,6 +6,17 @@
 
 ---
 
+## Names used in the pitch (and in the product) — and their code names
+
+| Pitch name | What it does (one line, as in the pitch) | Code name |
+| --- | --- | --- |
+| **Dispatcher** | Understands the question, routes it and rejects off-topic or manipulative requests | supervisor (`supervisor.py`, `guardrails.py`; ADK agent `dispatcher`) |
+| **Analyst** | Pulls the data through MCP connectors and runs the load forecast | worker (`worker.py`, `specialists.py`; ADK agent `analyst`) |
+| **Inspector** | Recomputes key numbers from the raw data before anything is shown — ground truth, knowledge-base boundaries and the **quality database** through its MCP server | evaluator (`evaluator.py`, `quality_mcp.py`; events / spans `inspector.*`) |
+| **Writer** | Produces a one-screen brief: verdict, evidence, do-now, caveat, sources | writer (`writer.py`) |
+
+ADK events, trace spans (`dispatcher.plan`, `analyst.loop`, `analyst.execute`, `analyst_inspector.round`, `inspector.check`, `inspector.llm`, `inspector.quality_mcp`), the dashboard, the operator desktop and the Sources line ("Inspector: accept") use the pitch names; Python modules, schemas and stored timing keys (`supervisor_s`, `worker_evaluator_s`) keep the code names so stored runs and the API stay compatible. Older traces in the database keep the old span names; the Observability page understands both.
+
 ## 1. Your specification → what exists
 
 | You asked for | Implemented as | Status |

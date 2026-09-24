@@ -82,7 +82,7 @@ def appendix(art: dict) -> str:
     llm = art.get("llm") or []
     t = art.get("timing") or {}
     if t or llm:
-        bits = [f"total {t.get('total_s')} s = supervisor {t.get('supervisor_s')} + worker/evaluator {t.get('worker_evaluator_s')} + writer {t.get('writer_s')}"] if t else []
+        bits = [f"total {t.get('total_s')} s = dispatcher {t.get('supervisor_s')} + analyst/inspector {t.get('worker_evaluator_s')} + writer {t.get('writer_s')}"] if t else []
         if llm:
             bits.append("LLM calls: " + "; ".join(f"{r['role']} {r['model']} {r['seconds']} s ({r.get('tok_in')}→{r.get('tok_out')} tokens)" for r in llm))
         out.append("7. **Time and models:** " + " · ".join(bits) + ".")

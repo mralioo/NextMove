@@ -147,6 +147,8 @@ def links() -> list[dict]:
         "" if snap.exists() else "create it: ./.venv/bin/python scripts/tasks.py cognee-graph (or the button below)")
     add("Operator API (feedback loop)", "Interactive API documentation (Swagger) — score, action report, turns, precedents", f"http://127.0.0.1:{opi}/docs" if opi else None, "api", opi and _port_open(opi),
         "" if opi else "not running: make up")
+    qp = st.get("mcp-quality", {}).get("port")
+    add("Quality MCP server", "MCP endpoint (normalized data + boundaries; the Inspector uses it in-process)", f"http://127.0.0.1:{qp}/mcp" if qp else None, "api", qp and _port_open(qp), "" if qp else "not running: make up")
     add("Knowledge MCP server", "MCP endpoint (for MCP clients; not a web page)", f"http://127.0.0.1:{kn}/mcp" if kn else None, "api", kn and _port_open(kn), "" if kn else "not running: make up")
     add("Knowledge MCP server", "Inspect the tools in a browser", "npx @modelcontextprotocol/inspector", "command", True, f"then connect to http://127.0.0.1:{kn or 8766}/mcp (streamable HTTP)")
     add("LangSmith", "LangSmith (only if you run `./.venv/bin/python scripts/tasks.py ls-eval --upload`)", "https://smith.langchain.com", "ui", bool(os.environ.get("LANGSMITH_API_KEY")), "" if os.environ.get("LANGSMITH_API_KEY") else "LANGSMITH_API_KEY not set: evaluations stay offline")

@@ -1,8 +1,9 @@
-"""The pipeline as ADK agents:  supervisor -> worker -> writer   (SequentialAgent).
+"""The pipeline as ADK agents:  Dispatcher -> Analyst (⇄ Inspector) -> Writer   (SequentialAgent). Names as in the pitch; code names in brackets.
 
-  supervisor  input guardrails, category + parameters, follow-up / history, objective and route (supervisor.py)
-  worker      the worker <-> evaluator loop (loop.py): the specialist's MCP playbook, checked against ground truth, revised if needed
-  writer      verdict -> evidence -> sources: one small-LLM call + deterministic guard (writer.py); fixed text for bounce / history
+  Dispatcher  [supervisor]  understands the question, routes it and rejects off-topic or manipulative requests (supervisor.py, guardrails.py)
+  Analyst     [worker]      pulls the data through MCP connectors and runs the load forecast (worker.py, specialists.py)
+  Inspector   [evaluator]   recomputes key numbers from the raw data before anything is shown: ground truth, knowledge-base boundaries and the QUALITY DATABASE via its MCP server (evaluator.py, quality_mcp.py)
+  Writer                    produces a one-screen brief: verdict, evidence, do-now, caveat, sources — one small-LLM call + deterministic guard (writer.py); fixed text for bounce / history
 
 Stages hand over typed messages (schemas.py) in session state ("sp", "result", "verdict"; plus the legacy "plan" / "facts" dicts the dashboard and metrics
 read). Each stage emits an event (visible in `adk web`) carrying its own timing; the writer's event is the final response. The earlier multi-LLM
@@ -98,11 +99,11 @@ async def _report_from_artifact(q: str, plan: SupervisorPlan, art: dict) -> tupl
 
 
 class SupervisorAgent(BaseAgent):
-    """SUPERVISOR: question -> `SupervisorPlan` (schemas.py). Input guardrails (unrelated → bounce), category + parameters, follow-up continuation,
+    """DISPATCHER (code: supervisor): question -> `SupervisorPlan` (schemas.py). Input guardrails (unrelated → bounce), category + parameters, follow-up continuation,
     history hit, objective, route (specialist · MCP servers · datasets · ML engine), knowledge-base boundaries. Deterministic, ~1 ms; a small-LLM JSON
     call only if unsure. Also kicks the MCP server warm-up (no-op if already running)."""
-    name: str = "supervisor"
-    description: str = "Guards scope, classifies, extracts parameters, resolves follow-ups and history, assigns MCP servers / datasets / ML engine and the objective."
+    name: str = "dispatcher"
+    description: str = "Dispatcher — understands the question, routes it (category, parameters, follow-up, history, MCP servers, datasets, ML engine, objective) and rejects off-topic or manipulative requests."
 
     async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
         t0 = time.time()
@@ -129,7 +130,7 @@ class SupervisorAgent(BaseAgent):
                 last, last_facts = lt["plan"], lt["facts"]
                 st["last_facts"], st["last_plan"] = last_facts, last
         data_end = (K.by_id["B-COV"]["value"]["end"][:16] if K is not None and "B-COV" in K.by_id else None)
-        with span("supervisor.plan", **{"tmt.router": CONFIG.router}) as sp:
+        with span("dispatcher.plan", **{"tmt.router": CONFIG.router}) as sp:
             plan = await supervisor.supervise(q, last=last, last_facts=last_facts, kb=K, data_end=data_end)
             set_attr(sp, "tmt.category", plan.category)
             set_attr(sp, "tmt.confidence", plan.confidence)
@@ -161,11 +162,11 @@ class SupervisorAgent(BaseAgent):
 
 
 class WorkerAgent(BaseAgent):
-    """WORKER ⇄ EVALUATOR loop (loop.py): the worker runs the assigned specialist playbook over the MCP tools (datasets, analytics, TabPFN engine) and returns facts
-    + confidence; the evaluator checks them against the objective, the knowledge base (ground truth, boundaries) and the knowledge graph (similar past cases) and
+    """ANALYST ⇄ INSPECTOR loop (loop.py; code: worker ⇄ evaluator): the Analyst runs the assigned specialist playbook over the MCP tools (datasets, analytics, TabPFN engine) and returns facts
+    + confidence; the Inspector recomputes the key numbers from the raw data and checks them against the objective, the knowledge base (ground truth, boundaries) and the knowledge graph (similar past cases) and
     either accepts, asks for a revision (validated adjustments) or rejects. Bounded by the failsafes in guardrails.LIMITS."""
-    name: str = "worker"
-    description: str = "Runs the assigned specialist over MCP tools; the evaluator loop verifies and, if needed, revises."
+    name: str = "analyst"
+    description: str = "Analyst — pulls the data through MCP connectors and runs the load forecast; the Inspector recomputes key numbers from the raw data before anything is shown and, if needed, asks for a revision."
 
     async def _run_async_impl(self, ctx: InvocationContext) -> AsyncGenerator[Event, None]:
         t0 = time.time()
@@ -187,7 +188,7 @@ class WorkerAgent(BaseAgent):
             out = LoopOutcome(result=res, verdict=ver, iterations=[], guardrails=[])
         else:
             from kgraph import kg
-            with span("worker.loop", **{"tmt.category": plan.category, "tmt.tools": plan.route.tools, "tmt.ml_engine": plan.route.ml_engine}) as sp:
+            with span("analyst.loop", **{"tmt.category": plan.category, "tmt.tools": plan.route.tools, "tmt.ml_engine": plan.route.ml_engine}) as sp:
                 out = await worker_evaluator_loop(plan, st.get("last_facts"), get_runtime(), K, kg() if K is not None else None, allow_llm=(CONFIG.memory == "cognee"))
                 set_attr(sp, "tmt.iterations", len(out.iterations))
                 set_attr(sp, "tmt.verdict", out.verdict.verdict)
@@ -212,7 +213,7 @@ class WorkerAgent(BaseAgent):
                               "similar_cases": [c.model_dump() for c in out.verdict.similar_cases]}
         st["facts"], st["timing"] = facts, timing
         name = specialists.SPECIALISTS[plan.category].name if plan.category in specialists.SPECIALISTS else plan.category.lower()
-        author = f"worker:{name}"
+        author = f"analyst:{name}"
         # ---- the steps, as ADK events (visible in the ADK UI chat and trace): every MCP call as a function_call / function_response pair with its arguments,
         #      result preview and time, then the evaluator's verdict for that round. Custom agents make these calls themselves, so we report them here.
         by_round: dict[int, list] = {}
@@ -231,16 +232,16 @@ class WorkerAgent(BaseAgent):
             for r in it.get("llm", []):
                 yield _llm_event("evaluator", r, t_start)
             yield Event(author=author, content=types.Content(role="model", parts=[types.Part(text=(
-                f"[worker round {it['i']} · {it['worker_s']} s] {name} · engine {it['engine']} · tools {it['tools']} · status {it['status']} · confidence {it['confidence']}"))]),
+                f"[analyst round {it['i']} · {it['worker_s']} s] {name} · engine {it['engine']} · tools {it['tools']} · status {it['status']} · confidence {it['confidence']}"))]),
                 custom_metadata={"round": it["i"], "kind": "worker_round", "seconds": it["worker_s"], "started_at_ms": _ms(it.get("started"), t_start), "tools": it["tools"],
                                  "engine": it["engine"], "confidence": it["confidence"], "overrides": it.get("overrides")})
-            yield Event(author="evaluator", content=types.Content(role="model", parts=[types.Part(text=(
-                f"[evaluator round {it['i']} · {it['evaluator_s']} s] {it['verdict']} · score {it['score']} · confidence {it['confidence']} · model {it['model']}"
+            yield Event(author="inspector", content=types.Content(role="model", parts=[types.Part(text=(
+                f"[inspector round {it['i']} · {it['evaluator_s']} s] {it['verdict']} · score {it['score']} · confidence {it['confidence']} · model {it['model']}"
                 + (f" · issues: {'; '.join(it['issues'])}" if it.get("issues") else "") + (f" · adjustments: {it['adjustments']}" if it.get("adjustments") else "")))]),
                 custom_metadata={"round": it["i"], "kind": "evaluator", "seconds": it["evaluator_s"], "model": it["model"], "verdict": it["verdict"], "score": it["score"],
                                  "issues": it.get("issues"), "adjustments": it.get("adjustments"), "llm_calls": len(it.get("llm", []))})
         yield Event(author=author, content=types.Content(role="model", parts=[types.Part(
-            text=f"[facts · worker+evaluator {timing['tools_s']} s] confidence {out.result.confidence} · verdict {out.verdict.verdict} · {json.dumps(facts, ensure_ascii=False, separators=(',', ':'))[:1800]}")]),
+            text=f"[facts · analyst+inspector {timing['tools_s']} s] confidence {out.result.confidence} · verdict {out.verdict.verdict} · {json.dumps(facts, ensure_ascii=False, separators=(',', ':'))[:1800]}")]),
             custom_metadata={"kind": "facts", "seconds": timing["tools_s"], "mcp_s": round(sum(c.seconds for _, c in out.calls), 3), "rounds": len(out.iterations)},
             actions=EventActions(state_delta={"facts": facts, "timing": timing, "result": out.result.model_dump(exclude={"facts"}, mode="json"), "verdict": out.verdict.model_dump(mode="json")}))
 
@@ -397,7 +398,7 @@ class WriterAgent(BaseAgent):
             yield _llm_event(self.name, r, t_start)
         delta["timing"] = timing
         yield Event(author=self.name, content=types.Content(role="model", parts=[types.Part(text=(
-            f"[timing] total {total} s = supervisor {parts['supervisor_s']} s + worker/evaluator {parts['worker_evaluator_s']} s (of which MCP calls {parts['mcp_s']} s, summed over parallel calls) "
+            f"[timing] total {total} s = dispatcher {parts['supervisor_s']} s + analyst/inspector {parts['worker_evaluator_s']} s (of which MCP calls {parts['mcp_s']} s, summed over parallel calls) "
             f"+ writer {parts['writer_s']} s (LLM inference {parts['writer_llm_s']} s)"))]), custom_metadata={"kind": "timing", **parts})
         final = _text_event(self.name, answer, delta)
         final.custom_metadata = {"kind": "answer", "source": source, "answer_mode": mode if source in ("worker", "follow_up") else None, "answer_words": len(answer.split()),
@@ -474,6 +475,8 @@ def build_fast_agent() -> SequentialAgent:
     init_tracing()
     if os.environ.get("WARM_ON_START", "1") != "0":
         get_runtime()          # start the MCP server now: its warm-up overlaps with agent start-up / the user typing
+        import quality_mcp
+        quality_mcp.warm()     # the Inspector's quality database (normalized data + boundaries), loaded in the background
         if os.environ.get("WARM_LLM", "1") != "0":     # one tiny call; skipped by the evaluation harness
             import threading
             threading.Thread(target=writer.warm_connection, daemon=True, name="llm-warm").start()

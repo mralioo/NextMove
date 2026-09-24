@@ -75,7 +75,7 @@ async def run_worker(task: WorkerTask, last_facts: dict | None, mcp, kb=None) ->
     calls: list = []
     token = CALL_LOG.set(calls)                                    # every MCP call in this task (also the parallel ones) is logged with args and result preview
     try:
-        with span("worker.execute", **{"tmt.iteration": task.iteration, "tmt.category": task.category, "tmt.specialist": task.route.specialist, "tmt.mcp_servers": task.route.mcp_servers,
+        with span("analyst.execute", **{"tmt.iteration": task.iteration, "tmt.category": task.category, "tmt.specialist": task.route.specialist, "tmt.mcp_servers": task.route.mcp_servers,
                                         "tmt.tools_planned": task.route.tools, "tmt.datasets": task.route.datasets, "tmt.ml_engine": task.route.ml_engine, "tmt.overrides": task.overrides,
                                         "tmt.task": payload(task.model_dump(exclude={"parts"}, mode="json"), 4000)}) as sp:
             facts, trace = await executor.execute(plan, task.question, last_facts, mcp)

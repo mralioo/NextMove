@@ -102,7 +102,7 @@ def _short(t: str, n: int = 90) -> str:
 @app.post("/api/v1/chat", tags=["chat"])
 def chat(body: ChatBody) -> dict:
     """Ask the agent. Returns the answer (Markdown) plus everything the desktop shows next to it: `turn_id` / `artifact_turn_id` / `requires_action` / `precedent` (for feedback),
-    `steps` (operations log), `tools`, `llm`, `tokens` {in,out,total,estimated}, `timing` {supervisor_s, worker_evaluator_s, mcp_s, writer_s, total_s}, `counts`.
+    `steps` (operations log), `tools`, `llm`, `tokens` {in,out,total,estimated}, `timing` {supervisor_s (Dispatcher), worker_evaluator_s (Analyst + Inspector), mcp_s, writer_s, total_s}, `counts`.
 
     **One conversation = one situation.** With an existing `session_id` and `context_mode = auto`, a message that is not clearly about the conversation's situation (another kind of question,
     other line / station / event, or a vague short message) is NOT sent to the agent. The response is `{"needs_choice": true, "relation", "reason", "anchor", "choices", "recommended", "message"}`;
